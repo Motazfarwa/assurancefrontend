@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listLoginUsers } from '../../services/authApi';
 
-const ADMIN_USER = 'admin';
+const ADMIN_USER = 'Admin';
 
 export default function LoginForm() {
   const { login } = useAuth();
