@@ -1,6 +1,6 @@
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000";
+  import.meta.env.VITE_API_URL || "http://https://assurancebackend.onrender.com";
 
 export async function createPolice(payload) {
   const response = await fetch(

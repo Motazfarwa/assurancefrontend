@@ -1,4 +1,4 @@
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://https://assurancebackend.onrender.com').replace(/\/$/, '');
 
 async function request(accessToken, path, options = {}) {
   let response;
