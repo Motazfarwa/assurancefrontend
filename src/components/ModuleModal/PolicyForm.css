@@ -131,6 +131,20 @@
   row-gap: 9px;
 }
 
+/* Identification: 6 columns so code/nom branche sit side by side, compact. */
+.policy-modal-expanded .pf-grid.pf-grid-identification {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.policy-modal-expanded .pf-grid-identification > .pf-field {
+  grid-column: span 2;
+}
+
+.policy-modal-expanded .pf-grid-identification > .pf-field-branche-nom,
+.policy-modal-expanded .pf-grid-identification > .pf-field-code-branche {
+  grid-column: span 1;
+}
+
 .policy-modal-expanded .pf-field {
   display: flex;
   flex-direction: column;

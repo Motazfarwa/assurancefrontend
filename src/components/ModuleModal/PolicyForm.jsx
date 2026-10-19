@@ -362,8 +362,8 @@ export default function PolicyForm({ onClose }) {
 
             <section className="pf-section pf-identification">
                 <h3>Identification de la police</h3>
-                <div className="pf-grid">
-                    <label className="pf-field">
+                <div className="pf-grid pf-grid-identification">
+                    <label className="pf-field pf-field-wide">
                         <span>Compagnie *</span>
 
                         <select
@@ -388,7 +388,7 @@ export default function PolicyForm({ onClose }) {
                         )}
                     </label>
 
-                    <label className="pf-field">
+                    <label className="pf-field pf-field-code-branche">
                         <span>Code branche *</span>
                         <input
                             type="text"
@@ -405,17 +405,7 @@ export default function PolicyForm({ onClose }) {
                         />
                     </label>
 
-                    <label className="pf-field">
-                        <span>N° Police *</span>
-                        <input
-                            value={values.num_police}
-                            maxLength={12}
-                            onChange={e => handleNumberChange(e.target.value)}
-                            placeholder="202601156895"
-                        />
-                    </label>
-
-                    <label className="pf-field">
+                    <label className="pf-field pf-field-branche-nom">
                         <span>Nom branche</span>
                         <input
                             type="text"
@@ -432,6 +422,16 @@ export default function PolicyForm({ onClose }) {
                                 {brancheError}
                             </small>
                         )}
+                    </label>
+
+                    <label className="pf-field pf-field-wide">
+                        <span>N° Police *</span>
+                        <input
+                            value={values.num_police}
+                            maxLength={12}
+                            onChange={e => handleNumberChange(e.target.value)}
+                            placeholder="202601156895"
+                        />
                     </label>
 
                     {field("Code client", "code_client")}
