@@ -10,15 +10,6 @@ installAuthFetch();
 const AuthContext = createContext(null);
 const REFRESH_MARGIN_MS = 60 * 1000;
 
-// Predefined administrator, checked in the browser without the database.
-const LOCAL_ADMIN = { username: 'admin', password: '123' };
-const LOCAL_ADMIN_KEY = 'assurance-local-admin';
-const LOCAL_ADMIN_USER = { name: LOCAL_ADMIN.username, username: LOCAL_ADMIN.username, lieu: null, role: 'admin', isAdmin: true };
-
-function hasLocalAdminSession() {
-  return Boolean(window.localStorage.getItem(LOCAL_ADMIN_KEY) || window.sessionStorage.getItem(LOCAL_ADMIN_KEY));
-}
-
 function normalizeUser(user) {
   if (!user || !user.username) throw new Error('Le serveur a renvoye un profil utilisateur invalide.');
   const role = typeof user.role === 'string' ? user.role.toLowerCase() : null;
@@ -33,13 +24,13 @@ function normalizeUser(user) {
 
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(getStoredToken);
-  const [user, setUser] = useState(hasLocalAdminSession() ? LOCAL_ADMIN_USER : null);
-  const [isLoading, setIsLoading] = useState(Boolean(getStoredToken()) && !hasLocalAdminSession());
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(Boolean(getStoredToken()));
 
   useEffect(() => {
     let active = true;
     const token = getStoredToken();
-    if (!token || hasLocalAdminSession()) {
+    if (!token) {
       setIsLoading(false);
       return () => { active = false; };
     }
@@ -84,18 +75,6 @@ export function AuthProvider({ children }) {
   }, [accessToken]);
 
   async function login({ username, password, remember }) {
-    if (username.trim() === LOCAL_ADMIN.username && password === LOCAL_ADMIN.password) {
-      clearStoredToken();
-      const store = remember ? window.localStorage : window.sessionStorage;
-      window.localStorage.removeItem(LOCAL_ADMIN_KEY);
-      window.sessionStorage.removeItem(LOCAL_ADMIN_KEY);
-      store.setItem(LOCAL_ADMIN_KEY, '1');
-      setAccessToken(null);
-      setUser(LOCAL_ADMIN_USER);
-      return LOCAL_ADMIN_USER;
-    }
-    window.localStorage.removeItem(LOCAL_ADMIN_KEY);
-    window.sessionStorage.removeItem(LOCAL_ADMIN_KEY);
     const response = await loginRequest(username.trim(), password);
     if (!response.access_token || !response.user) throw new Error('Reponse de connexion incomplete.');
 
@@ -108,8 +87,6 @@ export function AuthProvider({ children }) {
 
   function logout() {
     clearStoredToken();
-    window.localStorage.removeItem(LOCAL_ADMIN_KEY);
-    window.sessionStorage.removeItem(LOCAL_ADMIN_KEY);
     setAccessToken(null);
     setUser(null);
   }
