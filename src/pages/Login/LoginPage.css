@@ -36,6 +36,9 @@
 .field { display: block; }
 .field > span:first-child { display: block; margin-bottom: 9px; color: #293b49; font-size: 11px; font-weight: 650; }
 .select-row { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 20px; }
+.admin-toggle { height: 47px; border: 1px solid #dce3e7; border-radius: 7px; background: #fff; color: #243746; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.admin-toggle:hover { border-color: #63b9a9; }
+.admin-toggle.is-active { background: #187d78; border-color: #187d78; color: #fff; }
 .select-wrap { position: relative; display: block; }
 .select-wrap select, .input-wrap input { width: 100%; height: 47px; border: 1px solid #dce3e7; border-radius: 7px; outline: none; background: #fff; color: #243746; font: inherit; font-size: 12px; transition: border-color .15s, box-shadow .15s; }
 .select-wrap select { appearance: none; padding: 0 34px 0 12px; cursor: pointer; }
