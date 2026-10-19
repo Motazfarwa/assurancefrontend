@@ -1,4 +1,4 @@
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://https://assurancebackend.onrender.com').replace(/\/$/, '');
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://assurancebackend.onrender.com').replace(/\/$/, '');
 
 export async function listAgencyUnpaid(accessToken, filters) {
   const params = new URLSearchParams();

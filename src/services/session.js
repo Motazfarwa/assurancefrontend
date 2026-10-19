@@ -1,4 +1,4 @@
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://https://assurancebackend.onrender.com').replace(/\/$/, '');
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://assurancebackend.onrender.com').replace(/\/$/, '');
 export const ACCESS_KEY = 'assurance-access-token';
 export const REFRESH_KEY = 'assurance-refresh-token';
 export const TOKENS_CHANGED = 'auth:tokens';

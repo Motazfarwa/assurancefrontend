@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import "./ClientPolicesModal.css";
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "http://https://assurancebackend.onrender.com";
+  import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com";
 
 // Format dates in French
 function formatDate(value) {

@@ -90,7 +90,7 @@ export default function PolicyForm({ onClose }) {
             try {
                 const API_URL =
                     import.meta.env.VITE_API_URL ||
-                    "http://https://assurancebackend.onrender.com";
+                    "https://assurancebackend.onrender.com";
 
                 const response = await fetch(
                     `${API_URL}/api/polices/compagnies`,
@@ -143,7 +143,7 @@ export default function PolicyForm({ onClose }) {
             try {
                 const API_URL =
                     import.meta.env.VITE_API_URL ||
-                    "http://https://assurancebackend.onrender.com";
+                    "https://assurancebackend.onrender.com";
 
                 const params = new URLSearchParams({
                     code_compagnie: String(compagnie),
@@ -310,7 +310,7 @@ export default function PolicyForm({ onClose }) {
 
         try {
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL || "http://https://assurancebackend.onrender.com"}/api/polices`,
+                `${import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com"}/api/polices`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
