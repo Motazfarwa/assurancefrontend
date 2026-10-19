@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-label="Attijariwafa bank">
+  <defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#ffc400"/><stop offset="1" stop-color="#f05a3c"/></linearGradient></defs>
+  <path fill="url(#g)" d="M5 5h150v110H5z"/>
+  <path fill="none" stroke="#252329" stroke-linecap="round" stroke-linejoin="round" stroke-width="13" d="m9 73 29-31 29 32 30-32 28 32 26-30"/>
+  <path fill="#252329" d="M36 77h8v8h-8z"/>
+</svg>

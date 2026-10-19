@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 92" role="img" aria-label="STB Bank">
+  <g fill="#08090b" font-family="Georgia,serif" font-size="42"><text x="4" y="61">STB</text><text x="211" y="61">BANK</text></g>
+  <circle cx="164" cy="46" r="42" fill="#0875bd"/>
+  <circle cx="164" cy="46" r="35" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <g fill="#fff" font-family="serif" font-weight="bold" text-anchor="middle"><text x="164" y="34" font-size="19">الشركة</text><text x="164" y="51" font-size="17">التونسية</text><text x="164" y="68" font-size="17">للبنك</text></g>
+</svg>

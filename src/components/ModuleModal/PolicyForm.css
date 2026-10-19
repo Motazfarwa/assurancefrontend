@@ -1,0 +1,308 @@
+/* Gestion des polices - clean, single-screen desktop form.
+   Replace the entire previous PolicyForm.css with this file. */
+
+.policy-modal-expanded .policy-legacy-form {
+  box-sizing: border-box;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 18px 14px;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: auto auto auto auto auto;
+  column-gap: 12px;
+  row-gap: 14px;
+  align-content: stretch;
+  overflow-x: hidden;
+  overflow-y: auto; /* Only scrolls if the available viewport is too short. */
+  color: #233c4b;
+  font-size: 11px;
+}
+
+.policy-modal-expanded .policy-legacy-form *,
+.policy-modal-expanded .policy-legacy-form *::before,
+.policy-modal-expanded .policy-legacy-form *::after {
+  box-sizing: border-box;
+}
+
+/* Toolbar */
+.policy-modal-expanded .pf-toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 7px;
+  border-bottom: 1px solid #dce5eb;
+}
+
+.policy-modal-expanded .pf-toolbar strong {
+  font-size: 11px;
+  font-weight: 700;
+  color: #187d78;
+}
+
+.policy-modal-expanded .pf-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.policy-modal-expanded .pf-toolbar button,
+.policy-modal-expanded .pf-footer button {
+  min-height: 30px;
+  padding: 5px 11px;
+  border: 1px solid #d4dfe5;
+  border-radius: 7px;
+  background: #fff;
+  color: #263d4f;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.policy-modal-expanded .pf-toolbar button[type="submit"],
+.policy-modal-expanded .pf-footer button[type="submit"] {
+  border-color: #187d78;
+  background: #187d78;
+  color: #fff;
+}
+
+.policy-modal-expanded .pf-toolbar button:disabled,
+.policy-modal-expanded .pf-footer button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Sections: intrinsic height prevents overlap and clipping. */
+.policy-modal-expanded .pf-section {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  padding: 12px 12px 10px;
+  border: 1px solid #dce5eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.policy-modal-expanded .pf-section h3 {
+  position: relative;
+  display: table;
+  width: auto;
+  margin: -20px 0 10px;
+  padding: 0 7px;
+  background: #fff;
+  color: #187d78;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.policy-modal-expanded .pf-identification {
+  grid-column: 1 / -1;
+}
+
+.policy-modal-expanded .pf-policy-info {
+  grid-column: 1 / 7;
+}
+
+.policy-modal-expanded .pf-quittance-info {
+  grid-column: 7 / -1;
+}
+
+.policy-modal-expanded .pf-observation-section {
+  grid-column: 1 / -1;
+}
+
+/* Inputs: four columns in each section. */
+.policy-modal-expanded .pf-grid,
+.policy-modal-expanded .pf-grid-four {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 10px;
+  row-gap: 9px;
+}
+
+.policy-modal-expanded .pf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  color: #334957;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.policy-modal-expanded .pf-field > span {
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.policy-modal-expanded .pf-field input,
+.policy-modal-expanded .pf-field select,
+.policy-modal-expanded .pf-field textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 5px 7px;
+  border: 1px solid #d2dfe5;
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: #233c4b;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.policy-modal-expanded .pf-field input:focus,
+.policy-modal-expanded .pf-field select:focus,
+.policy-modal-expanded .pf-observation:focus {
+  border-color: #63b9a9;
+  box-shadow: 0 0 0 2px rgba(99, 185, 169, 0.14);
+  outline: none;
+}
+
+/* Insurance-option checkboxes */
+.policy-modal-expanded .pf-check-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 13px;
+  margin: 0 0 11px;
+}
+
+.policy-modal-expanded .pf-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.policy-modal-expanded .pf-check input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: #187d78;
+}
+
+/* Observation */
+.policy-modal-expanded .pf-observation {
+  display: block;
+  width: 100%;
+  height: 38px;
+  min-height: 38px;
+  margin: 0;
+  padding: 7px 9px;
+  resize: none;
+  border: 1px solid #d2dfe5;
+  border-radius: 6px;
+  background: #fff;
+  color: #233c4b;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+/* Validation messages */
+.policy-modal-expanded .pf-error,
+.policy-modal-expanded .pf-success {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.policy-modal-expanded .pf-error {
+  color: #b42318;
+  background: #fff1f0;
+}
+
+.policy-modal-expanded .pf-success {
+  color: #08765e;
+  background: #eaf7f3;
+}
+
+/* Footer is pushed toward the bottom of the fixed-height modal. */
+.policy-modal-expanded .pf-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  align-self: end;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 0 0;
+}
+
+/* When an error is displayed, let the grid size itself naturally. */
+.policy-modal-expanded .policy-legacy-form:has(.pf-error) {
+  grid-template-rows: auto;
+}
+
+/* Narrow screens: stack sections and allow vertical scrolling. */
+@media (max-width: 900px) {
+  .policy-modal-expanded .policy-legacy-form {
+    grid-template-rows: auto;
+    align-content: start;
+    padding: 12px;
+  }
+
+  .policy-modal-expanded .pf-policy-info,
+  .policy-modal-expanded .pf-quittance-info {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .policy-modal-expanded .pf-grid,
+  .policy-modal-expanded .pf-grid-four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 370px) {
+  .policy-modal-expanded .pf-grid,
+  .policy-modal-expanded .pf-grid-four {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pf-branch-error {
+  color: #b42318;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.policy-modal-expanded .pf-field input[readonly] {
+  background: #f4f8f9;
+  color: #187d78;
+  font-weight: 600;
+}
+.pf-view-client-button {
+  background: #eaf6f3 !important;
+  color: #187d78 !important;
+  border: 1px solid #b8ddd5 !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.pf-view-client-button:hover {
+  background: #d8eee8 !important;
+}
