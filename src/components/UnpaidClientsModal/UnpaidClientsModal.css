@@ -5,4 +5,7 @@
 .unpaid-clients-toggle label.is-active { background: #20796e; color: #fff; }
 .unpaid-clients-toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .unpaid-clients-tools > input { width: 260px; max-width: 100%; height: 34px; padding: 0 11px; border: 1px solid #d2dfe5; border-radius: 7px; font: inherit; font-size: 12px; }
+.unpaid-clients-tools > select { width: 200px; max-width: 100%; height: 34px; padding: 0 8px; border: 1px solid #d2dfe5; border-radius: 7px; background: #fff; font: inherit; font-size: 12px; }
+.unpaid-clients-tools > select:first-of-type { flex: 1 1 200px; max-width: 280px; }
+.unpaid-clients-tools > input:disabled { background: #f4f7f8; cursor: not-allowed; }
 .unpaid-clients-tools > input:focus { border-color: #63b9a9; box-shadow: 0 0 0 2px rgba(99, 185, 169, .16); outline: none; }

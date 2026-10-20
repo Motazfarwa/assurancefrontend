@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { listClientSettlements } from '../../services/unpaidApi';
+import { listClientSettlements, listSettlementClients } from '../../services/unpaidApi';
 import './UnpaidClientsModal.css';
 
 const COLUMNS = [
   ['code_client', 'Code client'], ['nom_client', 'Client'], ['num_quittance', 'N° quittance'],
-  ['Periode', 'Période'], ['echeance', 'Échéance'], ['prime_total', 'Prime totale'], ['montant_regle', 'Montant réglé'], ['solde_quittance', 'Solde'],
+  ['Periode', 'Période'], ['echeance', 'Échéance'], ['prime_total', 'Prime totale'], ['montant_regle', 'Montant réglé'], ['solde_quittance', 'Solde'], ['acompte_solde', 'Acompte / Solde'],
 ];
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
@@ -18,13 +18,23 @@ function format(key, value) {
 export default function UnpaidClientsModal({ accessToken, onClose }) {
   const [statut, setStatut] = useState('impaye');
   const [search, setSearch] = useState('');
+  const [acompteSolde, setAcompteSolde] = useState('');
+  const [clientCode, setClientCode] = useState('');
+  const [clients, setClients] = useState([]);
   const [state, setState] = useState({ loading: true, error: '', items: [], limit: 0 });
 
   useEffect(() => {
     let active = true;
+    listSettlementClients(accessToken).then((items) => { if (active) setClients(items); }).catch(() => {});
+    return () => { active = false; };
+  }, [accessToken]);
+
+  useEffect(() => {
+    let active = true;
     const text = search.trim();
-    const filters = { statut };
-    if (text) filters[/^\d+$/.test(text) ? 'code_client' : 'nom_client'] = text;
+    const filters = { statut, acompte_solde: acompteSolde };
+    if (clientCode) filters.code_client = clientCode;
+    else if (text) filters[/^\d+$/.test(text) ? 'code_client' : 'nom_client'] = text;
     setState((current) => ({ ...current, loading: true, error: '' }));
     const timer = window.setTimeout(async () => {
       try {
@@ -35,7 +45,7 @@ export default function UnpaidClientsModal({ accessToken, onClose }) {
       }
     }, 300);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [accessToken, statut, search]);
+  }, [accessToken, statut, search, acompteSolde, clientCode]);
 
   return <div className="client-records-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="client-records-dialog unpaid-clients-dialog" role="dialog" aria-modal="true" aria-label="Visualisation des clients">
@@ -45,7 +55,16 @@ export default function UnpaidClientsModal({ accessToken, onClose }) {
           <label className={statut === 'impaye' ? 'is-active' : ''}><input type="radio" name="statut" checked={statut === 'impaye'} onChange={() => setStatut('impaye')} /> Clients impayés</label>
           <label className={statut === 'paye' ? 'is-active' : ''}><input type="radio" name="statut" checked={statut === 'paye'} onChange={() => setStatut('paye')} /> Clients payés</label>
         </div>
-        <input type="search" placeholder="Code ou nom du client" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <select value={clientCode} onChange={(event) => setClientCode(event.target.value)} aria-label="Filtrer par client">
+          <option value="">Tous les clients</option>
+          {clients.map((client) => <option key={client.code_client} value={client.code_client}>{client.code_client} — {client.nom_client || 'Sans nom'}</option>)}
+        </select>
+        <select value={acompteSolde} onChange={(event) => setAcompteSolde(event.target.value)} aria-label="Filtrer par acompte ou solde">
+          <option value="">Acompte / Solde</option>
+          <option value="S">S — Solde</option>
+          <option value="A">A — Acompte</option>
+        </select>
+        <input type="search" placeholder="Code ou nom du client" value={search} onChange={(event) => setSearch(event.target.value)} disabled={Boolean(clientCode)} />
       </div>
       {state.loading ? <p className="client-records-message">Chargement…</p> : state.error ? <p className="client-records-message is-error">{state.error}</p> : state.items.length === 0 ? <p className="client-records-message">Aucun client trouvé.</p> : <div className="client-records-table-wrap"><table><thead><tr>{COLUMNS.map(([, label]) => <th key={label}>{label}</th>)}</tr></thead><tbody>{state.items.map((row, index) => <tr key={`${row.num_quittance || row.code_client}-${index}`}>{COLUMNS.map(([key]) => <td key={key}>{format(key, row[key])}</td>)}</tr>)}</tbody></table></div>}
       <footer><span>{state.loading ? '' : `${state.items.length} résultat${state.items.length > 1 ? 's' : ''}${state.limit && state.items.length >= state.limit ? ` — limité à ${state.limit}` : ''}`}</span><button className="client-secondary-button" type="button" onClick={onClose}>Fermer</button></footer>

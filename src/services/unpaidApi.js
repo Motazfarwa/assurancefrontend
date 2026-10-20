@@ -37,6 +37,20 @@ export async function listClientSettlements(accessToken, filters) {
   return body;
 }
 
+export async function listSettlementClients(accessToken) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/impayes-agence/reglements/clients`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new Error(`Impossible de joindre l'API (${API_BASE_URL}). Vérifiez que FastAPI est démarré.`);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Impossible de charger les clients.');
+  return body.items || [];
+}
+
 export async function listAgencyUnpaidCompanies(accessToken) {
   let response;
   try {
