@@ -18,6 +18,25 @@ export async function listAgencyUnpaid(accessToken, filters) {
   return body;
 }
 
+// Clients paid / unpaid according to their settlements (TRDetRegCli).
+export async function listClientSettlements(accessToken, filters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== '' && value != null) params.set(key, String(value));
+  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/impayes-agence/reglements?${params.toString()}`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new Error(`Impossible de joindre l'API (${API_BASE_URL}). Vérifiez que FastAPI est démarré.`);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Impossible de charger les clients.');
+  return body;
+}
+
 export async function listAgencyUnpaidCompanies(accessToken) {
   let response;
   try {

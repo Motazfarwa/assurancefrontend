@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { listAgencyUnpaid } from '../../services/unpaidApi';
+import { listClientSettlements } from '../../services/unpaidApi';
 import './UnpaidClientsModal.css';
 
 const COLUMNS = [
-  ['code_client', 'Code client'], ['nom_client', 'Client'], ['nom_compagnie', 'Compagnie'], ['num_quittance', 'N° quittance'],
-  ['Periode', 'Période'], ['echeance', 'Échéance'], ['prime_total', 'Prime totale'], ['solde_quittance', 'Solde'], ['Total_Piece', 'Total pièce'],
+  ['code_client', 'Code client'], ['nom_client', 'Client'], ['num_quittance', 'N° quittance'],
+  ['Periode', 'Période'], ['echeance', 'Échéance'], ['prime_total', 'Prime totale'], ['montant_regle', 'Montant réglé'], ['solde_quittance', 'Solde'],
 ];
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
 function format(key, value) {
   if (value == null || value === '') return '—';
   if (key === 'echeance') return String(value).slice(0, 10).split('-').reverse().join('/');
-  if (['prime_total', 'solde_quittance', 'Total_Piece'].includes(key)) return money.format(Number(value));
+  if (['prime_total', 'montant_regle', 'solde_quittance'].includes(key)) return money.format(Number(value));
   return String(value);
 }
 
@@ -28,7 +28,7 @@ export default function UnpaidClientsModal({ accessToken, onClose }) {
     setState((current) => ({ ...current, loading: true, error: '' }));
     const timer = window.setTimeout(async () => {
       try {
-        const body = await listAgencyUnpaid(accessToken, filters);
+        const body = await listClientSettlements(accessToken, filters);
         if (active) setState({ loading: false, error: '', items: body.items || [], limit: body.limit });
       } catch (error) {
         if (active) setState({ loading: false, error: error.message, items: [], limit: 0 });
