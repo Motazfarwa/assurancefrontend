@@ -171,3 +171,30 @@
 
 /* Visualiser + Nouveau client sit together on the right */
 .client-view-tabs .client-new-button + .client-new-button { margin-left: 8px; }
+
+/* Read-only code client */
+.client-field-readonly input, .client-field input:read-only { background: #eef3f4; color: #4b6470; font-weight: 700; cursor: not-allowed; }
+
+/* Nom / Prénom autocomplete */
+.client-autocomplete { position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.client-autocomplete > label { display: flex; flex-direction: column; gap: inherit; }
+.client-autocomplete small { font-size: 8px; font-weight: 600; }
+.client-autocomplete-ok { color: #1f796e; }
+.client-autocomplete-warn { color: #b45309; }
+.client-autocomplete-list { position: absolute; z-index: 30; top: 100%; left: 0; right: 0; margin: 2px 0 0; padding: 4px; list-style: none; max-height: 190px; overflow-y: auto; border: 1px solid #cfe0e4; border-radius: 8px; background: #fff; box-shadow: 0 8px 22px rgba(20, 50, 60, .16); }
+.client-autocomplete-list button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; font: inherit; }
+.client-autocomplete-list button:hover { background: #eff8f5; }
+.client-autocomplete-list strong { font-size: 10px; color: #1f3a46; }
+.client-autocomplete-list span { font-size: 8px; color: #6a8089; }
+
+/* Gestion police / quittance / sinistre */
+.client-action-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 22px; border-bottom: 1px solid #edf1f2; background: #fff; }
+.client-action-bar > span { margin-right: 4px; color: #6a8089; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.client-action-button { padding: 7px 13px; border: 1px solid #cfe5df; border-radius: 7px; background: #eff8f5; color: #1f796e; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+.client-action-button:hover:not(:disabled) { background: #e1f2ec; }
+.client-action-button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Observation (step 2) */
+.client-observation-section textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d2dfe5; border-radius: 7px; font: inherit; font-size: 11px; line-height: 1.45; resize: vertical; min-height: 84px; }
+.client-observation-section textarea:focus { border-color: #63b9a9; box-shadow: 0 0 0 2px rgba(99, 185, 169, .16); outline: none; }
+.client-observation-count { align-self: flex-end; color: #8a9aa2; font-size: 8px; }

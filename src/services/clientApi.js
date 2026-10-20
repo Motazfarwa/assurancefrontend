@@ -43,6 +43,30 @@ export async function getClientByCode(accessToken, code) {
   return normalizeClientRecord(body);
 }
 
+// Last client code + 1. Uses the dedicated endpoint, or falls back to scanning the client list.
+export async function getNextClientCode(accessToken) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/clients/next-code`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (response.ok && body.next_code) return String(body.next_code);
+  } catch { /* fall through to the list */ }
+  const clients = await listClients(accessToken);
+  const last = clients.reduce((max, item) => (/^\d+$/.test(item.code_client) ? Math.max(max, Number(item.code_client)) : max), 0);
+  return String(last + 1);
+}
+
+// Clients whose code or name contains the text (used for autocomplete and duplicate checks).
+export async function searchClients(accessToken, text, limit = 8) {
+  const response = await fetch(`${API_BASE_URL}/api/clients?q=${encodeURIComponent(text)}&limit=${limit}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Recherche impossible.');
+  return Array.isArray(body.items) ? body.items.map(normalizeClientRecord) : [];
+}
+
 export function toClientPayload(client) {
   const civilStatus = { Celibataire: 'C', 'Marie(e)': 'M', 'Divorce(e)': 'D', 'Veuf / Veuve': 'V' };
   const dateTimestamp = (value) => value ? `${value.slice(0, 10)}T00:00:00` : null;

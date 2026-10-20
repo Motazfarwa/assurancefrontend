@@ -48,16 +48,21 @@ const FORM_FIELDS = {
   ],
 };
 
-function Field({ field }) {
+function Field({ field, lockedValue }) {
   const [name, label, type, required, options] = field;
+  if (lockedValue !== undefined) return <label className="module-form-field"><span>{label}</span><input name={name} type="text" value={lockedValue} readOnly /></label>;
   if (type === 'textarea') return <label className="module-form-field module-form-wide"><span>{label}{required && ' *'}</span><textarea name={name} rows="4" required={required} placeholder="Saisir votre reponse..." /></label>;
   if (type === 'select') return <label className="module-form-field"><span>{label}{required && ' *'}</span><select name={name} required={required} defaultValue=""><option value="" disabled>Selectionner</option>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
   return <label className="module-form-field"><span>{label}{required && ' *'}</span><input name={name} type={type} required={required} placeholder={type === 'number' ? '0.00' : undefined} /></label>;
 }
 
-export default function ModuleModal({ module, category, onClose }) {
+export default function ModuleModal({ module, category, onClose, clientCode = '' }) {
   const [submitted, setSubmitted] = useState(false);
-  const fields = FORM_FIELDS[module.form] || FORM_FIELDS.search;
+  const baseFields = FORM_FIELDS[module.form] || FORM_FIELDS.search;
+  // With a client code the client field comes first and cannot be edited.
+  const fields = clientCode && ['receipt', 'claim'].includes(module.form)
+    ? [['client', 'Code client', 'text'], ...baseFields.filter((field) => field[0] !== 'client')]
+    : baseFields;
   const isReport = module.form === 'report';
   const isPolicy = module.form === 'policy';
   useEffect(() => {
@@ -107,7 +112,7 @@ return (
       </header>
 
       {isPolicy ? (
-        <PolicyForm onClose={onClose} />
+        <PolicyForm clientCode={clientCode} />
       ) : submitted ? (
         <div className="module-form-success">
           <span className="success-mark">✓</span>
@@ -138,7 +143,7 @@ return (
 
           <div className="module-form-grid">
             {fields.map(field => (
-              <Field key={field[0]} field={field} />
+              <Field key={field[0]} field={field} lockedValue={clientCode && field[0] === 'client' ? clientCode : undefined} />
             ))}
           </div>
 

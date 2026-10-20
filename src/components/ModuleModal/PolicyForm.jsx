@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./PolicyForm.css";
 import ClientPolicesModal from "./ClientPolicesModal";
 
@@ -40,35 +40,60 @@ const initialValues = {
     observation: ""
 };
 
-const POLICE_FIELDS = [
-    "num_police", "code_compagnie", "code_client",
-    "code_branche", "date_creation", "renouvelable",
-    "duree", "effet", "heure_effet", "echeance",
-    "expiration", "etat", "date_mvt", "risque",
-    "hors_taxe", "tous_risque", "participation",
-    "num_imat", "obser"
-];
+const API_URL = import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com";
 
-const MONEY_FIELDS = [
-    "prime_net", "commission", "prime_total",
-    "taxe", "timbre", "cout_attestation",
-    "montant_quittance", "solde_quittance"
-];
+const asDate = (value) =>
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : value ?? "";
+const asText = (value) => (value == null ? "" : String(value));
+const asFlag = (value) => value === "O" || value === true;
+const asTime = (value) => {
+    const match = typeof value === "string" ? value.match(/(\d{2}):(\d{2})/) : null;
+    return match ? `${match[1]}:${match[2]}` : "00:00";
+};
 
-const DATE_FIELDS = [
-    "date_creation", "effet", "expiration",
-    "date_mvt", "date_saisie", "date_emission"
-];
-
-function toTimestamp(value) {
-    if (!value) return null;
-    return value.length === 10
-        ? `${value}T00:00:00`
-        : value;
+// Backend policy + receipt record -> form values.
+function fromDetail({ police: p = {}, quittance: q = {} }) {
+    q = q || {};
+    return {
+        num_police: asText(p.num_police).trim(),
+        code_compagnie: asText(p.code_compagnie),
+        code_client: asText(p.code_client).trim(),
+        code_branche: asText(p.code_branche).trim(),
+        date_creation: asDate(p.date_creation),
+        renouvelable: asFlag(p.renouv_an),
+        duree: asText(p.duree),
+        effet: asDate(p.effet),
+        heure_effet: asTime(p.heure_effet),
+        echeance: asDate(p.echeance),
+        expiration: asDate(p.expiration),
+        etat: asText(p.etat),
+        date_mvt: asDate(p.date_mvt),
+        risque: asText(p.risque),
+        hors_taxe: asFlag(p.hors_taxe),
+        tous_risque: asFlag(p.tous_risque),
+        participation: asFlag(p.participation),
+        num_imat: asText(p.num_imat),
+        date_saisie: asDate(q.date_saisie),
+        date_emission: asDate(q.date_emission),
+        periode: asText(q.periode),
+        prime_net: asText(q.prime_net ?? p.prime_net),
+        commission: asText(q.commission ?? p.commission),
+        prime_total: asText(q.prime_total ?? p.prime_total),
+        taxe: asText(q.taxe),
+        timbre: asText(q.timbre),
+        cout_attestation: asText(q.cout_attestation),
+        montant_quittance: asText(q.montant_quittance),
+        solde_quittance: asText(q.solde_quittance),
+        num_attestation: asText(q.num_attestation),
+        observation: asText(q.observation ?? p.obser)
+    };
 }
 
-export default function PolicyForm({ onClose }) {
-    const [values, setValues] = useState(initialValues);
+export default function PolicyForm({ clientCode = "" }) {
+    const loadedKey = useRef("");
+    const [values, setValues] = useState(
+        clientCode ? { ...initialValues, code_client: clientCode } : initialValues
+    );
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
@@ -215,6 +240,7 @@ export default function PolicyForm({ onClose }) {
                     type={type}
                     step={type === "number" ? "any" : undefined}
                     value={values[name]}
+                    readOnly={name !== "code_client" || Boolean(clientCode)}
                     onChange={e => update(name, e.target.value)}
                 />
             )}
@@ -226,7 +252,8 @@ export default function PolicyForm({ onClose }) {
             <input
                 type="checkbox"
                 checked={values[name]}
-                onChange={e => update(name, e.target.checked)}
+                disabled
+                readOnly
             />
             {label}
         </label>
@@ -245,105 +272,57 @@ export default function PolicyForm({ onClose }) {
         }));
     };
 
-    async function save(e) {
-        e.preventDefault();
-        setError("");
-        setMessage("");
+    // Typing a policy number (12 digits) or a client code loads the matching policy and its latest receipt.
+    useEffect(() => {
+        const number = values.num_police;
+        const client = values.code_client.trim();
+        const key = number.length === 12 ? `n:${number}` : client ? `c:${client}` : "";
 
-        const v = values;
+        if (!key || key === loadedKey.current) return undefined;
 
-        if (!/^\d{12}$/.test(v.num_police)) {
-            setError(
-                "Le numéro doit contenir 12 chiffres : année + branche + 5 chiffres."
-            );
-            return;
-        }
-
-        if (v.num_police.slice(4, 7) !== v.code_branche) {
-            setError("Le code branche ne correspond pas au numéro de police.");
-            return;
-        }
-
-        if (!v.code_client.trim()) {
-            setError("Veuillez renseigner le client.");
-            return;
-        }
-
-        const police = {};
-        const quittance = {};
-
-        for (const [key, value] of Object.entries(v)) {
-            if (key === "heure_effet") continue;
-
-            let converted = value;
-
-            if (value === "") converted = null;
-            if (DATE_FIELDS.includes(key)) {
-                converted = toTimestamp(value);
-            }
-            if (MONEY_FIELDS.includes(key) && value !== "") {
-                converted = Number(value);
-            }
-            if (
-                ["code_compagnie", "duree"].includes(key) &&
-                value !== ""
-            ) {
-                converted = Number(value);
-            }
-
-            if (POLICE_FIELDS.includes(key)) {
-                police[key] = converted;
-            } else {
-                quittance[key] = converted;
-            }
-        }
-
-        if (v.effet) {
-            police.heure_effet = `${v.effet}T${v.heure_effet}:00`;
-        }
-
-        // The existing schema uses observation on the receipt,
-        // and obser on the policy.
-        quittance.observation = v.observation || "";
-
-        setLoading(true);
-
-        try {
-            const response = await fetch(
-                `${import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com"}/api/polices`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({ police, quittance })
-                }
-            );
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    typeof result.detail === "string"
-                        ? result.detail
-                        : JSON.stringify(result.detail || result)
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            setLoading(true);
+            setError("");
+            setMessage("");
+            try {
+                const params = new URLSearchParams(
+                    key.startsWith("n:") ? { num_police: number } : { code_client: client }
                 );
+                const response = await fetch(`${API_URL}/api/polices/detail?${params}`, {
+                    credentials: "include",
+                    signal: controller.signal
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(
+                        typeof data.detail === "string" ? data.detail : "Recherche impossible"
+                    );
+                }
+                const loaded = fromDetail(data);
+                loadedKey.current = `n:${loaded.num_police}`;
+                setValues(prev => ({ ...prev, ...loaded }));
+                setNomBranche(data.nom_branche || "");
+                if (key.startsWith("c:") && data.matches > 1) {
+                    setMessage(`${data.matches} polices pour ce client — la plus récente est affichée.`);
+                }
+            } catch (err) {
+                if (err.name !== "AbortError") setError(err.message);
+            } finally {
+                if (!controller.signal.aborted) setLoading(false);
             }
+        }, 400);
 
-            setMessage(
-                `Police ${result.num_police} enregistrée. ` +
-                `Quittance : ${result.num_quittance}`
-            );
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }
+        return () => {
+            controller.abort();
+            clearTimeout(timer);
+        };
+    }, [values.num_police, values.code_client]);
 
 
     return (
          <>
-        <form className="policy-legacy-form" onSubmit={save}>
+        <form className="policy-legacy-form" onSubmit={e => e.preventDefault()}>
             <div className="pf-toolbar">
                 <strong>GESTION DES POLICES</strong>
                 <div className="pf-toolbar-actions">
@@ -369,8 +348,7 @@ export default function PolicyForm({ onClose }) {
                         <select
                             name="code_compagnie"
                             value={values.code_compagnie}
-                            onChange={(e) => update("code_compagnie", e.target.value)}
-                            required
+                            disabled
                         >
                             <option value="">Sélectionner une compagnie</option>
 
@@ -394,14 +372,8 @@ export default function PolicyForm({ onClose }) {
                             type="text"
                             value={values.code_branche}
                             maxLength={3}
-                            onChange={(e) =>
-                                update(
-                                    "code_branche",
-                                    e.target.value.replace(/\D/g, "").slice(0, 3)
-                                )
-                            }
+                            readOnly
                             placeholder="Ex : 011"
-                            required
                         />
                     </label>
 
@@ -487,21 +459,14 @@ export default function PolicyForm({ onClose }) {
                 <textarea
                     className="pf-observation"
                     value={values.observation}
-                    onChange={e => update("observation", e.target.value)}
+                    readOnly
                 />
             </section>
 
             {error && <div className="pf-error">{error}</div>}
             {message && <div className="pf-success">{message}</div>}
 
-            <footer className="pf-footer">
-                <button type="button" onClick={onClose}>
-                    Annuler
-                </button>
-                <button type="submit" disabled={loading}>
-                    {loading ? "Enregistrement..." : "Enregistrer"}
-                </button>
-            </footer>
+            {loading && <div className="pf-success">Recherche en cours…</div>}
     </form>
 
     {showClientPolices && (
@@ -509,10 +474,8 @@ export default function PolicyForm({ onClose }) {
         codeClient={values.code_client.trim()}
         onClose={() => setShowClientPolices(false)}
         onSelect={(police) => {
-          // For now: only select and close.
-          // Loading a saved policy for editing requires
-          // a complete policy detail endpoint.
-          console.log("Police sélectionnée :", police);
+          // Selecting a policy shows its details (the lookup effect loads them).
+          update("num_police", String(police.num_police || "").trim());
           setShowClientPolices(false);
         }}
       />
