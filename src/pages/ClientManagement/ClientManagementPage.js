@@ -172,9 +172,17 @@ export default function ClientManagementPage({ modal = false }) {
       setSaving(false);
     }
   }
+  // Picking a suggestion only fills Nom and Prénom; the code and every other field stay as they are.
   function pickExistingClient(record) {
-    setClient({ ...record, _persisted: true });
-    setNotice(`Client existant chargé : code ${record.clientCode}.`);
+    let lastName = record.lastName || '';
+    let firstName = record.firstName || '';
+    if (!lastName && !firstName) {
+      const [first = '', ...others] = String(record.nom_client || '').trim().split(/\s+/);
+      lastName = first;
+      firstName = others.join(' ');
+    }
+    setClient((current) => ({ ...current, lastName, firstName }));
+    setNotice('');
   }
 
   function startNewClient() {
