@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "./PolicyForm.css";
 import ClientPolicesModal from "./ClientPolicesModal";
+import { useAuth } from "../../auth/AuthContext";
 
 const initialValues = {
     // Police
@@ -91,6 +92,7 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
 }
 
 export default function PolicyForm({ clientCode = "" }) {
+    const { accessToken } = useAuth();
     const loadedRef = useRef({ num: "", client: "" });
     const [quittances, setQuittances] = useState([]);
     const [values, setValues] = useState(
@@ -273,6 +275,42 @@ export default function PolicyForm({ clientCode = "" }) {
         }));
     };
 
+    // Fallback built on /client/{code} or /search and the client's receipts (needs a signed-in token).
+    const legacyLookup = async (params, signal) => {
+        const url = params.code_client
+            ? `${API_URL}/api/polices/client/${encodeURIComponent(params.code_client)}`
+            : `${API_URL}/api/polices/search?numero=${encodeURIComponent(params.num_police)}`;
+        const response = await fetch(url, { credentials: 'include', signal });
+        const rows = await response.json().catch(() => []);
+        if (!response.ok || !Array.isArray(rows)) {
+            throw new Error(typeof rows.detail === 'string' ? rows.detail : 'Recherche impossible');
+        }
+        if (rows.length === 0) throw new Error('Aucune police trouvée');
+
+        const police = rows[0];
+        let receipts = [];
+        if (accessToken && police.code_client) {
+            try {
+                const receiptsResponse = await fetch(
+                    `${API_URL}/api/clients/${encodeURIComponent(String(police.code_client).trim())}/receipts?limit=1000`,
+                    { headers: { Authorization: `Bearer ${accessToken}` }, signal }
+                );
+                const body = await receiptsResponse.json().catch(() => ({}));
+                const items = receiptsResponse.ok && Array.isArray(body.items) ? body.items : [];
+                receipts = items.filter(item => String(item.num_int).trim() === String(police.num_int).trim());
+            } catch (err) {
+                if (err.name === 'AbortError') throw err;
+            }
+        }
+        return {
+            police,
+            quittance: receipts[0] || null,
+            quittances: receipts,
+            nom_branche: police.nom_branche,
+            matches: rows.length
+        };
+    };
+
     // Fetches a policy (with its receipts) by number or by client code and fills the form.
     const lookup = async (params, signal) => {
         setLoading(true);
@@ -283,8 +321,11 @@ export default function PolicyForm({ clientCode = "" }) {
                 credentials: 'include',
                 signal
             });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) {
+            let data = await response.json().catch(() => ({}));
+            // Older backend without /detail: rebuild what we can from the existing endpoints.
+            if (response.status === 405 || (response.status === 404 && data.detail === 'Not Found')) {
+                data = await legacyLookup(params, signal);
+            } else if (!response.ok) {
                 throw new Error(typeof data.detail === 'string' ? data.detail : 'Recherche impossible');
             }
             const loaded = fromDetail(data);
