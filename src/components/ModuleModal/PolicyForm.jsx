@@ -51,6 +51,19 @@ const asTime = (value) => {
     return match ? `${match[1]}:${match[2]}` : "00:00";
 };
 
+const RECEIPT_COLUMNS = [
+    ["num_quittance", "N° quittance"], ["date_saisie", "Date saisie", "date"], ["date_emission", "Émission", "date"],
+    ["echeance", "Échéance", "date"], ["periode", "Période"], ["prime_net", "P. nette", "money"],
+    ["prime_total", "P. totale", "money"], ["montant_quittance", "Montant", "money"], ["solde_quittance", "Solde", "money"]
+];
+
+function formatCell(value, kind) {
+    if (value == null || value === "") return "—";
+    if (kind === "date") return String(value).slice(0, 10).split("-").reverse().join("/");
+    if (kind === "money") return Number(value).toLocaleString("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    return String(value);
+}
+
 // Backend policy + receipt record -> form values.
 function fromDetail({ police: p = {}, quittance: q = {} }) {
     q = q || {};
@@ -73,24 +86,13 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
         tous_risque: asFlag(p.tous_risque),
         participation: asFlag(p.participation),
         num_imat: asText(p.num_imat),
-        date_saisie: asDate(q.date_saisie),
-        date_emission: asDate(q.date_emission),
-        periode: asText(q.periode),
-        prime_net: asText(q.prime_net ?? p.prime_net),
-        commission: asText(q.commission ?? p.commission),
-        prime_total: asText(q.prime_total ?? p.prime_total),
-        taxe: asText(q.taxe),
-        timbre: asText(q.timbre),
-        cout_attestation: asText(q.cout_attestation),
-        montant_quittance: asText(q.montant_quittance),
-        solde_quittance: asText(q.solde_quittance),
-        num_attestation: asText(q.num_attestation),
-        observation: asText(q.observation ?? p.obser)
+        observation: asText(p.obser ?? q.observation)
     };
 }
 
 export default function PolicyForm({ clientCode = "" }) {
-    const loadedKey = useRef("");
+    const loadedRef = useRef({ num: "", client: "" });
+    const [quittances, setQuittances] = useState([]);
     const [values, setValues] = useState(
         clientCode ? { ...initialValues, code_client: clientCode } : initialValues
     );
@@ -240,7 +242,7 @@ export default function PolicyForm({ clientCode = "" }) {
                     type={type}
                     step={type === "number" ? "any" : undefined}
                     value={values[name]}
-                    readOnly={name !== "code_client" || Boolean(clientCode)}
+                    readOnly={name === "code_client" && Boolean(clientCode)}
                     onChange={e => update(name, e.target.value)}
                 />
             )}
@@ -252,8 +254,7 @@ export default function PolicyForm({ clientCode = "" }) {
             <input
                 type="checkbox"
                 checked={values[name]}
-                disabled
-                readOnly
+                onChange={e => update(name, e.target.checked)}
             />
             {label}
         </label>
@@ -272,52 +273,57 @@ export default function PolicyForm({ clientCode = "" }) {
         }));
     };
 
-    // Typing a policy number (12 digits) or a client code loads the matching policy and its latest receipt.
+    // Fetches a policy (with its receipts) by number or by client code and fills the form.
+    const lookup = async (params, signal) => {
+        setLoading(true);
+        setError('');
+        setMessage('');
+        try {
+            const response = await fetch(`${API_URL}/api/polices/detail?${new URLSearchParams(params)}`, {
+                credentials: 'include',
+                signal
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(typeof data.detail === 'string' ? data.detail : 'Recherche impossible');
+            }
+            const loaded = fromDetail(data);
+            loadedRef.current = { num: loaded.num_police, client: loaded.code_client };
+            setValues(prev => ({ ...prev, ...loaded }));
+            setNomBranche(data.nom_branche || '');
+            setQuittances(Array.isArray(data.quittances) ? data.quittances : []);
+            if (params.code_client && data.matches > 1) {
+                setMessage(`${data.matches} polices pour ce client — la plus récente est affichée.`);
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                setQuittances([]);
+                setError(err.message);
+            }
+        } finally {
+            if (!signal.aborted) setLoading(false);
+        }
+    };
+
+    // Policy number (12 digits) -> that policy and its receipts.
     useEffect(() => {
         const number = values.num_police;
-        const client = values.code_client.trim();
-        const key = number.length === 12 ? `n:${number}` : client ? `c:${client}` : "";
-
-        if (!key || key === loadedKey.current) return undefined;
-
+        if (number.length !== 12 || number === loadedRef.current.num) return undefined;
         const controller = new AbortController();
-        const timer = setTimeout(async () => {
-            setLoading(true);
-            setError("");
-            setMessage("");
-            try {
-                const params = new URLSearchParams(
-                    key.startsWith("n:") ? { num_police: number } : { code_client: client }
-                );
-                const response = await fetch(`${API_URL}/api/polices/detail?${params}`, {
-                    credentials: "include",
-                    signal: controller.signal
-                });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(
-                        typeof data.detail === "string" ? data.detail : "Recherche impossible"
-                    );
-                }
-                const loaded = fromDetail(data);
-                loadedKey.current = `n:${loaded.num_police}`;
-                setValues(prev => ({ ...prev, ...loaded }));
-                setNomBranche(data.nom_branche || "");
-                if (key.startsWith("c:") && data.matches > 1) {
-                    setMessage(`${data.matches} polices pour ce client — la plus récente est affichée.`);
-                }
-            } catch (err) {
-                if (err.name !== "AbortError") setError(err.message);
-            } finally {
-                if (!controller.signal.aborted) setLoading(false);
-            }
-        }, 400);
+        const timer = setTimeout(() => lookup({ num_police: number }, controller.signal), 400);
+        return () => { controller.abort(); clearTimeout(timer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [values.num_police]);
 
-        return () => {
-            controller.abort();
-            clearTimeout(timer);
-        };
-    }, [values.num_police, values.code_client]);
+    // Client code -> the client's most recent policy and its receipts.
+    useEffect(() => {
+        const client = values.code_client.trim();
+        if (!client || client === loadedRef.current.client) return undefined;
+        const controller = new AbortController();
+        const timer = setTimeout(() => lookup({ code_client: client }, controller.signal), 400);
+        return () => { controller.abort(); clearTimeout(timer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [values.code_client]);
 
 
     return (
@@ -348,7 +354,7 @@ export default function PolicyForm({ clientCode = "" }) {
                         <select
                             name="code_compagnie"
                             value={values.code_compagnie}
-                            disabled
+                            onChange={(e) => update("code_compagnie", e.target.value)}
                         >
                             <option value="">Sélectionner une compagnie</option>
 
@@ -372,7 +378,9 @@ export default function PolicyForm({ clientCode = "" }) {
                             type="text"
                             value={values.code_branche}
                             maxLength={3}
-                            readOnly
+                            onChange={(e) =>
+                                update("code_branche", e.target.value.replace(/\D/g, "").slice(0, 3))
+                            }
                             placeholder="Ex : 011"
                         />
                     </label>
@@ -436,21 +444,27 @@ export default function PolicyForm({ clientCode = "" }) {
             </section>
 
             <section className="pf-section pf-quittance-info">
-                <h3>Informations Quittance</h3>
+                <h3>Visualisation des quittances</h3>
 
-                <div className="pf-grid">
-                    {field("Date saisie", "date_saisie", "date")}
-                    {field("Date émission", "date_emission", "date")}
-                    {field("Période", "periode")}
-                    {field("Prime nette", "prime_net", "number")}
-                    {field("Commission", "commission", "number")}
-                    {field("Prime totale", "prime_total", "number")}
-                    {field("Taxe", "taxe", "number")}
-                    {field("Timbre", "timbre", "number")}
-                    {field("Coût attestation", "cout_attestation", "number")}
-                    {field("Montant quittance", "montant_quittance", "number")}
-                    {field("Solde quittance", "solde_quittance", "number")}
-                    {field("N° Attestation", "num_attestation")}
+                <div className="pf-receipts-wrap">
+                    <table className="pf-receipts">
+                        <thead>
+                            <tr>
+                                {RECEIPT_COLUMNS.map(([, label]) => <th key={label}>{label}</th>)}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {quittances.length === 0 ? (
+                                <tr><td colSpan={RECEIPT_COLUMNS.length} className="pf-receipts-empty">Aucune quittance à afficher</td></tr>
+                            ) : quittances.map((row, index) => (
+                                <tr key={`${row.num_quittance}-${index}`}>
+                                    {RECEIPT_COLUMNS.map(([key, , kind]) => (
+                                        <td key={key} className={kind === "money" ? "is-number" : undefined}>{formatCell(row[key], kind)}</td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </section>
 
@@ -459,7 +473,7 @@ export default function PolicyForm({ clientCode = "" }) {
                 <textarea
                     className="pf-observation"
                     value={values.observation}
-                    readOnly
+                    onChange={e => update("observation", e.target.value)}
                 />
             </section>
 

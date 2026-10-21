@@ -338,3 +338,22 @@
 .policy-modal-expanded .pf-check input { width: 15px; height: 15px; }
 .policy-modal-expanded .pf-check-row { margin-bottom: clamp(6px, 1.2vh, 11px); }
 .policy-modal-expanded .pf-observation { height: clamp(32px, 6vh, 46px); min-height: clamp(32px, 6vh, 46px); font-size: clamp(11px, 1.9vh, 13px); }
+
+/* Receipts table */
+.policy-modal-expanded .pf-receipts-wrap { max-height: clamp(110px, 24vh, 220px); overflow: auto; border: 1px solid #dce5eb; border-radius: 7px; }
+.policy-modal-expanded .pf-receipts { width: 100%; border-collapse: collapse; font-size: clamp(10px, 1.7vh, 12px); }
+.policy-modal-expanded .pf-receipts th { position: sticky; top: 0; padding: 6px 8px; background: #eef4f6; color: #2c4350; font-weight: 800; text-align: left; white-space: nowrap; border-bottom: 1px solid #dce5eb; }
+.policy-modal-expanded .pf-receipts td { padding: 5px 8px; border-bottom: 1px solid #edf1f2; color: #233c4b; white-space: nowrap; }
+.policy-modal-expanded .pf-receipts td.is-number { text-align: right; font-variant-numeric: tabular-nums; }
+.policy-modal-expanded .pf-receipts tbody tr:hover { background: #f4faf8; }
+.policy-modal-expanded .pf-receipts-empty { text-align: center; color: #7a8d96; padding: 14px 8px; }
+.policy-modal-expanded .pf-field input:read-only:not([readonly=""]) { background: #fff; }
+
+/* Receipts table */
+.policy-modal-expanded .pf-receipts-wrap { max-height: clamp(110px, 24vh, 220px); overflow: auto; border: 1px solid #dce5eb; border-radius: 7px; }
+.policy-modal-expanded .pf-receipts { width: 100%; border-collapse: collapse; font-size: clamp(10px, 1.7vh, 12px); }
+.policy-modal-expanded .pf-receipts th { position: sticky; top: 0; padding: 6px 8px; background: #eef4f6; color: #2c4350; font-weight: 800; text-align: left; white-space: nowrap; border-bottom: 1px solid #dce5eb; }
+.policy-modal-expanded .pf-receipts td { padding: 5px 8px; border-bottom: 1px solid #edf1f2; color: #233c4b; white-space: nowrap; }
+.policy-modal-expanded .pf-receipts td.is-number { text-align: right; font-variant-numeric: tabular-nums; }
+.policy-modal-expanded .pf-receipts tbody tr:hover { background: #f4faf8; }
+.policy-modal-expanded .pf-receipts-empty { text-align: center; color: #7a8d96; padding: 14px 8px; }
