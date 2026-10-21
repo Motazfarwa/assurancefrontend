@@ -239,3 +239,33 @@
 .client-page-modal .client-window-modal .client-action-bar { padding: 6px 28px; }
 .client-page-modal .client-window-modal .client-current-summary { padding: 6px 18px; }
 .client-page-modal .client-window-modal .client-form-actions { position: sticky; bottom: 0; z-index: 5; margin: 0 -28px; padding: 12px 28px; border-top: 1px solid #e4eaec; background: #fff; box-shadow: 0 -6px 14px rgba(20, 50, 60, .06); }
+
+/* ===== Everything visible at once: sizes scale with the window height ===== */
+.client-page-modal { padding: 8px; }
+.client-page-modal .client-window-modal { width: min(100%, 1280px); height: min(98vh, 1000px); }
+.client-page-modal .client-window-modal .client-page-header { padding-top: clamp(6px, 1.2vh, 12px); padding-bottom: clamp(6px, 1.2vh, 12px); }
+.client-page-modal .client-window-modal .client-action-bar { padding: clamp(3px, .8vh, 7px) 28px; }
+.client-page-modal .client-window-modal .client-action-button { padding: clamp(4px, .9vh, 8px) 14px; }
+.client-page-modal .client-window-modal .client-form-progress { padding-top: clamp(3px, .8vh, 8px); padding-bottom: clamp(3px, .8vh, 8px); }
+.client-page-modal .client-window-modal .client-current-summary { padding: clamp(2px, .6vh, 6px) 18px; }
+.client-page-modal .client-window-modal .client-current-summary strong { font-size: clamp(12px, 2vh, 16px); }
+.client-page-modal .client-window-modal .client-record-form { gap: clamp(6px, 1.2vh, 12px); padding: clamp(6px, 1.2vh, 12px) 28px 0; }
+.client-page-modal .client-window-modal .client-fields { gap: clamp(5px, 1.1vh, 10px) 16px; }
+.client-page-modal .client-window-modal .client-section { padding: clamp(8px, 1.4vh, 13px) 14px clamp(8px, 1.4vh, 14px); }
+.client-page-modal .client-window-modal .client-field { gap: clamp(2px, .5vh, 4px); font-size: clamp(10px, 1.7vh, 12px); }
+.client-page-modal .client-window-modal .client-field input,
+.client-page-modal .client-window-modal .client-field select { height: clamp(27px, 4.9vh, 38px); font-size: clamp(11px, 1.9vh, 14px); }
+.client-page-modal .client-window-modal .client-form-actions { padding: clamp(6px, 1.2vh, 12px) 28px; }
+.client-page-modal .client-window-modal .client-form-actions button { padding: clamp(6px, 1.1vh, 11px) 22px; }
+
+/* Step 2: sections side by side, contact groups stacked, observation next to the options */
+.client-page-modal .client-window-modal .client-contact-fields { grid-template-columns: 1fr; gap: clamp(4px, 1vh, 8px); }
+.client-page-modal .client-window-modal .client-contact-group { padding: clamp(4px, .9vh, 8px) 8px; }
+.client-page-modal .client-window-modal .client-contact-group > strong { margin-bottom: clamp(2px, .5vh, 5px); font-size: clamp(10px, 1.7vh, 12px); }
+.client-page-modal .client-window-modal .client-contact-group > div { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.client-page-modal .client-window-modal .client-contact-entry:has(.client-contact-label) { grid-column: 1 / -1; }
+.client-page-modal .client-window-modal .client-record-form-step-two > .client-observation-section { grid-column: span 2; }
+.client-page-modal .client-window-modal .client-record-form-step-two > .client-record-options { grid-column: span 2; grid-template-columns: 1fr; gap: clamp(4px, 1vh, 8px); }
+.client-page-modal .client-window-modal .client-record-form-step-two > .client-form-actions { grid-column: 1 / -1; justify-content: flex-end; }
+.client-page-modal .client-window-modal .client-observation-section textarea { min-height: clamp(44px, 9vh, 80px); height: clamp(44px, 9vh, 80px); font-size: clamp(11px, 1.9vh, 14px); }
+.client-page-modal .client-window-modal .client-record-options fieldset { padding: clamp(4px, .9vh, 9px) 12px; }

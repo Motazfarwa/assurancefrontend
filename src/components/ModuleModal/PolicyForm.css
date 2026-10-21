@@ -320,3 +320,21 @@
 .pf-view-client-button:hover {
   background: #d8eee8 !important;
 }
+/* ===== Clearer view: larger text that still fits without scrolling (scales with window height) ===== */
+.policy-modal-expanded .policy-legacy-form { padding: clamp(8px, 1.6vh, 16px) 22px clamp(8px, 1.6vh, 16px); row-gap: clamp(8px, 1.8vh, 16px); font-size: clamp(11px, 1.9vh, 13px); }
+.policy-modal-expanded .pf-toolbar strong { font-size: clamp(12px, 2vh, 14px); }
+.policy-modal-expanded .pf-toolbar button { min-height: clamp(28px, 4.6vh, 36px); font-size: clamp(11px, 1.9vh, 13px); }
+.policy-modal-expanded .pf-section { padding: clamp(10px, 1.8vh, 16px) 14px clamp(8px, 1.6vh, 14px); }
+.policy-modal-expanded .pf-section h3 { font-size: clamp(11px, 1.9vh, 13px); font-weight: 800; }
+.policy-modal-expanded .pf-grid { row-gap: clamp(6px, 1.3vh, 12px); column-gap: 14px; }
+.policy-modal-expanded .pf-field { gap: clamp(2px, .5vh, 5px); font-size: clamp(10px, 1.7vh, 12px); font-weight: 700; color: #2c4350; }
+.policy-modal-expanded .pf-field > span { line-height: 1.25; }
+.policy-modal-expanded .pf-field input,
+.policy-modal-expanded .pf-field select,
+.policy-modal-expanded .pf-field textarea { height: clamp(27px, 4.8vh, 36px); min-height: clamp(27px, 4.8vh, 36px); padding: 4px 9px; font-size: clamp(11px, 1.9vh, 13px); border-radius: 7px; }
+.policy-modal-expanded .pf-field input:read-only,
+.policy-modal-expanded .pf-field select:disabled { background: #f4f8f9; color: #1f3340; }
+.policy-modal-expanded .pf-check { font-size: clamp(11px, 1.8vh, 13px); }
+.policy-modal-expanded .pf-check input { width: 15px; height: 15px; }
+.policy-modal-expanded .pf-check-row { margin-bottom: clamp(6px, 1.2vh, 11px); }
+.policy-modal-expanded .pf-observation { height: clamp(32px, 6vh, 46px); min-height: clamp(32px, 6vh, 46px); font-size: clamp(11px, 1.9vh, 13px); }
