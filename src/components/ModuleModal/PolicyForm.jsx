@@ -106,21 +106,25 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
         etat: asText(p.etat),
         date_mvt: asDate(p.date_mvt),
         risque: asText(p.risque),
-        hors_taxe: asFlag(p.hors_taxe),
-        tous_risque: asFlag(p.tous_risque),
+        hors_taxe: asFlag(p.horstaxe ?? p.hors_taxe),
+        tous_risque: asFlag(p.tousrisque ?? p.tous_risque),
         participation: asFlag(p.participation),
         num_imat: asText(p.num_imat),
         observation: asText(p.obser ?? q.observation)
     };
 }
 
-export default function PolicyForm({ clientCode = "" }) {
+export default function PolicyForm({ clientCode = "", onStepChange }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
     const [step, setStep] = useState(1);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        if (onStepChange) onStepChange(step);
+    }, [step, onStepChange]);
     const loadedRef = useRef({ num: "", client: "" });
     const [quittances, setQuittances] = useState([]);
     const [values, setValues] = useState(
@@ -363,7 +367,11 @@ export default function PolicyForm({ clientCode = "" }) {
             setSaved(true);
             setMessage(`Police ${result.num_police} enregistrée. Quittance : ${result.num_quittance}`);
         } catch (err) {
-            setError(err.message);
+            setError(
+                err instanceof TypeError
+                    ? "Le serveur n'a pas répondu. Vérifiez la connexion puis réessayez."
+                    : err.message
+            );
         } finally {
             setSaving(false);
         }
@@ -465,7 +473,7 @@ export default function PolicyForm({ clientCode = "" }) {
          <>
         <form className="policy-legacy-form" onSubmit={save}>
             <div className="pf-toolbar">
-                <strong>GESTION DES POLICES</strong>
+                <strong>{isCreate && step === 2 ? "GESTION DES QUITTANCES" : "GESTION DES POLICES"}</strong>
                 <div className="pf-toolbar-actions">
            <button
                type="button"
@@ -587,6 +595,14 @@ export default function PolicyForm({ clientCode = "" }) {
                 <h3>Informations Quittance</h3>
 
                 <div className="pf-grid">
+                    <label className="pf-field">
+                        <span>Code client</span>
+                        <input value={values.code_client} readOnly />
+                    </label>
+                    <label className="pf-field">
+                        <span>N° Police</span>
+                        <input value={values.num_police} readOnly />
+                    </label>
                     {field("Date saisie", "date_saisie", "date")}
                     {field("Date émission", "date_emission", "date")}
                     {field("Période", "periode")}

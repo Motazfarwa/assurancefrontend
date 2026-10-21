@@ -58,6 +58,7 @@ function Field({ field, lockedValue }) {
 
 export default function ModuleModal({ module, category, onClose, clientCode = '' }) {
   const [submitted, setSubmitted] = useState(false);
+  const [policyStep, setPolicyStep] = useState(1);
   const baseFields = FORM_FIELDS[module.form] || FORM_FIELDS.search;
   // With a client code the client field comes first and cannot be edited.
   const fields = clientCode && ['receipt', 'claim'].includes(module.form)
@@ -98,7 +99,7 @@ return (
             {category.label} · Module {module.id}
           </span>
           <h2 id="module-modal-title">
-            {module.title}
+            {isPolicy && clientCode && policyStep === 2 ? 'Gestion des quittances' : module.title}
           </h2>
         </div>
         <button
@@ -112,7 +113,7 @@ return (
       </header>
 
       {isPolicy ? (
-        <PolicyForm clientCode={clientCode} />
+        <PolicyForm clientCode={clientCode} onStepChange={setPolicyStep} />
       ) : submitted ? (
         <div className="module-form-success">
           <span className="success-mark">✓</span>
