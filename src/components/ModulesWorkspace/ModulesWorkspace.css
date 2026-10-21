@@ -18,3 +18,44 @@
 @media (max-width: 480px) { .workspace-user-copy { display: none; }.workspace-logout { margin-left: 2px; padding: 7px 8px; }.workspace-company { gap: 8px; }.workspace-company strong { font-size: 8px; }.nature-selector { padding: 11px 12px 12px; }.nature-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }.nature-option { min-height: 39px; gap: 6px; padding: 0 7px; font-size: 8px; }.nature-option-icon { width: 21px; height: 21px; font-size: 7px; }.workspace-workbench { padding: 9px; }.workspace-intro { min-height: 370px; padding: 15px; }.workspace-intro-copy h1 { font-size: 24px; }.workspace-intro-copy p { max-width: 190px; }.workspace-illustration { min-height: 170px; }.module-browser-heading h2 { font-size: 16px; }.module-browser-heading p { max-width: 220px; line-height: 1.5; }.module-table-head, .module-row { grid-template-columns: 55px minmax(0, 1fr) 18px; padding-right: 7px; padding-left: 7px; }.module-row-info { padding-left: 7px; }.module-browser-footer { font-size: 7px; }.workspace-footer { font-size: 7px; } }
 @media (max-width: 360px) { .workspace-topbar { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding-right: 10px; padding-left: 10px; }.workspace-brand { gap: 7px; }.workspace-brand strong { font-size: 10px; }.workspace-brand small { font-size: 7px; }.workspace-logout { gap: 4px; margin-left: 0; padding: 6px 7px; }.workspace-company { gap: 7px; }.workspace-workbench { padding: 7px; }.module-browser { padding-right: 9px; padding-left: 9px; }.module-browser-heading p { max-width: 175px; }.module-browser-footer span:first-child { max-width: 190px; line-height: 1.4; } }
 @media (max-height: 640px) and (min-width: 761px) { .workspace-shell { place-items: start center; }.workspace-window { min-height: 0; }.workspace-workbench { min-height: 0; }.workspace-intro, .module-browser { min-height: 470px; }.workspace-illustration { min-height: 190px; flex-basis: 190px; } }
+
+/* ===== Larger, clearer home page ===== */
+.workspace-shell { padding: 12px; }
+.workspace-window { width: min(100%, 1640px); min-height: calc(100vh - 24px); display: flex; flex-direction: column; }
+.workspace-workbench { flex: 1; min-height: 0; grid-template-columns: minmax(300px, .8fr) minmax(560px, 1.2fr); gap: 22px; padding: 22px; }
+.workspace-topbar { min-height: 88px; padding: 12px 28px; }
+.workspace-brand-mark { width: 46px; height: 46px; font-size: 22px; }
+.workspace-brand strong { font-size: 16px; }
+.workspace-brand small { font-size: 10px; }
+.workspace-company { min-height: 54px; font-size: 16px; }
+.workspace-company strong { font-size: 16px; }
+.workspace-avatar { width: 42px; height: 42px; font-size: 16px; }
+.workspace-user-copy strong { font-size: 14px; }
+.workspace-user-copy small { font-size: 11px; }
+.workspace-logout { padding: 10px 16px; font-size: 13px; }
+.nature-selector { padding: 14px 28px 18px; }
+.nature-selector legend { font-size: 13px; font-weight: 700; }
+.nature-option { min-height: 52px; font-size: 15px; }
+.nature-option-icon { width: 30px; height: 30px; font-size: 12px; }
+.nature-option b { font-size: 13px; }
+.workspace-intro { min-height: 0; padding: 36px 32px 22px; }
+.workspace-intro-copy span { font-size: 12px; }
+.workspace-intro-copy h1 { font-size: clamp(40px, 5vw, 58px); }
+.workspace-intro-copy p { font-size: 16px; line-height: 1.55; }
+.workspace-intro-footer { font-size: 12px; }
+.module-browser { min-height: 0; padding: 28px 30px 20px; }
+.module-browser-heading span { font-size: 12px; }
+.module-browser-heading h2 { font-size: 30px; }
+.module-browser-heading p { font-size: 14px; }
+.workspace-count { min-width: 90px; }
+.workspace-count strong { font-size: 24px; }
+.workspace-count span { font-size: 11px; }
+.workspace-search { height: 48px; padding: 0 14px; font-size: 14px; }
+.workspace-search input { font-size: 15px; }
+.module-table-head { min-height: 40px; grid-template-columns: 90px minmax(0, 1fr) 32px; font-size: 12px; }
+.module-row { min-height: 70px; grid-template-columns: 90px minmax(0, 1fr) 32px; }
+.module-row-code { padding: 8px 14px; font-size: 14px; }
+.module-row-info strong { font-size: 17px; }
+.module-row-info small, .module-row-info span { font-size: 13px; }
+.module-row-action { font-size: 18px; }
+.workspace-footer { padding: 14px 28px; font-size: 11px; }
