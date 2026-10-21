@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { checkValue, scanFiche } from '../../services/ficheOcr';
+import { checkValue, scanFiche, scanFicheWithAI } from '../../services/ficheOcr';
 import './FicheImportModal.css';
 
 const GROUPS = [
@@ -33,7 +33,9 @@ function buildPatches(rows) {
   return { client, policy };
 }
 
-export default function FicheImportModal({ file, onClose, onApply }) {
+export default function FicheImportModal({ file, accessToken, onClose, onApply }) {
+  const [source, setSource] = useState('');
+  const [aiNotice, setAiNotice] = useState('');
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('scanning');
   const [error, setError] = useState('');
@@ -46,9 +48,14 @@ export default function FicheImportModal({ file, onClose, onApply }) {
 
   useEffect(() => {
     let active = true;
-    scanFiche(file, (value) => { if (active) setProgress(value); })
+    scanFicheWithAI(file, accessToken)
+      .catch((aiError) => {
+        if (active) setAiNotice(`Lecture IA indisponible (${aiError.message}). Lecture locale utilisée : moins précise sur les photos.`);
+        return scanFiche(file, (value) => { if (active) setProgress(value); });
+      })
       .then((result) => {
         if (!active) return;
+        setSource(result.source);
         setText(result.text);
         setRows(result.fields.map((field) => ({ ...field, use: Boolean(field.value) && !field.warning })));
         setStatus('done');
@@ -59,7 +66,7 @@ export default function FicheImportModal({ file, onClose, onApply }) {
         setStatus('error');
       });
     return () => { active = false; };
-  }, [file]);
+  }, [file, accessToken]);
 
   function change(key, value) {
     setRows((current) => current.map((row) => (row.key === key
@@ -89,12 +96,13 @@ export default function FicheImportModal({ file, onClose, onApply }) {
               <div className="fiche-progress" role="status">
                 <strong>Lecture du document… {Math.round(progress * 100)} %</strong>
                 <div><i style={{ width: `${Math.max(4, progress * 100)}%` }} /></div>
-                <small>Français et arabe. La première lecture télécharge les langues (quelques secondes).</small>
+                <small>Analyse par l’IA (français et arabe). Si elle est indisponible, une lecture locale prend le relais.</small>
               </div>
             )}
             {status === 'error' && <p className="fiche-error" role="alert">{error}</p>}
             {status === 'done' && <>
-              <p className="fiche-hint">Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
+              {aiNotice && <p className="fiche-error" role="status">{aiNotice}</p>}
+              <p className="fiche-hint">{source === 'ai' ? 'Lu par l’IA. ' : ''}Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
               {GROUPS.map((group) => (
                 <fieldset key={group.id}>
                   <legend>{group.label}</legend>

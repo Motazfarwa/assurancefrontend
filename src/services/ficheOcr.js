@@ -79,9 +79,9 @@ export const FIELD_DEFS = [
 // Returns an error message when a value looks wrong, otherwise ''.
 export function checkValue(type, value) {
   if (!value) return '';
-  if (type === 'cin' && !/^\d{8}$/.test(value)) return 'Le C.I.N. doit contenir 8 chiffres';
+  if (type === 'cin' && !/^[A-Za-z0-9]{6,12}$/.test(value.replace(/\s/g, ''))) return 'Numéro de pièce d’identité invalide';
   if (type === 'postal' && !/^\d{4}$/.test(value)) return 'Le code postal doit contenir 4 chiffres';
-  if (type === 'policy' && !/^\d{12}$/.test(value)) return 'Le numéro de police doit contenir 12 chiffres';
+  if (type === 'policy' && !/^\d{8,14}$/.test(value)) return 'Numéro de contrat invalide (chiffres uniquement)';
   if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Email invalide';
   if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Date invalide (jj/mm/aaaa)';
   if (type === 'phone' && !/^\d{8}$/.test(value.replace(/\D/g, '').slice(-8))) return 'Téléphone invalide';
@@ -92,9 +92,9 @@ function convert(type, raw) {
   const value = clean(raw);
   if (type === 'date') return toIsoDate(value);
   if (type === 'money') return toNumber(value);
-  if (type === 'cin') return (value.replace(/\D/g, '').match(/\d{8}/) || [''])[0];
+  if (type === 'cin') return value.replace(/\s/g, '').toUpperCase().slice(0, 12);
   if (type === 'postal') return (value.match(/\b\d{4}\b/) || [''])[0];
-  if (type === 'policy') return (value.replace(/\s/g, '').match(/\d{12}/) || [''])[0];
+  if (type === 'policy') return (value.replace(/\s/g, '').match(/\d{8,14}/) || [''])[0];
   if (type === 'phone') return value.replace(/[^\d+]/g, '').replace(/^\+?216/, '').slice(0, 8);
   if (type === 'email') return (value.match(/[^\s@]+@[^\s@]+\.[^\s@]+/) || [''])[0];
   return value;
@@ -125,8 +125,59 @@ export async function scanFiche(file, onProgress) {
   });
   try {
     const { data } = await worker.recognize(file);
-    return { text: data.text || '', fields: extractFields(data.text || '') };
+    return { text: data.text || '', fields: extractFields(data.text || ''), source: 'ocr' };
   } finally {
     await worker.terminate();
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Preferred reading: the server's vision model (handles skewed photos, tables, Arabic + French).
+// ---------------------------------------------------------------------------------------------
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://assurancebackend.onrender.com').replace(/\/$/, '');
+
+// Server field -> form field key.
+const AI_MAP = {
+  last_name: 'lastName', first_name: 'firstName', birth_date: 'birthDate', birth_place: 'birthPlace',
+  nationality: 'nationality', profession: 'profession', id_number: 'identityNumber', id_date: 'identityDate',
+  id_place: 'identityPlace', license_number: 'licenseNumber', address: 'homeAddress', city: 'homeCity',
+  postal_code: 'homePostalCode', phone: 'phone', email: 'email', policy_number: 'num_police',
+  effect_date: 'effet', expiry_date: 'expiration', vehicle_registration: 'num_imat', net_premium: 'prime_net',
+  taxes: 'taxe', stamp: 'timbre', commission: 'commission', total_premium: 'prime_total', period: 'periode',
+};
+
+// Shrinks a phone photo before upload (text stays readable, size stays well under the limit).
+async function toJpegBase64(file, maxSide = 2000) {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  if (bitmap.close) bitmap.close();
+  return canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
+}
+
+export async function scanFicheWithAI(file, accessToken) {
+  if (!accessToken) throw new Error('session sans jeton serveur');
+  const image = await toJpegBase64(file);
+  const response = await fetch(`${API_BASE_URL}/api/assistant/extract-fiche`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ image_base64: image, media_type: 'image/jpeg' }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `erreur ${response.status}`);
+
+  const values = body.fields || {};
+  const fields = FIELD_DEFS.map((def) => {
+    const aiKey = Object.keys(AI_MAP).find((key) => AI_MAP[key] === def.key);
+    const raw = aiKey ? values[aiKey] : '';
+    const value = raw ? convert(def.type, String(raw)) : '';
+    return { ...def, value, warning: checkValue(def.type, value) };
+  });
+  // A company has no first name: its name goes in the Nom field.
+  const lastName = fields.find((field) => field.key === 'lastName');
+  if (lastName && !lastName.value && values.company_name) lastName.value = clean(values.company_name);
+  return { text: JSON.stringify(values, null, 2), fields, source: 'ai' };
 }
