@@ -357,3 +357,11 @@
 .policy-modal-expanded .pf-receipts td.is-number { text-align: right; font-variant-numeric: tabular-nums; }
 .policy-modal-expanded .pf-receipts tbody tr:hover { background: #f4faf8; }
 .policy-modal-expanded .pf-receipts-empty { text-align: center; color: #7a8d96; padding: 14px 8px; }
+
+/* Creating a policy from a client file: steps and footer buttons */
+.policy-modal-expanded .pf-span-full { grid-column: 1 / -1; }
+.policy-modal-expanded .pf-footer { padding-top: clamp(4px, 1vh, 10px); }
+.policy-modal-expanded .pf-footer button { min-height: clamp(30px, 5vh, 38px); padding: 5px 18px; border: 1px solid #d4dfe5; border-radius: 7px; background: #fff; color: #263d4f; font: inherit; font-size: clamp(11px, 1.9vh, 13px); font-weight: 700; cursor: pointer; }
+.policy-modal-expanded .pf-footer button.pf-primary,
+.policy-modal-expanded .pf-footer button[type="submit"] { border-color: #187d78; background: #187d78; color: #fff; }
+.policy-modal-expanded .pf-footer button:disabled { opacity: .6; cursor: not-allowed; }

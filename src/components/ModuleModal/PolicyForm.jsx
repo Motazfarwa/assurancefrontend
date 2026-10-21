@@ -43,6 +43,29 @@ const initialValues = {
 
 const API_URL = import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com";
 
+const POLICE_FIELDS = [
+    "num_police", "code_compagnie", "code_client",
+    "code_branche", "date_creation", "renouvelable",
+    "duree", "effet", "heure_effet", "echeance",
+    "expiration", "etat", "date_mvt", "risque",
+    "hors_taxe", "tous_risque", "participation",
+    "num_imat", "obser"
+];
+
+const MONEY_FIELDS = [
+    "prime_net", "commission", "prime_total",
+    "taxe", "timbre", "cout_attestation",
+    "montant_quittance", "solde_quittance"
+];
+
+const DATE_FIELDS = [
+    "date_creation", "effet", "expiration",
+    "date_mvt", "date_saisie", "date_emission"
+];
+
+const toTimestamp = (value) =>
+    !value ? null : value.length === 10 ? `${value}T00:00:00` : value;
+
 const asDate = (value) =>
     typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : value ?? "";
 const asText = (value) => (value == null ? "" : String(value));
@@ -93,6 +116,11 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
 
 export default function PolicyForm({ clientCode = "" }) {
     const { accessToken } = useAuth();
+    // Opened from a client file: a new policy (then its receipt) is entered for that client.
+    const isCreate = Boolean(clientCode);
+    const [step, setStep] = useState(1);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
     const loadedRef = useRef({ num: "", client: "" });
     const [quittances, setQuittances] = useState([]);
     const [values, setValues] = useState(
@@ -275,6 +303,72 @@ export default function PolicyForm({ clientCode = "" }) {
         }));
     };
 
+    const loadedExisting = loadedRef.current.num !== "" && loadedRef.current.num === values.num_police;
+
+    function goToReceipt() {
+        setError("");
+        if (!/^\d{12}$/.test(values.num_police)) {
+            setError("Le numéro doit contenir 12 chiffres : année + branche + 5 chiffres.");
+            return;
+        }
+        if (values.num_police.slice(4, 7) !== values.code_branche) {
+            setError("Le code branche ne correspond pas au numéro de police.");
+            return;
+        }
+        if (!values.code_compagnie) {
+            setError("Veuillez sélectionner la compagnie.");
+            return;
+        }
+        setStep(2);
+    }
+
+    async function save(e) {
+        e.preventDefault();
+        if (!isCreate || step !== 2 || saved) return;
+        setError("");
+        setMessage("");
+
+        const police = {};
+        const quittance = {};
+
+        for (const [key, value] of Object.entries(values)) {
+            if (key === "heure_effet") continue;
+
+            let converted = value === "" ? null : value;
+            if (DATE_FIELDS.includes(key)) converted = toTimestamp(value);
+            if (MONEY_FIELDS.includes(key) && value !== "") converted = Number(value);
+            if (["code_compagnie", "duree"].includes(key) && value !== "") converted = Number(value);
+
+            if (POLICE_FIELDS.includes(key)) police[key] = converted;
+            else quittance[key] = converted;
+        }
+
+        if (values.effet) police.heure_effet = `${values.effet}T${values.heure_effet}:00`;
+        quittance.observation = values.observation || "";
+
+        setSaving(true);
+        try {
+            const response = await fetch(`${API_URL}/api/polices`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ police, quittance })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(
+                    typeof result.detail === "string" ? result.detail : JSON.stringify(result.detail || result)
+                );
+            }
+            setSaved(true);
+            setMessage(`Police ${result.num_police} enregistrée. Quittance : ${result.num_quittance}`);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setSaving(false);
+        }
+    }
+
     // Fallback built on /client/{code} or /search and the client's receipts (needs a signed-in token).
     const legacyLookup = async (params, signal) => {
         const url = params.code_client
@@ -359,7 +453,7 @@ export default function PolicyForm({ clientCode = "" }) {
     // Client code -> the client's most recent policy and its receipts.
     useEffect(() => {
         const client = values.code_client.trim();
-        if (!client || client === loadedRef.current.client) return undefined;
+        if (isCreate || !client || client === loadedRef.current.client) return undefined;
         const controller = new AbortController();
         const timer = setTimeout(() => lookup({ code_client: client }, controller.signal), 400);
         return () => { controller.abort(); clearTimeout(timer); };
@@ -369,7 +463,7 @@ export default function PolicyForm({ clientCode = "" }) {
 
     return (
          <>
-        <form className="policy-legacy-form" onSubmit={e => e.preventDefault()}>
+        <form className="policy-legacy-form" onSubmit={save}>
             <div className="pf-toolbar">
                 <strong>GESTION DES POLICES</strong>
                 <div className="pf-toolbar-actions">
@@ -386,6 +480,7 @@ export default function PolicyForm({ clientCode = "" }) {
                 </div>
             </div>
 
+            {!(isCreate && step === 2) && (
             <section className="pf-section pf-identification">
                 <h3>Identification de la police</h3>
                 <div className="pf-grid pf-grid-identification">
@@ -461,8 +556,10 @@ export default function PolicyForm({ clientCode = "" }) {
                     {field("Immatriculation", "num_imat")}
                 </div>
             </section>
+            )}
 
-            <section className="pf-section pf-policy-info">
+            {!(isCreate && step === 2) && (
+            <section className={`pf-section pf-policy-info${isCreate ? " pf-span-full" : ""}`}>
                 <h3>Information Police</h3>
 
                 <div className="pf-check-row">
@@ -483,7 +580,30 @@ export default function PolicyForm({ clientCode = "" }) {
                     {field("Risque", "risque")}
                 </div>
             </section>
+            )}
 
+            {isCreate && step === 2 && (
+            <section className="pf-section pf-quittance-info pf-span-full">
+                <h3>Informations Quittance</h3>
+
+                <div className="pf-grid">
+                    {field("Date saisie", "date_saisie", "date")}
+                    {field("Date émission", "date_emission", "date")}
+                    {field("Période", "periode")}
+                    {field("Prime nette", "prime_net", "number")}
+                    {field("Commission", "commission", "number")}
+                    {field("Prime totale", "prime_total", "number")}
+                    {field("Taxe", "taxe", "number")}
+                    {field("Timbre", "timbre", "number")}
+                    {field("Coût attestation", "cout_attestation", "number")}
+                    {field("Montant quittance", "montant_quittance", "number")}
+                    {field("Solde quittance", "solde_quittance", "number")}
+                    {field("N° Attestation", "num_attestation")}
+                </div>
+            </section>
+            )}
+
+            {!isCreate && (
             <section className="pf-section pf-quittance-info">
                 <h3>Visualisation des quittances</h3>
 
@@ -508,7 +628,9 @@ export default function PolicyForm({ clientCode = "" }) {
                     </table>
                 </div>
             </section>
+            )}
 
+            {(!isCreate || step === 2) && (
             <section className="pf-section pf-observation-section">
                 <h3>Observation</h3>
                 <textarea
@@ -517,11 +639,32 @@ export default function PolicyForm({ clientCode = "" }) {
                     onChange={e => update("observation", e.target.value)}
                 />
             </section>
+            )}
 
             {error && <div className="pf-error">{error}</div>}
             {message && <div className="pf-success">{message}</div>}
 
             {loading && <div className="pf-success">Recherche en cours…</div>}
+            {isCreate && !saved && loadedExisting && step === 1 && (
+                <div className="pf-error">Cette police existe déjà : modification impossible ici.</div>
+            )}
+
+            {isCreate && (
+                <footer className="pf-footer">
+                    {step === 2 && !saved && (
+                        <button type="button" onClick={() => setStep(1)}>← Précédent</button>
+                    )}
+                    {step === 1 ? (
+                        <button type="button" className="pf-primary" onClick={goToReceipt} disabled={loadedExisting}>
+                            Suivant : quittance →
+                        </button>
+                    ) : (
+                        <button type="submit" className="pf-primary" disabled={saving || saved}>
+                            {saving ? "Enregistrement..." : saved ? "Enregistré" : "Soumettre"}
+                        </button>
+                    )}
+                </footer>
+            )}
     </form>
 
     {showClientPolices && (
