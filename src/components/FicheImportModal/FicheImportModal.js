@@ -50,7 +50,8 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
     let active = true;
     scanFicheWithAI(file, accessToken)
       .catch((aiError) => {
-        if (active) setAiNotice(`Lecture IA indisponible (${aiError.message}). Lecture locale utilisée : moins précise sur les photos.`);
+        // No server AI configured is a normal setup: read locally without a warning.
+        if (active && !/non configur|jeton/i.test(aiError.message)) setAiNotice(`Lecture IA indisponible (${aiError.message}). Lecture locale utilisée.`);
         return scanFiche(file, (value) => { if (active) setProgress(value); });
       })
       .then((result) => {
@@ -96,7 +97,7 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
               <div className="fiche-progress" role="status">
                 <strong>Lecture du document… {Math.round(progress * 100)} %</strong>
                 <div><i style={{ width: `${Math.max(4, progress * 100)}%` }} /></div>
-                <small>Analyse par l’IA (français et arabe). Si elle est indisponible, une lecture locale prend le relais.</small>
+                <small>Lecture du texte (français et arabe) en plusieurs passes. Cela peut prendre une à deux minutes.</small>
               </div>
             )}
             {status === 'error' && <p className="fiche-error" role="alert">{error}</p>}

@@ -49,7 +49,7 @@ function after(lines, labels) {
 
 // Fields we know how to read. `kind` decides where the value goes and how it is checked.
 export const FIELD_DEFS = [
-  { key: 'lastName', group: 'client', label: 'Nom', labels: ['nom\\b(?!\\s+du\\s+contact)', 'اللقب'], type: 'text' },
+  { key: 'lastName', group: 'client', label: 'Nom', labels: ['nom\\b(?!\\s*/)(?!\\s+du\\s+contact)', 'اللقب'], type: 'text' },
   { key: 'firstName', group: 'client', label: 'Prénom', labels: ['pr[ée]nom', 'الاسم'], type: 'text' },
   { key: 'birthDate', group: 'client', label: 'Date de naissance', labels: ['date\\s+de\\s+naissance', 'n[ée]\\(?e?\\)?\\s+le', 'تاريخ\\s+الولادة'], type: 'date' },
   { key: 'birthPlace', group: 'client', label: 'Lieu de naissance', labels: ['lieu\\s+de\\s+naissance', '[àa]\\s+naissance', 'مكان\\s+الولادة'], type: 'text' },
@@ -62,7 +62,7 @@ export const FIELD_DEFS = [
   { key: 'homeAddress', group: 'client', label: 'Adresse', labels: ['adresse', 'العنوان'], type: 'text' },
   { key: 'homeCity', group: 'client', label: 'Ville', labels: ['ville', 'المدينة'], type: 'text' },
   { key: 'homePostalCode', group: 'client', label: 'Code postal', labels: ['code\\s+postal', 'الرمز\\s+البريدي'], type: 'postal' },
-  { key: 'phone', group: 'client', label: 'Téléphone', labels: ['t[ée]l[ée]?(?:phone)?', 'gsm', 'mobile', 'الهاتف', 'هاتف'], type: 'phone' },
+  { key: 'phone', group: 'client', label: 'Téléphone', labels: ['\\bt[ée]l(?:[ée]phone)?\\b', '\\bgsm\\b', '\\bmobile\\b', 'الهاتف', 'هاتف'], type: 'phone' },
   { key: 'email', group: 'client', label: 'Email', labels: ['e-?mail', 'mail', 'البريد'], type: 'email' },
   { key: 'num_police', group: 'police', label: 'N° police', labels: ['n[°o]\\s*(?:de\\s+)?police', 'police\\s+n[°o]', 'عقد\\s+(?:عدد|رقم)'], type: 'policy' },
   { key: 'effet', group: 'police', label: 'Date effet', labels: ['date\\s+d[\'’]?\\s*effet', 'effet', 'تاريخ\\s+السريان'], type: 'date' },
@@ -79,7 +79,7 @@ export const FIELD_DEFS = [
 // Returns an error message when a value looks wrong, otherwise ''.
 export function checkValue(type, value) {
   if (!value) return '';
-  if (type === 'cin' && !/^[A-Za-z0-9]{6,12}$/.test(value.replace(/\s/g, ''))) return 'Numéro de pièce d’identité invalide';
+  if (type === 'cin' && !/^(\d{8}|[A-Za-z]{1,2}\d{6,8})$/.test(value.replace(/\s/g, ''))) return 'Numéro de pièce d’identité invalide';
   if (type === 'postal' && !/^\d{4}$/.test(value)) return 'Le code postal doit contenir 4 chiffres';
   if (type === 'policy' && !/^\d{8,14}$/.test(value)) return 'Numéro de contrat invalide (chiffres uniquement)';
   if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Email invalide';
@@ -104,31 +104,188 @@ export function extractFields(rawText) {
   const text = normalize(rawText);
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   const found = [];
+  const layout = readLayout(lines, text);
   FIELD_DEFS.forEach((def) => {
-    let value = convert(def.type, after(lines, def.labels));
+    // Generic "label: value" reading, kept only when the value looks sane (OCR noise is common).
+    let generic = convert(def.type, after(lines, def.labels));
+    if (generic && (checkValue(def.type, generic) || (LETTERS_ONLY.has(def.key) && !/^[\p{L}][\p{L}' -]{1,40}$/u.test(generic)))) generic = '';
+    let value = layout[def.key] || generic;
     // Fallbacks on the whole text for well-formed values.
     if (!value && def.type === 'email') value = convert('email', text);
     if (!value && def.type === 'policy') value = (text.replace(/[ .-]/g, '').match(/(?:19|20)\d{2}\d{3}\d{5}/) || [''])[0];
-    if (!value && def.type === 'cin') value = (text.match(/\b\d{8}\b/) || [''])[0];
     found.push({ ...def, value, warning: checkValue(def.type, value) });
   });
   return found;
 }
 
+const LETTERS_ONLY = new Set(['lastName', 'firstName', 'nationality', 'homeCity']);
+const DATE_RE = /\b(\d{1,2})\s*[/.-]\s*(\d{1,2})\s*[/.-]\s*(\d{4})\b/;
+const AMOUNT_RE = /\d{1,3}(?:[ .]\d{3})*[.,]\d{3}/g;
+
+// A date written on the label's line, or on the line just above / below (table layouts).
+function dateNear(lines, labelPattern, offsets = [0, -1, 1]) {
+  const label = new RegExp(labelPattern, 'i');
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!label.test(lines[index])) continue;
+    for (const offset of offsets) {
+      const match = (lines[index + offset] || '').match(DATE_RE);
+      if (match) return toIsoDate(`${match[1]}/${match[2]}/${match[3]}`);
+    }
+  }
+  return '';
+}
+
+// Values of documents laid out as tables / forms (contracts, quotations): label and value are
+// often on different lines, so look at the neighbouring lines and at well-known shapes.
+function readLayout(lines, text) {
+  const result = {};
+  const flat = text.replace(/\n/g, ' ');
+
+  // Contract number: after "Contrat N°" (same or next line), otherwise the longest digit run starting like a policy.
+  const contract = flat.match(/contrat\s*n[°o]?\s*[:._-]*\s*(\d{9,14})/i);
+  if (contract) result.num_police = contract[1];
+
+  // Tunisian plate: "209 TU 222", "123 تونس 4567".
+  const plate = flat.match(/\b(\d{1,4})\s*(TU|RS|تونس)\s*(\d{1,4})\b/i);
+  if (plate) result.num_imat = `${plate[1]} ${plate[2].toUpperCase()} ${plate[3]}`;
+
+  result.effet = dateNear(lines, "(date\\s*d['’]?\\s*effet|sate\\s*d['’]?\\s*effet|effet)", [0, -1, -2, 1]);
+  result.expiration = dateNear(lines, "(date\\s*d['’]?\\s*[ée]ch[ée]ance|expiration)", [0, 1]);
+  result.birthDate = dateNear(lines, 'date\\s+de\\s+naissance|n[ée]\\(?e?\\)?\\s+le');
+  result.identityDate = dateNear(lines, 'date\\s+(?:de\\s+)?(?:d[ée]livrance|c\\.?i\\.?n)');
+
+  // Identity number next to "CIN / Identifiant unique": 8-digit CIN or a passport-like code.
+  const idLine = lines.findIndex((line) => /c\.?i\.?n\s*\/?\s*identifiant|identifiant\s+unique/i.test(line));
+  if (idLine >= 0) {
+    const near = [lines[idLine], lines[idLine - 1], lines[idLine + 1]].join(' ');
+    const id = near.match(/\b(\d{8})\b/) || near.match(/\b([A-Z]{1,2}\d{6,8})\b/);
+    if (id) result.identityNumber = id[1];
+  }
+
+  // Insured name: "Nom / RS" followed by capitals (same line or next one).
+  const nameLine = lines.findIndex((line) => /nom\s*\/\s*r\.?s|nom\s*\/\s*rs/i.test(line));
+  if (nameLine >= 0) {
+    const candidates = [lines[nameLine].replace(/.*nom\s*\/\s*r\.?s\.?/i, ''), lines[nameLine + 1], lines[nameLine - 1]];
+    const name = candidates.map((candidate) => (candidate || '').match(/\b[A-ZÀ-Ý][A-ZÀ-Ý'-]{2,}(?:\s+[A-ZÀ-Ý][A-ZÀ-Ý'-]{2,}){0,3}\b/)).find(Boolean);
+    if (name) {
+      const [first, ...rest] = name[0].split(/\s+/);
+      result.lastName = first;
+      result.firstName = rest.join(' ');
+    }
+  }
+
+  // Address line (street word) with an optional "CITY 8050" ending.
+  const addressLine = lines.find((line) => /\b(rue|avenue|av\.|boulevard|bd|cit[ée]|r[ée]sidence|impasse|route)\b/i.test(line) && /[A-Za-z]{3}/.test(line));
+  // Street word damaged by OCR ("RICE. LUMUMBA HAMMAMET 8050"): fall back on "... CITY 1234" at the end of a line.
+  const cityLine = lines.find((line) => /\s[A-ZÀ-Ý]{4,}\s+\d{4}\s*$/.test(line.trim()) && !/[a-z]{3}/.test(line));
+  if (!addressLine && cityLine) {
+    const ending = clean(cityLine).match(/^(.*?)\s*([A-ZÀ-Ý]{4,})\s+(\d{4})$/);
+    if (ending) [, result.homeAddress, result.homeCity, result.homePostalCode] = ending;
+  }
+  if (addressLine) {
+    const cleaned = clean(addressLine.replace(/[^\p{L}\p{N}\s'’./,-]/gu, ' '));
+    const ending = cleaned.match(/^(.*?)\s+([A-ZÀ-Ý][A-ZÀ-Ý' -]{2,})\s+(\d{4})$/);
+    if (ending) {
+      [, result.homeAddress, result.homeCity, result.homePostalCode] = ending;
+    } else {
+      result.homeAddress = cleaned;
+    }
+  }
+
+  // Amounts line: "140,000DT 30,000DT 48,449DT 3,400DT ... 459,394" in the order Net / Frais / Taxes / FGA / FSSR / FPAC / FA / Total.
+  const amountLines = lines.map((line) => line.match(AMOUNT_RE)).filter((list) => list && list.length >= 5);
+  if (amountLines.length) {
+    const amounts = amountLines[0].map((value) => toNumber(value.replace(/\s/g, '').replace(/\.(?=\d{3}\b)/, ',')));
+    result.prime_net = amounts[0];
+    result.taxe = amounts[2];
+    result.prime_total = String(Math.max(...amounts.map(Number)));
+  }
+  const total = flat.match(/(?:total|comptant|contribution\s+au\s+com\w*)\D{0,30}(\d{1,3}(?:[ .]\d{3})*[.,]\d{3})/i);
+  if (total && !result.prime_total) result.prime_total = toNumber(total[1].replace(/\s/g, ''));
+
+  Object.keys(result).forEach((key) => { if (!result[key]) delete result[key]; });
+  return result;
+}
+
 // Runs OCR (French + Arabic) on an image file. Progress is reported as 0..1.
+// Phone photos read much better once enlarged, turned to grey and stretched to full contrast.
+async function enhanceImage(file, targetSide = 2600) {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const scale = targetSide / Math.max(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  if (bitmap.close) bitmap.close();
+
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = image;
+  const histogram = new Uint32Array(256);
+  for (let i = 0; i < data.length; i += 4) {
+    const grey = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    data[i] = grey;
+    histogram[grey] += 1;
+  }
+  const pixels = data.length / 4;
+  let low = 0;
+  let high = 255;
+  for (let sum = 0; low < 255 && sum + histogram[low] < pixels * 0.02; low += 1) sum += histogram[low];
+  for (let sum = 0; high > 0 && sum + histogram[high] < pixels * 0.02; high -= 1) sum += histogram[high];
+  const range = Math.max(1, high - low);
+  for (let i = 0; i < data.length; i += 4) {
+    const value = Math.max(0, Math.min(255, ((data[i] - low) * 255) / range));
+    data[i] = value;
+    data[i + 1] = value;
+    data[i + 2] = value;
+  }
+  context.putImageData(image, 0, 0);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
+// Runs OCR on an image file (French first, then French + Arabic) and merges the readings.
+// Progress is reported as 0..1.
 export async function scanFiche(file, onProgress) {
   const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker(['fra', 'ara'], 1, {
-    logger: (message) => {
-      if (message.status === 'recognizing text' && onProgress) onProgress(message.progress);
-    },
-  });
-  try {
-    const { data } = await worker.recognize(file);
-    return { text: data.text || '', fields: extractFields(data.text || ''), source: 'ocr' };
-  } finally {
-    await worker.terminate();
+  const passes = [
+    { langs: ['fra'], pageMode: '4', enhanced: true },
+    { langs: ['fra'], pageMode: '6', enhanced: true },
+    { langs: ['fra', 'ara'], pageMode: '3', enhanced: false },
+  ];
+  const enhanced = await enhanceImage(file);
+  const texts = [];
+
+  for (let index = 0; index < passes.length; index += 1) {
+    const pass = passes[index];
+    const worker = await createWorker(pass.langs, 1, {
+      logger: (message) => {
+        if (message.status === 'recognizing text' && onProgress) onProgress((index + message.progress) / passes.length);
+      },
+    });
+    try {
+      await worker.setParameters({ tessedit_pageseg_mode: pass.pageMode, preserve_interword_spaces: '1' });
+      const { data } = await worker.recognize(pass.enhanced ? enhanced : file);
+      texts.push(data.text || '');
+    } finally {
+      await worker.terminate();
+    }
   }
+
+  // Each reading is parsed on its own and the first non-empty value wins, so one bad pass cannot hide a good one.
+  const readings = texts.map((text) => extractFields(text));
+  const fields = readings[0].map((field, position) => {
+    const candidates = readings.map((reading) => reading[position]).filter((candidate) => candidate.value);
+    const valid = candidates.filter((candidate) => !candidate.warning);
+    const pool = valid.length ? valid : candidates;
+    if (!pool.length) return field;
+    // The same value read by several passes is the most trustworthy; otherwise the first valid one.
+    const votes = new Map();
+    pool.forEach((candidate) => votes.set(candidate.value, (votes.get(candidate.value) || 0) + 1));
+    const top = Math.max(...votes.values());
+    return pool.find((candidate) => votes.get(candidate.value) === top);
+  });
+  return { text: texts.join('\n\n--- lecture suivante ---\n\n'), fields, source: 'ocr' };
 }
 
 // ---------------------------------------------------------------------------------------------
