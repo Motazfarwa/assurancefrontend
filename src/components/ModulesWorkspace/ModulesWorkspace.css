@@ -98,3 +98,39 @@
 .module-row-info small, .module-row-info span { font-size: 11px; }
 .module-row-action { font-size: 16px; }
 .workspace-footer { padding: 11px 24px; font-size: 9px; }
+
+/* ===== Compact: whole page fits the screen ===== */
+.workspace-shell { padding: 8px; }
+.workspace-window { width: min(100%, 1320px); min-height: 0; max-height: calc(100vh - 16px); overflow: auto; }
+.workspace-workbench { gap: 14px; padding: 14px; }
+.workspace-topbar { min-height: 62px; padding: 8px 20px; }
+.workspace-brand-mark { width: 34px; height: 34px; font-size: 17px; }
+.workspace-brand strong { font-size: 12px; }
+.workspace-brand small { font-size: 8px; }
+.workspace-company { min-height: 38px; }
+.workspace-company strong { font-size: 12px; }
+.workspace-avatar { width: 30px; height: 30px; font-size: 12px; }
+.workspace-user-copy strong { font-size: 11px; }
+.workspace-user-copy small { font-size: 9px; }
+.workspace-logout { padding: 6px 10px; font-size: 10px; }
+.nature-selector { padding: 8px 20px 10px; }
+.nature-selector legend { font-size: 10px; }
+.nature-option { min-height: 36px; font-size: 11px; }
+.nature-option-icon { width: 22px; height: 22px; font-size: 9px; }
+.nature-option b { font-size: 10px; }
+.workspace-intro { min-height: 0; padding: 22px 22px 14px; }
+.workspace-intro-copy h1 { font-size: clamp(28px, 3.4vw, 38px); }
+.workspace-intro-copy p { font-size: 12px; }
+.workspace-illustration { max-height: 34vh; }
+.module-browser { min-height: 0; padding: 18px 20px 12px; }
+.module-browser-heading h2 { font-size: 20px; }
+.module-browser-heading p { font-size: 11px; }
+.workspace-count strong { font-size: 17px; }
+.workspace-search { height: 34px; }
+.workspace-search input { font-size: 11px; }
+.module-table-head { min-height: 28px; grid-template-columns: 64px minmax(0, 1fr) 24px; font-size: 9px; }
+.module-row { min-height: 46px; grid-template-columns: 64px minmax(0, 1fr) 24px; }
+.module-row-code { padding: 5px 10px; font-size: 11px; }
+.module-row-info strong { font-size: 12px; }
+.module-row-info small, .module-row-info span { font-size: 10px; }
+.workspace-footer { padding: 8px 20px; font-size: 8px; }
