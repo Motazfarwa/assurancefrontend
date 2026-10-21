@@ -269,3 +269,7 @@
 .client-page-modal .client-window-modal .client-record-form-step-two > .client-form-actions { grid-column: 1 / -1; justify-content: flex-end; }
 .client-page-modal .client-window-modal .client-observation-section textarea { min-height: clamp(44px, 9vh, 80px); height: clamp(44px, 9vh, 80px); font-size: clamp(11px, 1.9vh, 14px); }
 .client-page-modal .client-window-modal .client-record-options fieldset { padding: clamp(4px, .9vh, 9px) 12px; }
+
+/* Import of a scanned file */
+.client-import-button { margin-right: auto; border-color: #20796e; background: #20796e; color: #fff; }
+.client-import-button:hover:not(:disabled) { background: #1a655c; }

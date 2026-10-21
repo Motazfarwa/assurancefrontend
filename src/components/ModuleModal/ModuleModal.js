@@ -56,7 +56,7 @@ function Field({ field, lockedValue }) {
   return <label className="module-form-field"><span>{label}{required && ' *'}</span><input name={name} type={type} required={required} placeholder={type === 'number' ? '0.00' : undefined} /></label>;
 }
 
-export default function ModuleModal({ module, category, onClose, clientCode = '' }) {
+export default function ModuleModal({ module, category, onClose, clientCode = '', prefill = null }) {
   const [submitted, setSubmitted] = useState(false);
   const [policyStep, setPolicyStep] = useState(1);
   const baseFields = FORM_FIELDS[module.form] || FORM_FIELDS.search;
@@ -113,7 +113,7 @@ return (
       </header>
 
       {isPolicy ? (
-        <PolicyForm clientCode={clientCode} onStepChange={setPolicyStep} />
+        <PolicyForm clientCode={clientCode} prefill={prefill} onStepChange={setPolicyStep} />
       ) : submitted ? (
         <div className="module-form-success">
           <span className="success-mark">✓</span>

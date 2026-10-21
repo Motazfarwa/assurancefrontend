@@ -3,6 +3,7 @@ import { EMPTY_CLIENT, useClient } from '../../contexts/ClientContext';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientByCode, getNextClientCode, saveClient, searchClients } from '../../services/clientApi';
 import ModuleModal from '../../components/ModuleModal/ModuleModal';
+import FicheImportModal from '../../components/FicheImportModal/FicheImportModal';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
 import ClientListModal from '../ClientListModal/ClientListModal';
 import UnpaidClientsModal from '../../components/UnpaidClientsModal/UnpaidClientsModal';
@@ -93,6 +94,9 @@ export default function ClientManagementPage({ modal = false }) {
   const [showUnpaidClients, setShowUnpaidClients] = useState(false);
   const [step, setStep] = useState(1);
   const [activeAction, setActiveAction] = useState(null);
+  const [ficheFile, setFicheFile] = useState(null);
+  const [policyPrefill, setPolicyPrefill] = useState(null);
+  const fileInputRef = useRef(null);
   const windowRef = useRef(null);
 
   // A new client gets the last client code + 1, shown read-only.
@@ -173,6 +177,14 @@ export default function ClientManagementPage({ modal = false }) {
     }
   }
   // Picking a suggestion only fills Nom and Prénom; the code and every other field stay as they are.
+  // Confirmed OCR values: the client part fills this form, the police / quittance part is kept for Gestion police.
+  function applyFiche({ client: clientPatch, policy }) {
+    setClient((current) => ({ ...current, ...clientPatch }));
+    setPolicyPrefill(Object.keys(policy).length ? policy : null);
+    setFicheFile(null);
+    setNotice(`Fiche importée : ${Object.keys(clientPatch).length} champ(s) client remplis${Object.keys(policy).length ? `, ${Object.keys(policy).length} champ(s) police / quittance prêts dans « Gestion police »` : ''}.`);
+  }
+
   function pickExistingClient(record) {
     let lastName = record.lastName || '';
     let firstName = record.firstName || '';
@@ -201,6 +213,8 @@ export default function ClientManagementPage({ modal = false }) {
         <header className="client-page-header"><a className="client-page-brand" href="/workspace"><span className="client-brand-mark">A</span><span>GESTION ASSURANCES<small>Assurance Jemmali · Siege</small></span></a><div className="client-page-heading"><span>PRODUCTION · MODULE 100</span><h1>Gestion des clients</h1></div><button type="button" className="client-close-button" onClick={() => navigate('/workspace')} aria-label="Fermer">×</button></header>
         <nav className="client-view-tabs" aria-label="Vue du dossier client"><button type="button" onClick={() => setShowClientList(true)}><span aria-hidden="true">◉</span> Rechercher</button><button type="button" className="is-current" aria-current="page"><span aria-hidden="true">✎</span> Modifier</button><button type="button" className="client-new-button" onClick={() => setShowUnpaidClients(true)}><span aria-hidden="true">◎</span> Visualiser</button></nav>
         <div className="client-action-bar" role="group" aria-label="Gestion du client">
+          <button type="button" className="client-action-button client-import-button" onClick={() => fileInputRef.current?.click()} title="Importer une fiche scannée (français ou arabe) et remplir les champs">⬆ Importer une fiche</button>
+          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setFicheFile(file); }} />
           <span>Gérer pour ce client</span>
           {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
         </div>
@@ -257,7 +271,8 @@ export default function ClientManagementPage({ modal = false }) {
         </form>
         <footer className="client-payment-footer"><div className="payment-method"><img src="/logos/attijari.svg" alt="Attijari Bank" /><strong>Virement &agrave; Attijari</strong></div><div className="payment-method"><strong>En esp&egrave;ces &agrave;</strong><img src="/logos/stb.svg" alt="STB Bank" /></div></footer>
       </section>
-      {activeAction && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} onClose={() => setActiveAction(null)} />}
+      {activeAction && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}
+      {ficheFile && <FicheImportModal file={ficheFile} onClose={() => setFicheFile(null)} onApply={applyFiche} />}
       {showUnpaidClients &&<UnpaidClientsModal accessToken={accessToken} onClose={() => setShowUnpaidClients(false)} />}
       {showClientList && <ClientListModal accessToken={accessToken} localClients={clients} onClose={() => setShowClientList(false)} onView={(record) => { setClient({ ...record, _persisted: true }); navigate('/clients/preview'); }} />}
     </main>

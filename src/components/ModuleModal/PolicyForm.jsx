@@ -114,7 +114,7 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
     };
 }
 
-export default function PolicyForm({ clientCode = "", onStepChange }) {
+export default function PolicyForm({ clientCode = "", prefill = null, onStepChange }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
@@ -128,7 +128,7 @@ export default function PolicyForm({ clientCode = "", onStepChange }) {
     const loadedRef = useRef({ num: "", client: "" });
     const [quittances, setQuittances] = useState([]);
     const [values, setValues] = useState(
-        clientCode ? { ...initialValues, code_client: clientCode } : initialValues
+        clientCode ? { ...initialValues, ...(prefill || {}), code_client: clientCode } : initialValues
     );
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
