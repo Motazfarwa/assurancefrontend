@@ -127,6 +127,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     }, [step, onStepChange]);
     const loadedRef = useRef({ num: "", client: "" });
     const [quittances, setQuittances] = useState([]);
+    const [nomClient, setNomClient] = useState("");
     const [values, setValues] = useState(
         clientCode ? { ...initialValues, ...(prefill || {}), code_client: clientCode } : initialValues
     );
@@ -434,6 +435,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             loadedRef.current = { num: loaded.num_police, client: loaded.code_client };
             setValues(prev => ({ ...prev, ...loaded }));
             setNomBranche(data.nom_branche || '');
+            if (data.nom_client) setNomClient(data.nom_client);
             setQuittances(Array.isArray(data.quittances) ? data.quittances : []);
             if (params.code_client && data.matches > 1) {
                 setMessage(`${data.matches} polices pour ce client — la plus récente est affichée.`);
@@ -447,6 +449,28 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             if (!signal.aborted) setLoading(false);
         }
     };
+
+    // Client name for the typed client code.
+    useEffect(() => {
+        const code = values.code_client.trim();
+        if (!code) { setNomClient(""); return undefined; }
+        let active = true;
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/clients/${encodeURIComponent(code)}`, {
+                    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+                });
+                const data = await response.json().catch(() => ({}));
+                const name = response.ok
+                    ? data.nom_client || [data.Nom, data.Prenom].filter(Boolean).join(" ")
+                    : "";
+                if (active) setNomClient(name || "");
+            } catch {
+                if (active) setNomClient("");
+            }
+        }, 350);
+        return () => { active = false; clearTimeout(timer); };
+    }, [values.code_client, accessToken]);
 
     // Policy number (12 digits) -> that policy and its receipts.
     useEffect(() => {
@@ -558,9 +582,32 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         />
                     </label>
 
-                    {field("Code client", "code_client")}
+                    <label className="pf-field pf-field-narrow">
+                        <span>Code client</span>
+                        <input
+                            value={values.code_client}
+                            readOnly={Boolean(clientCode)}
+                            onChange={e => update("code_client", e.target.value)}
+                        />
+                    </label>
 
-                    {field("Date création", "date_creation", "date")}
+                    <label className="pf-field pf-field-wide">
+                        <span>Nom client</span>
+                        <input
+                            value={nomClient}
+                            readOnly
+                            placeholder="Détecté automatiquement"
+                        />
+                    </label>
+
+                    <label className="pf-field pf-field-narrow">
+                        <span>Date création</span>
+                        <input
+                            type="date"
+                            value={values.date_creation}
+                            onChange={e => update("date_creation", e.target.value)}
+                        />
+                    </label>
                     {field("Immatriculation", "num_imat")}
                 </div>
             </section>
@@ -587,6 +634,17 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     {field("Date mouvement", "date_mvt", "date")}
                     {field("Risque", "risque")}
                 </div>
+            </section>
+            )}
+
+            {!isCreate && (
+            <section className="pf-section pf-observation-section pf-observation-side">
+                <h3>Observation</h3>
+                <textarea
+                    className="pf-observation"
+                    value={values.observation}
+                    onChange={e => update("observation", e.target.value)}
+                />
             </section>
             )}
 
@@ -620,7 +678,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             )}
 
             {!isCreate && (
-            <section className="pf-section pf-quittance-info">
+            <section className="pf-section pf-quittance-info pf-span-full">
                 <h3>Visualisation des quittances</h3>
 
                 <div className="pf-receipts-wrap">
@@ -646,7 +704,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             </section>
             )}
 
-            {(!isCreate || step === 2) && (
+            {isCreate && step === 2 && (
             <section className="pf-section pf-observation-section">
                 <h3>Observation</h3>
                 <textarea
