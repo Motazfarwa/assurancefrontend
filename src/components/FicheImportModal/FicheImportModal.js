@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { checkValue, scanFiche, scanFicheWithAI } from '../../services/ficheOcr';
+import { checkValue, scanFiche, scanFicheWithAI, scanFicheWithServerOcr } from '../../services/ficheOcr';
 import './FicheImportModal.css';
 
 const GROUPS = [
@@ -50,9 +50,12 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
     let active = true;
     scanFicheWithAI(file, accessToken)
       .catch((aiError) => {
-        // No server AI configured is a normal setup: read locally without a warning.
-        if (active && !/non configur|jeton/i.test(aiError.message)) setAiNotice(`Lecture IA indisponible (${aiError.message}). Lecture locale utilisée.`);
-        return scanFiche(file, (value) => { if (active) setProgress(value); });
+        // No server AI configured is a normal setup: use the free server OCR, then the in-browser one.
+        if (active && !/non configur|jeton/i.test(aiError.message)) setAiNotice(`Lecture IA indisponible (${aiError.message}).`);
+        return scanFicheWithServerOcr(file, accessToken).catch((ocrError) => {
+          if (active && !/jeton/i.test(ocrError.message)) setAiNotice((notice) => `${notice ? `${notice} ` : ''}OCR serveur indisponible (${ocrError.message}). Lecture locale utilisée.`);
+          return scanFiche(file, (value) => { if (active) setProgress(value); });
+        });
       })
       .then((result) => {
         if (!active) return;

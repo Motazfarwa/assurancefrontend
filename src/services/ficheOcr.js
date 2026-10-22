@@ -183,8 +183,10 @@ function readLayout(lines, text) {
     if (ending) [, result.homeAddress, result.homeCity, result.homePostalCode] = ending;
   }
   if (addressLine) {
-    const cleaned = clean(addressLine.replace(/[^\p{L}\p{N}\s'’./,-]/gu, ' '));
-    const ending = cleaned.match(/^(.*?)\s+([A-ZÀ-Ý][A-ZÀ-Ý' -]{2,})\s+(\d{4})$/);
+    // Start at the street word: labels glued to the line ("Adresse - CIN ... RUE ...") are dropped.
+    const street = addressLine.search(/\b(rue|avenue|av\.|boulevard|bd|cit[ée]|r[ée]sidence|impasse|route)\b/i);
+    const cleaned = clean(addressLine.slice(Math.max(0, street)).replace(/[^\p{L}\p{N}\s'’./,-]/gu, ' '));
+    const ending = cleaned.match(/^(.*?)\s+([A-ZÀ-Ý][A-ZÀ-Ý'-]{2,})\s+(\d{4})$/);
     if (ending) {
       [, result.homeAddress, result.homeCity, result.homePostalCode] = ending;
     } else {
@@ -200,6 +202,20 @@ function readLayout(lines, text) {
     result.taxe = amounts[2];
     result.prime_total = String(Math.max(...amounts.map(Number)));
   }
+  // Table "Contribution Nette / Frais / Taxes ... Total": amounts in DT follow the header, the total comes last.
+  if (!result.prime_net) {
+    const header = lines.findIndex((line) => /contribution\s+nette/i.test(line));
+    const dt = header < 0 ? [] : lines.slice(header, header + 6).join(' ').match(/\d{1,3}(?:[ .]\d{3})*[.,]\d{3}\s*DT/g) || [];
+    if (dt.length >= 4) {
+      const values = dt.map((value) => Number(toNumber(value.replace(/\s*DT$/, '').replace(/\s/g, '').replace(/\.(?=\d{3}\b)/, ','))));
+      if (values[values.length - 1] > values[values.length - 4]) {
+        result.prime_net = String(values[values.length - 4]);
+        result.taxe = String(values[values.length - 2]);
+        result.prime_total = String(values[values.length - 1]);
+      }
+    }
+  }
+  if (result.expiration && result.expiration === result.effet) delete result.expiration; // a cut-off date read twice
   const total = flat.match(/(?:total|comptant|contribution\s+au\s+com\w*)\D{0,30}(\d{1,3}(?:[ .]\d{3})*[.,]\d{3})/i);
   if (total && !result.prime_total) result.prime_total = toNumber(total[1].replace(/\s/g, ''));
 
@@ -272,7 +288,11 @@ export async function scanFiche(file, onProgress) {
     }
   }
 
-  // Each reading is parsed on its own and the first non-empty value wins, so one bad pass cannot hide a good one.
+  return mergeReadings(texts, 'ocr');
+}
+
+// Each reading is parsed on its own and the first non-empty value wins, so one bad pass cannot hide a good one.
+function mergeReadings(texts, source) {
   const readings = texts.map((text) => extractFields(text));
   const fields = readings[0].map((field, position) => {
     const candidates = readings.map((reading) => reading[position]).filter((candidate) => candidate.value);
@@ -285,7 +305,25 @@ export async function scanFiche(file, onProgress) {
     const top = Math.max(...votes.values());
     return pool.find((candidate) => votes.get(candidate.value) === top);
   });
-  return { text: texts.join('\n\n--- lecture suivante ---\n\n'), fields, source: 'ocr' };
+  return { text: texts.join('\n\n--- lecture suivante ---\n\n'), fields, source };
+}
+
+// Free server-side OCR (OCR.space): sturdier on phone photos than the in-browser engine, same parser.
+export async function scanFicheWithServerOcr(file, accessToken) {
+  if (!accessToken) throw new Error('session sans jeton serveur');
+  let image = '';
+  for (const [side, quality] of [[2200, 0.85], [1800, 0.75], [1500, 0.65], [1200, 0.6]]) {
+    image = await toJpegBase64(file, side, quality);
+    if (image.length < 1_300_000) break; // the free plan accepts files up to 1 MB
+  }
+  const response = await fetch(`${API_BASE_URL}/api/assistant/ocr-text`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ image_base64: image, media_type: 'image/jpeg' }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `erreur ${response.status}`);
+  return mergeReadings(body.texts || [], 'server-ocr');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -304,7 +342,7 @@ const AI_MAP = {
 };
 
 // Shrinks a phone photo before upload (text stays readable, size stays well under the limit).
-async function toJpegBase64(file, maxSide = 2000) {
+async function toJpegBase64(file, maxSide = 2000, quality = 0.88) {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
@@ -312,7 +350,7 @@ async function toJpegBase64(file, maxSide = 2000) {
   canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   if (bitmap.close) bitmap.close();
-  return canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
+  return canvas.toDataURL('image/jpeg', quality).split(',')[1];
 }
 
 export async function scanFicheWithAI(file, accessToken) {
