@@ -646,6 +646,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         />
                     </label>
 
+                    {!isCreate && (
                     <label className="pf-field pf-field-wide">
                         <span>Nom client</span>
                         <input
@@ -654,6 +655,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             placeholder="Détecté automatiquement"
                         />
                     </label>
+                    )}
 
                     <label className="pf-field pf-field-narrow">
                         <span>Date création</span>
