@@ -94,10 +94,54 @@ function convert(type, raw) {
   if (type === 'money') return toNumber(value);
   if (type === 'cin') return value.replace(/\s/g, '').toUpperCase().slice(0, 12);
   if (type === 'postal') return (value.match(/\b\d{4}\b/) || [''])[0];
-  if (type === 'policy') return (value.replace(/\s/g, '').match(/\d{8,14}/) || [''])[0];
+  if (type === 'policy') return (value.replace(/\s/g, '').match(/\d{8,14}/) || [value.replace(/[^\w-]/g, '').slice(0, 24)])[0];
   if (type === 'phone') return value.replace(/[^\d+]/g, '').replace(/^\+?216/, '').slice(0, 8);
   if (type === 'email') return (value.match(/[^\s@]+@[^\s@]+\.[^\s@]+/) || [''])[0];
   return value;
+}
+
+// Forms laid out as tables ("Nom | BENSALEM | Prenom | AMIRA"): a cell holding exactly a known label is followed by its value.
+const PAIR_LABELS = {
+  lastName: /^nom$/i,
+  firstName: /^pr[ée]nom$/i,
+  birthDate: /^date\s+de\s+naissance$/i,
+  birthPlace: /^lieu\s+de\s+naissance$/i,
+  nationality: /^nationalit[ée]$/i,
+  profession: /^profession$/i,
+  identityNumber: /^n\s*[°o]?\s*c\.?\s*i\.?\s*n\.?(?:\s*\/\s*identifiant.*)?$/i,
+  identityDate: /^date\s+c\.?\s*i\.?\s*n\.?$/i,
+  identityPlace: /^lieu\s+c\.?\s*i\.?\s*n\.?$/i,
+  licenseNumber: /^n\s*[°o]?\s*permis$/i,
+  homeAddress: /^adresse$/i,
+  homeCity: /^ville$/i,
+  homePostalCode: /^code\s+postal$/i,
+  phone: /^(?:t[ée]l[ée]phone|t[ée]l\.?|gsm|mobile)$/i,
+  email: /^e-?mail$/i,
+  num_police: /^n\s*[°o]?\s*(?:de\s+)?police$/i,
+  effet: /^date\s+(?:d['’]\s*)?effet$/i,
+  expiration: /^(?:date\s+d['’]\s*)?(?:expiration|[ée]ch[ée]ance)$/i,
+  num_imat: /^(?:immatriculation|immat\.?)$/i,
+  prime_net: /^(?:prime\s+nette|contribution\s+nette)$/i,
+  taxe: /^taxes?$/i,
+  timbre: /^timbre$/i,
+  commission: /^commission$/i,
+  prime_total: /^(?:prime\s+totale?|total\s+ttc|net\s+[àa]\s+payer)$/i,
+  periode: /^p[ée]riode$/i,
+};
+
+function readPairs(lines) {
+  const found = {};
+  const labelOf = (cell) => Object.keys(PAIR_LABELS).find((key) => PAIR_LABELS[key].test(clean(cell)));
+  lines.forEach((line) => {
+    const cells = line.split(/\t+| {3,}/).map((cell) => cell.trim()).filter(Boolean);
+    for (let index = 0; index < cells.length - 1; index += 1) {
+      const key = labelOf(cells[index]);
+      if (!key || found[key] !== undefined) continue;
+      if (labelOf(cells[index + 1])) continue; // the next cell is another label: this one is empty
+      found[key] = cells[index + 1];
+    }
+  });
+  return found;
 }
 
 export function extractFields(rawText) {
@@ -105,11 +149,16 @@ export function extractFields(rawText) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   const found = [];
   const layout = readLayout(lines, text);
+  const pairs = readPairs(lines);
   FIELD_DEFS.forEach((def) => {
     // Generic "label: value" reading, kept only when the value looks sane (OCR noise is common).
     let generic = convert(def.type, after(lines, def.labels));
     if (generic && (checkValue(def.type, generic) || (LETTERS_ONLY.has(def.key) && !/^[\p{L}][\p{L}' -]{1,40}$/u.test(generic)))) generic = '';
-    let value = layout[def.key] || generic;
+    // A "label | value" cell pair is the most reliable reading of a table, except for the money table of
+    // some contracts where the layout reader knows the column order.
+    let paired = pairs[def.key] ? convert(def.type, pairs[def.key]) : '';
+    if (paired && ((def.type !== 'policy' && checkValue(def.type, paired)) || (LETTERS_ONLY.has(def.key) && !/^[\p{L}][\p{L}' -]{1,40}$/u.test(paired)))) paired = '';
+    let value = (def.type === 'money' ? layout[def.key] || paired : paired || layout[def.key]) || generic;
     // Fallbacks on the whole text for well-formed values.
     if (!value && def.type === 'email') value = convert('email', text);
     if (!value && def.type === 'policy') value = (text.replace(/[ .-]/g, '').match(/(?:19|20)\d{2}\d{3}\d{5}/) || [''])[0];
