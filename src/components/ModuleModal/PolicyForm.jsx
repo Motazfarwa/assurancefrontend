@@ -29,7 +29,7 @@ const initialValues = {
     // Vehicle guarantees (screen only: the policy table has no matching columns)
     g_vol: "",
     g_incendie: "",
-    g_bdg: "",
+    g_bdg: "2000",
     g_personnes: "",
     g_ind_cond: "",
     g_remarquage: "",
