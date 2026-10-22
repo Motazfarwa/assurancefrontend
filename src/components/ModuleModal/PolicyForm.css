@@ -375,3 +375,22 @@
 .policy-modal-expanded .pf-quittance-info.pf-span-full .pf-receipts-wrap { max-height: clamp(130px, 26vh, 260px); }
 .policy-modal-expanded .pf-quittance-info.pf-span-full .pf-receipts th,
 .policy-modal-expanded .pf-quittance-info.pf-span-full .pf-receipts td { padding: 7px 12px; }
+
+/* Information police: Renouvelable / Fermé / Durée / Échéance / Expiration on one row */
+.policy-modal-expanded .pf-policy-info { grid-column: 1 / 8; }
+.policy-modal-expanded .pf-observation-side { grid-column: 8 / -1; }
+.policy-modal-expanded .pf-term-row { display: grid; grid-template-columns: auto auto minmax(90px, 1fr) minmax(120px, 1.2fr) minmax(120px, 1.2fr); align-items: end; column-gap: 14px; margin-bottom: clamp(8px, 1.4vh, 12px); }
+.policy-modal-expanded .pf-term-row > .pf-check { align-self: end; min-height: clamp(27px, 4.8vh, 36px); }
+.policy-modal-expanded .pf-check-row { align-items: center; flex-wrap: wrap; column-gap: 16px; }
+.policy-modal-expanded .pf-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.policy-modal-expanded .pf-franchise { display: inline-flex; align-items: center; gap: 6px; font-size: clamp(11px, 1.8vh, 13px); font-weight: 700; color: #2c4350; }
+.policy-modal-expanded .pf-franchise input { width: 64px; height: clamp(26px, 4.4vh, 32px); padding: 3px 7px; border: 1px solid #cfdce3; border-radius: 7px; font: inherit; text-align: right; }
+.policy-modal-expanded .pf-franchise b { color: #187d78; }
+
+/* Vehicle guarantees */
+.policy-modal-expanded .pf-garanties { grid-column: 1 / -1; }
+.policy-modal-expanded .pf-grid.pf-grid-garanties { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+/* Breathing room above the receipts table */
+.policy-modal-expanded .pf-quittance-info.pf-span-full { margin-top: clamp(8px, 1.8vh, 18px); }
+.policy-modal-expanded .policy-legacy-form { row-gap: clamp(10px, 2vh, 18px); }

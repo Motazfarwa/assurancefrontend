@@ -11,7 +11,7 @@ const initialValues = {
     code_branche: "",
     date_creation: new Date().toISOString().slice(0, 10),
     renouvelable: true,
-    duree: "1",
+    duree: "12",
     effet: "",
     heure_effet: "00:00",
     echeance: "",
@@ -24,6 +24,15 @@ const initialValues = {
     participation: false,
     num_imat: "",
     obser: "",
+    franchise: "0",
+
+    // Vehicle guarantees (screen only: the policy table has no matching columns)
+    g_vol: "",
+    g_incendie: "",
+    g_bdg: "",
+    g_personnes: "",
+    g_ind_cond: "",
+    g_remarquage: "",
 
     // Quittance
     date_saisie: new Date().toISOString().slice(0, 10),
@@ -49,8 +58,38 @@ const POLICE_FIELDS = [
     "duree", "effet", "heure_effet", "echeance",
     "expiration", "etat", "date_mvt", "risque",
     "hors_taxe", "tous_risque", "participation",
-    "num_imat", "obser"
+    "num_imat", "obser", "franchise"
 ];
+
+const GARANTIES = [
+    ["g_vol", "Vol"], ["g_incendie", "Incendie"], ["g_bdg", "BDG"],
+    ["g_personnes", "Personnes transportées"], ["g_ind_cond", "IND conducteur"], ["g_remarquage", "Remarquage"]
+];
+const TERMS = [{ value: "12", label: "Année" }, { value: "6", label: "6 mois" }];
+const pad2 = (n) => String(n).padStart(2, "0");
+
+// effet + months, keeping the day when the target month is shorter (31 Aug + 6 months -> 28/29 Feb).
+function addMonths(iso, months) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
+
+// The policy table stores the due date as "dd/mm"; the form shows it as a real date.
+function echeanceToDate(echeance, effet) {
+    const match = /^(\d{1,2})\/(\d{1,2})$/.exec(echeance || "");
+    if (!match) return /^\d{4}-\d{2}-\d{2}$/.test(echeance || "") ? echeance : "";
+    let year = /^\d{4}/.test(effet || "") ? Number(effet.slice(0, 4)) : new Date().getFullYear();
+    let iso = `${year}-${pad2(match[2])}-${pad2(match[1])}`;
+    if (effet && iso < effet) { year += 1; iso = `${year}-${pad2(match[2])}-${pad2(match[1])}`; }
+    return iso;
+}
+const dateToEcheance = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : "");
+const termDates = (effet, duree) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effet || "")) return {};
+    const months = Number(duree) || 12;
+    return { expiration: addMonths(effet, months), echeance: dateToEcheance(addMonths(effet, Math.min(months, 12))) };
+};
 
 const MONEY_FIELDS = [
     "prime_net", "commission", "prime_total",
@@ -110,6 +149,7 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
         tous_risque: asFlag(p.tousrisque ?? p.tous_risque),
         participation: asFlag(p.participation),
         num_imat: asText(p.num_imat),
+        franchise: asText(p.franchise ?? 0),
         observation: asText(p.obser ?? q.observation)
     };
 }
@@ -337,17 +377,27 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         const quittance = {};
 
         for (const [key, value] of Object.entries(values)) {
-            if (key === "heure_effet") continue;
+            if (key === "heure_effet" || key.startsWith("g_")) continue;
 
             let converted = value === "" ? null : value;
             if (DATE_FIELDS.includes(key)) converted = toTimestamp(value);
             if (MONEY_FIELDS.includes(key) && value !== "") converted = Number(value);
             if (["code_compagnie", "duree"].includes(key) && value !== "") converted = Number(value);
+            if (key === "franchise") converted = values.tous_risque && value !== "" ? Math.round(Number(value)) || 0 : null;
 
             if (POLICE_FIELDS.includes(key)) police[key] = converted;
             else quittance[key] = converted;
         }
 
+        const amount = (value) => (value === "" ? null : Number(value));
+        const garanties = {
+            vol: amount(values.g_vol),
+            incendie: amount(values.g_incendie),
+            bdg: amount(values.g_bdg),
+            personnes_transportees: amount(values.g_personnes),
+            ind_conducteur: amount(values.g_ind_cond),
+            remarquage: amount(values.g_remarquage)
+        };
         if (values.effet) police.heure_effet = `${values.effet}T${values.heure_effet}:00`;
         quittance.observation = values.observation || "";
 
@@ -357,7 +407,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ police, quittance })
+                body: JSON.stringify({ police, quittance, garanties })
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -433,7 +483,12 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             }
             const loaded = fromDetail(data);
             loadedRef.current = { num: loaded.num_police, client: loaded.code_client };
-            setValues(prev => ({ ...prev, ...loaded }));
+            const g = data.garanties || {};
+            const guarantees = {
+                g_vol: asText(g.vol), g_incendie: asText(g.incendie), g_bdg: asText(g.bdg),
+                g_personnes: asText(g.personnes_transportees), g_ind_cond: asText(g.ind_conducteur), g_remarquage: asText(g.remarquage)
+            };
+            setValues(prev => ({ ...prev, ...loaded, ...guarantees }));
             setNomBranche(data.nom_branche || '');
             if (data.nom_client) setNomClient(data.nom_client);
             setQuittances(Array.isArray(data.quittances) ? data.quittances : []);
@@ -617,22 +672,111 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             <section className={`pf-section pf-policy-info${isCreate ? " pf-span-full" : ""}`}>
                 <h3>Information Police</h3>
 
+                <div className="pf-term-row">
+                    <label className="pf-check">
+                        <input
+                            type="checkbox"
+                            checked={values.renouvelable}
+                            onChange={e => update("renouvelable", e.target.checked)}
+                        />
+                        Renouvelable
+                    </label>
+                    <label className="pf-check">
+                        <input
+                            type="checkbox"
+                            checked={!values.renouvelable}
+                            onChange={e => update("renouvelable", !e.target.checked)}
+                        />
+                        Fermé
+                    </label>
+                    <label className="pf-field">
+                        <span>Durée</span>
+                        <select
+                            value={values.duree}
+                            onChange={e => setValues(prev => ({ ...prev, duree: e.target.value, ...termDates(prev.effet, e.target.value) }))}
+                        >
+                            {!TERMS.some(t => t.value === String(values.duree)) && values.duree !== "" && (
+                                <option value={values.duree}>{values.duree} mois</option>
+                            )}
+                            {TERMS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                    </label>
+                    <label className="pf-field">
+                        <span>Échéance</span>
+                        <input
+                            type="date"
+                            value={echeanceToDate(values.echeance, values.effet)}
+                            onChange={e => update("echeance", dateToEcheance(e.target.value))}
+                        />
+                    </label>
+                    <label className="pf-field">
+                        <span>Expiration</span>
+                        <input
+                            type="date"
+                            value={values.expiration}
+                            onChange={e => update("expiration", e.target.value)}
+                        />
+                    </label>
+                </div>
+
                 <div className="pf-check-row">
-                    {check("Renouvelable", "renouvelable")}
                     {check("Hors taxe", "hors_taxe")}
                     {check("Tous risques", "tous_risque")}
+                    {values.tous_risque && (
+                        <label className="pf-franchise">
+                            <span>Franchise</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={values.franchise}
+                                onChange={e => update("franchise", e.target.value)}
+                            />
+                            <b>%</b>
+                        </label>
+                    )}
                     {check("Participation", "participation")}
                 </div>
 
                 <div className="pf-grid">
-                    {field("Durée", "duree", "number")}
-                    {field("Date effet", "effet", "date")}
+                    <label className="pf-field">
+                        <span>Date effet</span>
+                        <input
+                            type="date"
+                            value={values.effet}
+                            onChange={e => setValues(prev => ({ ...prev, effet: e.target.value, ...termDates(e.target.value, prev.duree) }))}
+                        />
+                    </label>
                     {field("Heure effet", "heure_effet", "time")}
-                    {field("Échéance", "echeance")}
-                    {field("Expiration", "expiration", "date")}
                     {field("État", "etat")}
                     {field("Date mouvement", "date_mvt", "date")}
                     {field("Risque", "risque")}
+                </div>
+            </section>
+            )}
+
+            {!(isCreate && step === 2) && (
+            <section className="pf-section pf-garanties pf-span-full">
+                <h3>Garanties véhicule</h3>
+                <div className="pf-grid pf-grid-garanties">
+                    {GARANTIES.map(([key, label]) => (
+                        <label className="pf-field" key={key}>
+                            <span>{label}</span>
+                            <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={values[key]}
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    // Vol and Incendie share the same value.
+                                    setValues(prev => (key === "g_vol"
+                                        ? { ...prev, g_vol: value, g_incendie: value }
+                                        : { ...prev, [key]: value }));
+                                }}
+                            />
+                        </label>
+                    ))}
                 </div>
             </section>
             )}
