@@ -550,7 +550,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     return (
          <>
-        <form className="policy-legacy-form" onSubmit={save}>
+        <form className={`policy-legacy-form ${isCreate ? "is-create" : "is-view"}`} onSubmit={save}>
             <div className="pf-toolbar">
                 <strong>{isCreate && step === 2 ? "GESTION DES QUITTANCES" : "GESTION DES POLICES"}</strong>
                 <div className="pf-toolbar-actions">

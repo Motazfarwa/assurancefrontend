@@ -432,3 +432,71 @@
 /* Children of the display:contents wrapper must not shrink either (they were squashed and overlapped). */
 .policy-modal-expanded .pf-info-row > .pf-section { flex: 0 0 auto; }
 .policy-modal-expanded .pf-info-row .pf-observation-side { display: block; }
+
+/* ===== Gestion des polices (consultation): everything on one screen, no scrolling ===== */
+.policy-modal-expanded .policy-legacy-form.is-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr auto auto auto;
+  column-gap: clamp(10px, 1.4vw, 18px);
+  row-gap: clamp(8px, 1.7vh, 16px);
+  align-content: start;
+  padding: clamp(6px, 1.4vh, 14px) clamp(12px, 1.6vw, 22px) clamp(8px, 1.6vh, 16px);
+}
+.policy-modal-expanded .is-view > * { order: 0; }
+.policy-modal-expanded .is-view > .pf-toolbar { grid-column: 1 / -1; grid-row: 1; }
+.policy-modal-expanded .is-view > .pf-identification { grid-column: 1 / -1; grid-row: 2; }
+.policy-modal-expanded .is-view .pf-info-row > .pf-policy-info { grid-column: 1; grid-row: 3 / span 2; }
+.policy-modal-expanded .is-view > .pf-garanties { grid-column: 2; grid-row: 3; }
+.policy-modal-expanded .is-view .pf-info-row > .pf-observation-side { grid-column: 2; grid-row: 4; display: flex; flex-direction: column; min-height: 0; }
+.policy-modal-expanded .is-view > .pf-quittance-info { grid-column: 1 / -1; grid-row: 5; margin: 0; }
+.policy-modal-expanded .is-view > .pf-error,
+.policy-modal-expanded .is-view > .pf-success { grid-column: 1 / -1; grid-row: 6; }
+
+/* compact sizes that scale with the window height */
+.policy-modal-expanded .is-view .pf-section { padding: clamp(12px, 2.2vh, 20px) 12px clamp(6px, 1.2vh, 12px); }
+.policy-modal-expanded .is-view .pf-field input,
+.policy-modal-expanded .is-view .pf-field select { height: clamp(24px, 4.1vh, 32px); min-height: clamp(24px, 4.1vh, 32px); }
+.policy-modal-expanded .is-view .pf-grid { row-gap: clamp(4px, 1vh, 9px); column-gap: 10px; }
+.policy-modal-expanded .is-view .pf-term-row { margin-bottom: clamp(4px, 1vh, 9px); column-gap: 10px; }
+.policy-modal-expanded .is-view .pf-check-row { margin-bottom: clamp(4px, 1vh, 9px); }
+.policy-modal-expanded .is-view .pf-policy-info .pf-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.policy-modal-expanded .is-view .pf-grid.pf-grid-garanties { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.policy-modal-expanded .is-view .pf-observation-side .pf-observation { flex: 1 1 auto; height: auto; min-height: clamp(34px, 6vh, 60px); }
+.policy-modal-expanded .is-view .pf-receipts-wrap { max-height: clamp(64px, 15vh, 150px); }
+.policy-modal-expanded .is-view .pf-receipts th,
+.policy-modal-expanded .is-view .pf-receipts td { padding: clamp(3px, .7vh, 6px) 8px; }
+.policy-modal-expanded .is-view .pf-toolbar { min-height: 0; }
+.policy-modal-expanded .is-view .pf-toolbar button { min-height: clamp(24px, 4vh, 30px); }
+
+/* ===== Same compact one-screen layout when a policy is created from a client file ===== */
+.policy-modal-expanded .policy-legacy-form.is-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr auto auto auto;
+  column-gap: clamp(10px, 1.4vw, 18px);
+  row-gap: clamp(8px, 1.7vh, 16px);
+  align-content: start;
+  padding: clamp(6px, 1.4vh, 14px) clamp(12px, 1.6vw, 22px) clamp(8px, 1.6vh, 16px);
+}
+.policy-modal-expanded .is-create > * { order: 0; }
+.policy-modal-expanded .is-create > .pf-toolbar { grid-column: 1 / -1; grid-row: 1; }
+.policy-modal-expanded .is-create > .pf-identification { grid-column: 1 / -1; grid-row: 2; }
+.policy-modal-expanded .is-create .pf-info-row > .pf-policy-info { grid-column: 1; grid-row: 3 / span 2; }
+.policy-modal-expanded .is-create > .pf-garanties { grid-column: 2; grid-row: 3 / span 2; }
+.policy-modal-expanded .is-create > .pf-quittance-info { grid-column: 1 / -1; grid-row: 3; margin: 0; }
+.policy-modal-expanded .is-create > .pf-observation-section { grid-column: 1 / -1; grid-row: 4; display: flex; flex-direction: column; min-height: 0; }
+.policy-modal-expanded .is-create > .pf-error { grid-column: 1 / -1; grid-row: 5; }
+.policy-modal-expanded .is-create > .pf-success { grid-column: 1 / -1; grid-row: 6; }
+.policy-modal-expanded .is-create > .pf-footer { grid-column: 1 / -1; grid-row: 7; align-self: end; margin: 0; padding-top: 0; }
+
+.policy-modal-expanded .is-create .pf-section { padding: clamp(12px, 2.2vh, 20px) 12px clamp(6px, 1.2vh, 12px); }
+.policy-modal-expanded .is-create .pf-field input,
+.policy-modal-expanded .is-create .pf-field select { height: clamp(24px, 4.1vh, 32px); min-height: clamp(24px, 4.1vh, 32px); }
+.policy-modal-expanded .is-create .pf-grid { row-gap: clamp(4px, 1vh, 9px); column-gap: 10px; }
+.policy-modal-expanded .is-create .pf-term-row { margin-bottom: clamp(4px, 1vh, 9px); column-gap: 10px; }
+.policy-modal-expanded .is-create .pf-check-row { margin-bottom: clamp(4px, 1vh, 9px); }
+.policy-modal-expanded .is-create .pf-policy-info .pf-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.policy-modal-expanded .is-create .pf-grid.pf-grid-garanties { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: clamp(8px, 2vh, 18px); }
+.policy-modal-expanded .is-create .pf-observation-section .pf-observation { flex: 1 1 auto; height: auto; min-height: clamp(34px, 6vh, 60px); }
+.policy-modal-expanded .is-create .pf-toolbar button { min-height: clamp(24px, 4vh, 30px); }
