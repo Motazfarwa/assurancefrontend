@@ -318,3 +318,36 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ===== Legacy-style "Liste des polices client" ===== */
+.client-polices-dialog { width: min(980px, 96vw); max-height: 88vh; }
+.client-polices-content { display: flex; flex-direction: column; gap: 14px; }
+
+.client-polices-client { display: flex; gap: 14px; align-items: flex-end; }
+.client-polices-client label { display: flex; flex-direction: column; gap: 4px; color: #587079; font-size: 11px; font-weight: 700; }
+.client-polices-client input { height: 34px; padding: 6px 10px; border: 1px solid #d8e3e8; border-radius: 7px; background: #fff; font: inherit; font-size: 13px; outline: none; box-sizing: border-box; }
+.client-polices-client input:focus { border-color: #187d78; box-shadow: 0 0 0 2px rgba(24, 125, 120, .1); }
+.client-polices-client label:first-child input { width: 130px; }
+.client-polices-client-name { flex: 1; min-width: 0; }
+.client-polices-client-name input { width: 100%; background: #f4f8f9; font-weight: 700; color: #173247; }
+
+.client-polices-list { border: 1px solid #cfdde3; border-radius: 8px; overflow: hidden; background: #fff; }
+.client-polices-list-title { padding: 6px 12px; background: #187d78; color: #fff; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.client-polices-list .client-polices-table-wrap { height: clamp(150px, 34vh, 340px); overflow: auto; border: 0; border-radius: 0; }
+.client-polices-list .client-polices-table th { position: sticky; top: 0; z-index: 1; background: #eef4f6; color: #1d4f7a; font-size: 11px; border-bottom: 1px solid #cfdde3; }
+.client-polices-list .client-polices-table td { padding: 8px 10px; border-top: 1px solid #edf1f2; color: #233c4b; }
+.client-polices-list .is-number { text-align: right; font-variant-numeric: tabular-nums; }
+.client-polices-list .client-polices-table tbody tr { cursor: pointer; }
+.client-polices-list .client-polices-table tbody tr.is-selected { background: #173247; }
+.client-polices-list .client-polices-table tbody tr.is-selected td { color: #fff; }
+
+.client-polices-statuts { display: flex; justify-content: center; gap: 10px; }
+.client-polices-statuts button { min-width: 108px; padding: 8px 14px; border: 1px solid #c4d3da; border-radius: 6px; background: #f6f9fa; color: #263d4f; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.client-polices-statuts button:hover { background: #e9f3f1; }
+.client-polices-statuts button.is-active { border-color: #187d78; background: #187d78; color: #fff; }
+
+.client-polices-footer { justify-content: space-between; align-items: center; }
+.client-polices-footer > span { color: #778b97; font-size: 11px; }
+.client-polices-footer > div { display: flex; gap: 8px; }
+.client-polices-footer .client-polices-primary { border-color: #187d78; background: #187d78; color: #fff; }
+.client-polices-footer .client-polices-primary:disabled { opacity: .45; cursor: not-allowed; }
