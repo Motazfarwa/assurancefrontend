@@ -114,11 +114,19 @@ const asTime = (value) => {
     return match ? `${match[1]}:${match[2]}` : "00:00";
 };
 
+// Same columns as the legacy receipts grid. Effet = receipt start (emission) date; Reg = settled (has a settlement date).
 const RECEIPT_COLUMNS = [
-    ["num_quittance", "N° quittance"], ["date_saisie", "Date saisie", "date"], ["date_emission", "Émission", "date"],
-    ["echeance", "Échéance", "date"], ["periode", "Période"], ["prime_net", "P. nette", "money"],
-    ["prime_total", "P. totale", "money"], ["montant_quittance", "Montant", "money"], ["solde_quittance", "Solde", "money"]
+    ["num_quittance", "N° quittance"], ["date_saisie", "Date Saisie", "date"], ["date_emission", "Effet", "date"],
+    ["tc", "TC"], ["prime_net", "P. Net", "money"], ["reg", "Reg"], ["date_reglement", "Date Reg", "date"],
+    ["commission", "MM. Comp", "money"], ["date_m", "Date Mvt", "date"], ["montant_quittance", "Mont. Quit.", "money"],
+    ["solde_quittance", "Solde", "money"]
 ];
+
+// Receipt rows come with mixed-case column names depending on the endpoint: use lower case and derive "Reg".
+const normalizeReceipt = (row) => {
+    const lower = Object.fromEntries(Object.entries(row || {}).map(([key, value]) => [key.toLowerCase(), value]));
+    return { ...lower, reg: lower.date_reglement ? "O" : "N" };
+};
 
 function formatCell(value, kind) {
     if (value == null || value === "") return "—";
@@ -491,7 +499,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             setValues(prev => ({ ...prev, ...loaded, ...guarantees }));
             setNomBranche(data.nom_branche || '');
             if (data.nom_client) setNomClient(data.nom_client);
-            setQuittances(Array.isArray(data.quittances) ? data.quittances : []);
+            setQuittances(Array.isArray(data.quittances) ? data.quittances.map(normalizeReceipt) : []);
             if (params.code_client && data.matches > 1) {
                 setMessage(`${data.matches} polices pour ce client — la plus récente est affichée.`);
             }

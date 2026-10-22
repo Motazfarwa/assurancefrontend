@@ -15,7 +15,8 @@ function DetailSection({ title, children }) {
 }
 
 const POLICY_COLUMNS = [['num_int', 'N° dossier'], ['num_police', 'N° police'], ['code_branche', 'Branche'], ['effet', 'Date effet'], ['expiration', 'Expiration'], ['etat', 'État'], ['prime_total', 'Prime totale']];
-const RECEIPT_COLUMNS = [['num_quittance', 'N° quittance'], ['num_int', 'N° dossier'], ['date_emission', 'Émission'], ['echeance', 'Échéance'], ['montant_quittance', 'Montant'], ['solde_quittance', 'Solde'], ['observation', 'Observation']];
+// Same columns as the legacy receipts grid. Effet = receipt start (emission) date; Reg = settled (has a settlement date).
+const RECEIPT_COLUMNS = [['num_quittance', 'N° quittance'], ['date_saisie', 'Date Saisie'], ['date_emission', 'Effet'], ['tc', 'TC'], ['prime_net', 'P. Net'], ['reg', 'Reg'], ['Date_Reglement', 'Date Reg'], ['commission', 'MM. Comp'], ['Date_M', 'Date Mvt'], ['montant_quittance', 'Mont. Quit.'], ['solde_quittance', 'Solde']];
 
 // key = API field, column = key in the record returned by the API when it differs.
 const POLICY_FIELDS = [
@@ -126,7 +127,7 @@ export default function ClientPreviewPage() {
     setReceiptsState((current) => ({ ...current, loading: true, error: '' }));
     try {
       const receipts = await listClientRecords(accessToken, 'receipts', client.clientCode);
-      setReceiptsState({ loading: false, error: '', records: receipts.filter((receipt) => receipt.num_int === policy.num_int) });
+      setReceiptsState({ loading: false, error: '', records: receipts.filter((receipt) => receipt.num_int === policy.num_int).map((receipt) => ({ ...receipt, reg: receipt.Date_Reglement ? 'O' : 'N' })) });
     } catch (error) {
       setReceiptsState({ loading: false, error: error.message, records: [] });
     }
