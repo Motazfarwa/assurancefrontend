@@ -31,7 +31,7 @@ function formatMoney(value) {
 export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
   const { accessToken } = useAuth();
   const [code, setCode] = useState(codeClient || "");
-  const [statut, setStatut] = useState("vigueur");
+  const [statut, setStatut] = useState("tous");
   const [nomClient, setNomClient] = useState("");
   const [polices, setPolices] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -89,17 +89,13 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
     const value = code.trim();
     setSelected(null);
     setError("");
-    if (!value) {
-      setPolices([]);
-      setSearched(false);
-      return undefined;
-    }
-
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams({ code_client: value, statut });
+        // Without a client code the filter applies to every client's policies.
+        const params = new URLSearchParams({ statut });
+        if (value) params.set("code_client", value);
         const response = await fetch(`${API_URL}/api/polices/search?${params}`, {
           credentials: "include",
           signal: controller.signal
@@ -179,6 +175,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                 <thead>
                   <tr>
                     <th>N° Police</th>
+                    {!code.trim() && <th>Client</th>}
                     <th>Effet</th>
                     <th>Échéance</th>
                     <th>Expiration</th>
@@ -190,11 +187,9 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={8} className="empty-row">Recherche en cours...</td></tr>
-                  ) : !code.trim() ? (
-                    <tr><td colSpan={8} className="empty-row">Saisissez le code client pour afficher ses polices.</td></tr>
+                    <tr><td colSpan={code.trim() ? 8 : 9} className="empty-row">Recherche en cours...</td></tr>
                   ) : searched && polices.length === 0 ? (
-                    <tr><td colSpan={8} className="empty-row">Aucune police pour ce filtre.</td></tr>
+                    <tr><td colSpan={code.trim() ? 8 : 9} className="empty-row">Aucune police pour ce filtre.</td></tr>
                   ) : (
                     polices.map((police) => (
                       <tr
@@ -204,6 +199,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                         onDoubleClick={() => onSelect?.(police)}
                       >
                         <td><strong>{police.num_police || ""}</strong></td>
+                        {!code.trim() && <td>{police.code_client || ""}</td>}
                         <td>{formatDate(police.effet)}</td>
                         <td>{police.echeance || ""}</td>
                         <td>{formatDate(police.expiration)}</td>
@@ -235,8 +231,8 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
 
         <footer className="client-polices-footer">
           <span>
-            {searched && !loading && code.trim() ? `${polices.length} police(s)` : ""}
-            {polices.length === 100 && " — limité à 100"}
+            {searched && !loading ? `${polices.length} police(s)` : ""}
+            {polices.length === 100 && " — limité à 100, précisez un code client"}
           </span>
           <div>
             <button
