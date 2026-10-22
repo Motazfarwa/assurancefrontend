@@ -506,3 +506,15 @@
 .policy-modal-expanded .is-create .pf-grid-identification { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .policy-modal-expanded .is-create .pf-grid-identification > .pf-field-narrow { grid-column: span 2; }
 .policy-modal-expanded .is-create .pf-grid-identification > .pf-field:last-child { grid-column: span 2; }
+
+/* Creation: fill the modal like the client modal (no empty band): sections stretch, their rows spread out, buttons sit in a bottom bar */
+.policy-modal-expanded .policy-legacy-form.is-create { grid-template-rows: auto auto auto 1fr auto auto auto; row-gap: clamp(8px, 1.8vh, 18px); }
+.policy-modal-expanded .is-create .pf-policy-info,
+.policy-modal-expanded .is-create .pf-garanties { display: flex; flex-direction: column; justify-content: space-between; }
+.policy-modal-expanded .is-create .pf-grid.pf-grid-garanties { flex: 1 1 auto; align-content: space-around; }
+.policy-modal-expanded .is-create > .pf-footer {
+  margin: 0 calc(-1 * clamp(12px, 1.6vw, 22px)) calc(-1 * clamp(8px, 1.6vh, 16px));
+  padding: clamp(8px, 1.6vh, 14px) clamp(12px, 1.6vw, 22px);
+  border-top: 1px solid #e4eaec;
+  background: #fff;
+}
