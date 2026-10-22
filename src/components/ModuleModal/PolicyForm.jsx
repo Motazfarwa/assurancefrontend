@@ -669,6 +669,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             )}
 
             {!(isCreate && step === 2) && (
+            <div className="pf-info-row">
             <section className={`pf-section pf-policy-info${isCreate ? " pf-span-full" : ""}`}>
                 <h3>Information Police</h3>
 
@@ -753,6 +754,17 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     {field("Risque", "risque")}
                 </div>
             </section>
+            {!isCreate && (
+            <section className="pf-section pf-observation-section pf-observation-side">
+                <h3>Observation</h3>
+                <textarea
+                    className="pf-observation"
+                    value={values.observation}
+                    onChange={e => update("observation", e.target.value)}
+                />
+            </section>
+            )}
+            </div>
             )}
 
             {!(isCreate && step === 2) && (
@@ -778,17 +790,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         </label>
                     ))}
                 </div>
-            </section>
-            )}
-
-            {!isCreate && (
-            <section className="pf-section pf-observation-section pf-observation-side">
-                <h3>Observation</h3>
-                <textarea
-                    className="pf-observation"
-                    value={values.observation}
-                    onChange={e => update("observation", e.target.value)}
-                />
             </section>
             )}
 

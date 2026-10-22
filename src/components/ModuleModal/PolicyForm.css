@@ -394,3 +394,37 @@
 /* Breathing room above the receipts table */
 .policy-modal-expanded .pf-quittance-info.pf-span-full { margin-top: clamp(8px, 1.8vh, 18px); }
 .policy-modal-expanded .policy-legacy-form { row-gap: clamp(10px, 2vh, 18px); }
+
+/* Clear layout: the form is a simple vertical stack (no overlapping rows), with room between sections. */
+.policy-modal-expanded .policy-legacy-form {
+  display: flex;
+  flex-direction: column;
+  align-content: normal;
+  gap: clamp(18px, 3vh, 28px);
+  padding-top: clamp(14px, 2.4vh, 22px);
+}
+.policy-modal-expanded .policy-legacy-form > * { flex: 0 0 auto; min-width: 0; }
+.policy-modal-expanded .policy-legacy-form > .pf-footer { margin-top: auto; }
+.policy-modal-expanded .pf-section { padding-top: clamp(16px, 2.6vh, 22px); }
+
+/* Information Police on the left, Observation filling the space on the right */
+.policy-modal-expanded .pf-info-row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: clamp(14px, 2vw, 24px); align-items: stretch; }
+.policy-modal-expanded .pf-info-row > .pf-section { grid-column: auto; }
+.policy-modal-expanded .pf-info-row .pf-observation-side { display: flex; flex-direction: column; }
+.policy-modal-expanded .pf-info-row .pf-observation-side .pf-observation { flex: 1 1 auto; height: auto; min-height: 140px; resize: none; }
+.policy-modal-expanded .pf-info-row:not(:has(.pf-observation-side)) { grid-template-columns: 1fr; }
+.policy-modal-expanded .pf-term-row { margin-bottom: clamp(12px, 2vh, 18px); }
+.policy-modal-expanded .pf-check-row { margin-bottom: clamp(12px, 2vh, 18px); }
+.policy-modal-expanded .pf-quittance-info.pf-span-full { margin-top: 0; }
+
+/* Observation: full-width row, same width as the receipts table (below the guarantees) */
+.policy-modal-expanded .pf-info-row { display: contents; }
+.policy-modal-expanded .pf-policy-info { order: 1; }
+.policy-modal-expanded .pf-garanties { order: 2; }
+.policy-modal-expanded .pf-observation-side { order: 3; display: block; }
+.policy-modal-expanded .pf-quittance-info { order: 4; }
+.policy-modal-expanded .pf-observation-section:not(.pf-observation-side) { order: 5; }
+.policy-modal-expanded .policy-legacy-form > .pf-error,
+.policy-modal-expanded .policy-legacy-form > .pf-success { order: 6; }
+.policy-modal-expanded .policy-legacy-form > .pf-footer { order: 7; }
+.policy-modal-expanded .pf-info-row .pf-observation-side .pf-observation { width: 100%; height: clamp(70px, 11vh, 110px); min-height: 70px; }
