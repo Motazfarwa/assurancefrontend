@@ -428,3 +428,7 @@
 .policy-modal-expanded .policy-legacy-form > .pf-success { order: 6; }
 .policy-modal-expanded .policy-legacy-form > .pf-footer { order: 7; }
 .policy-modal-expanded .pf-info-row .pf-observation-side .pf-observation { width: 100%; height: clamp(70px, 11vh, 110px); min-height: 70px; }
+
+/* Children of the display:contents wrapper must not shrink either (they were squashed and overlapped). */
+.policy-modal-expanded .pf-info-row > .pf-section { flex: 0 0 auto; }
+.policy-modal-expanded .pf-info-row .pf-observation-side { display: block; }
