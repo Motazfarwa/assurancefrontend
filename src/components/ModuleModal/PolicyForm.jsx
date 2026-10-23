@@ -162,7 +162,7 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
     };
 }
 
-export default function PolicyForm({ clientCode = "", prefill = null, onStepChange }) {
+export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
@@ -880,6 +880,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
             {isCreate && (
                 <footer className="pf-footer">
+                    {step === 1 && onClose && (
+                        <button type="button" onClick={onClose}>← Précédent</button>
+                    )}
                     {step === 2 && !saved && (
                         <button type="button" onClick={() => setStep(1)}>← Précédent</button>
                     )}

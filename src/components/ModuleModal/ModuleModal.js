@@ -116,7 +116,7 @@ return (
       </header>
 
       {isPolicy ? (
-        <PolicyForm clientCode={clientCode} prefill={prefill} onStepChange={setPolicyStep} />
+        <PolicyForm clientCode={clientCode} prefill={prefill} onStepChange={setPolicyStep} onClose={onClose} />
       ) : isReceiptManager ? (
         <ReceiptManager clientCode={clientCode} onClose={onClose} />
       ) : submitted ? (
