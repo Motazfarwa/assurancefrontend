@@ -243,15 +243,17 @@ export default function ClientManagementPage({ modal = false }) {
             <ClientField client={client} onChange={updateField} name="country" label="Pays" />
             <ClientField client={client} onChange={updateField} name="birthDate" label="Date de naissance" type="date" />
             <ClientField client={client} onChange={updateField} name="birthPlace" label="Lieu de naissance" />
-            <ClientField client={client} onChange={updateField} name="profession" label="Profession" />
-            <ClientField client={client} onChange={updateField} name="civilStatus" label="Situation familiale" type="select" options={['Celibataire', 'Marie(e)', 'Divorce(e)', 'Veuf / Veuve']} />
+            <ClientField client={client} onChange={updateField} name="profession" label={isCompany ? 'Secteur' : 'Profession'} />
+            {!isCompany && <ClientField client={client} onChange={updateField} name="civilStatus" label="Situation familiale" type="select" options={['Celibataire', 'Marie(e)', 'Divorce(e)', 'Veuf / Veuve']} />}
             <ClientField client={client} onChange={updateField} name="title" label="Titre" type="select" options={['M.', 'Mme', 'Mlle', 'Soc.']} />
             <ClientField client={client} onChange={updateField} name="identityNumber" label={isCompany ? 'Matricule fiscale' : 'N° C.I.N.'} />
-            <ClientField client={client} onChange={updateField} name="identityDate" label="Date C.I.N." type="date" />
-            <ClientField client={client} onChange={updateField} name="identityPlace" label="Lieu C.I.N." />
-            <ClientField client={client} onChange={updateField} name="licenseNumber" label="N° permis" />
-            <ClientField client={client} onChange={updateField} name="licenseDate" label="Date permis" type="date" />
-            <ClientField client={client} onChange={updateField} name="licensePlace" label="Lieu permis" />
+            {!isCompany && <>
+              <ClientField client={client} onChange={updateField} name="identityDate" label="Date C.I.N." type="date" />
+              <ClientField client={client} onChange={updateField} name="identityPlace" label="Lieu C.I.N." />
+              <ClientField client={client} onChange={updateField} name="licenseNumber" label="N° permis" />
+              <ClientField client={client} onChange={updateField} name="licenseDate" label="Date permis" type="date" />
+              <ClientField client={client} onChange={updateField} name="licensePlace" label="Lieu permis" />
+            </>}
           </FormSection>
           <FormSection title="Lien" className="client-link-section">
             <ClientField client={client} onChange={updateField} name="referenceCode" label="Code de contact" type="number" />

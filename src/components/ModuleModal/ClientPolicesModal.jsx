@@ -175,7 +175,6 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                 <thead>
                   <tr>
                     <th>N° Police</th>
-                    {!code.trim() && <th>Client</th>}
                     <th>Effet</th>
                     <th>Échéance</th>
                     <th>Expiration</th>
@@ -187,9 +186,9 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={code.trim() ? 8 : 9} className="empty-row">Recherche en cours...</td></tr>
+                    <tr><td colSpan={8} className="empty-row">Recherche en cours...</td></tr>
                   ) : searched && polices.length === 0 ? (
-                    <tr><td colSpan={code.trim() ? 8 : 9} className="empty-row">Aucune police pour ce filtre.</td></tr>
+                    <tr><td colSpan={8} className="empty-row">Aucune police pour ce filtre.</td></tr>
                   ) : (
                     polices.map((police) => (
                       <tr
@@ -199,7 +198,6 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                         onDoubleClick={() => onSelect?.(police)}
                       >
                         <td><strong>{police.num_police || ""}</strong></td>
-                        {!code.trim() && <td>{police.code_client || ""}</td>}
                         <td>{formatDate(police.effet)}</td>
                         <td>{police.echeance || ""}</td>
                         <td>{formatDate(police.expiration)}</td>
