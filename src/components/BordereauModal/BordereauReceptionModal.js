@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listCompanies } from '../../services/companyApi';
-import { BORDEREAU_FIELDS, buildLines, readBordereauFile } from '../../services/bordereauParser';
+import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
 import { currentMonth, deleteBordereau, getBordereau, listBordereaux, monthToPeriode, saveBordereau } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
@@ -27,6 +27,8 @@ export default function BordereauReceptionModal({ onClose }) {
   const [fichier, setFichier] = useState('');
   const [imported, setImported] = useState(null);
   const [dirty, setDirty] = useState(false);
+  const [millimes, setMillimes] = useState(false);
+  const skipLoad = useRef(false);
   const [selected, setSelected] = useState(-1);
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -46,6 +48,7 @@ export default function BordereauReceptionModal({ onClose }) {
 
   // Company / type / period -> the bordereau already stored for them, if any.
   useEffect(() => {
+    if (skipLoad.current) { skipLoad.current = false; return undefined; } // the form was just filled from the imported file
     if (!form.code_compagnie || !periode) return undefined;
     let active = true;
     setBusy(true);
@@ -74,6 +77,11 @@ export default function BordereauReceptionModal({ onClose }) {
     setForm((current) => ({ ...current, ...patch }));
   }
 
+  const makeLines = (info, scale, month) => {
+    const lines = buildLines(info, { periodMonth: Number(month) || undefined });
+    return scale ? scaleMillimes(lines) : lines;
+  };
+
   async function chooseFile(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -82,8 +90,23 @@ export default function BordereauReceptionModal({ onClose }) {
     setNotice('');
     try {
       const info = await readBordereauFile(file);
-      const parsedLines = buildLines(info);
-      if (!parsedLines.length) throw new Error('Aucune ligne avec un numéro de police n’a été trouvée. Vérifiez les colonnes ci-dessous.');
+      // The file may carry the company, the type and the period: use them to fill the form.
+      const { meta } = info;
+      const company = companies.find((item) => String(item.code_compagnie) === String(meta.code_compagnie));
+      const nextMonth = /^\d{2}\/\d{4}$/.test(meta.periode || '') ? `${meta.periode.slice(3)}-${meta.periode.slice(0, 2)}` : form.month;
+      const nextForm = { ...form, code_compagnie: company ? String(company.code_compagnie) : form.code_compagnie, tc: ['T', 'C'].includes(meta.tc) ? meta.tc : form.tc, month: nextMonth };
+      const raw = buildLines(info);
+      const scale = looksLikeMillimes(raw);
+      const parsedLines = makeLines(info, scale, nextMonth.slice(5));
+      if (!parsedLines.length) {
+        setImported(info);
+        throw new Error('Aucune ligne avec un numéro de police n’a été trouvée. Choisissez la colonne du N° de police ci-dessous.');
+      }
+      if (nextForm.code_compagnie !== form.code_compagnie || nextForm.tc !== form.tc || nextForm.month !== form.month) {
+        skipLoad.current = true;
+        setForm(nextForm);
+      }
+      setMillimes(scale);
       setImported(info);
       setLines(parsedLines);
       setFichier(file.name);
@@ -100,7 +123,13 @@ export default function BordereauReceptionModal({ onClose }) {
     if (value === '') delete mapping[key]; else mapping[key] = Number(value);
     const next = { ...imported, mapping };
     setImported(next);
-    setLines(buildLines(next));
+    setLines(makeLines(next, millimes, form.month.slice(5)));
+    setDirty(true);
+  }
+
+  function changeMillimes(checked) {
+    setMillimes(checked);
+    setLines(makeLines(imported, checked, form.month.slice(5)));
     setDirty(true);
   }
 
@@ -225,6 +254,7 @@ export default function BordereauReceptionModal({ onClose }) {
         {imported && (
           <details className="bd-mapping">
             <summary>Colonnes détectées dans le fichier{imported.titled ? '' : ' (aucune ligne de titres : ordre habituel supposé)'} — corrigez si besoin</summary>
+            <label className="bd-millimes"><input type="checkbox" checked={millimes} onChange={(event) => changeMillimes(event.target.checked)} /> Montants en millimes (726050 = 726,050) — diviser par 1000</label>
             <div className="bd-mapping-grid">
               {BORDEREAU_FIELDS.map((field) => (
                 <label key={field.key}>{field.label}{field.required ? ' *' : ''}

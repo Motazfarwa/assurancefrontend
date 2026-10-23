@@ -81,3 +81,5 @@
   .bd-backdrop { padding: 6px; }
   .bd-edit-grid { grid-template-columns: 1fr; }
 }
+.bd-millimes { display: flex; align-items: center; gap: 8px; padding: 8px 0 2px; color: #233c4b; font-size: 12px; font-weight: 600; }
+.bd-millimes input { width: 15px; height: 15px; }

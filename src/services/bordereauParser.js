@@ -2,7 +2,7 @@
 // The columns are found from their titles (several spellings accepted); the user can correct the mapping.
 
 export const BORDEREAU_FIELDS = [
-  { key: 'num_police', label: 'N° Police', required: true, synonyms: ['npolice', 'numpolice', 'numeropolice', 'policen', 'police', 'ncontrat', 'numcontrat', 'contrat', 'npol'] },
+  { key: 'num_police', label: 'N° Police', required: true, synonyms: ['npolice', 'numpolice', 'numint', 'numeropolice', 'policen', 'police', 'ncontrat', 'numcontrat', 'contrat', 'npol'] },
   { key: 'code_client', label: 'Code client', synonyms: ['codeclient', 'codeclt', 'cclient', 'codecli', 'codecl', 'ncl', 'client'] },
   { key: 'nom_client', label: 'Nom client', synonyms: ['nomclient', 'nomassure', 'nometprenom', 'nomprenom', 'raisonsociale', 'souscripteur', 'assure', 'nom'] },
   { key: 'echeance', label: 'Échéance', synonyms: ['echeance', 'dateecheance', 'dateterme', 'terme', 'dech'] },
@@ -108,7 +108,17 @@ export async function readBordereauFile(file) {
     ? Array.from({ length: width }, (_, index) => String(rows[headerRow][index] ?? '').trim() || `Colonne ${index + 1}`)
     : Array.from({ length: width }, (_, index) => `Colonne ${index + 1}`);
   const mapping = headerRow >= 0 ? guessMapping(headers) : { ...POSITIONAL };
-  return { rows, headerRow, headers, mapping, titled: headerRow >= 0 };
+  // Some exports repeat the company code, the type (T / C) and the period on every line: use them to fill the form.
+  const meta = {};
+  if (headerRow >= 0) {
+    const normalized = headers.map(normalize);
+    const first = rows.slice(headerRow + 1).find((row) => row.some((cell) => String(cell ?? '').trim())) || [];
+    const read = (name) => { const index = normalized.indexOf(name); return index >= 0 ? String(first[index] ?? '').trim() : ''; };
+    meta.code_compagnie = read('codecompagnie');
+    meta.tc = read('tc').toUpperCase().slice(0, 1);
+    meta.periode = /^\d{1,2}\/\d{4}$/.test(read('periode')) ? read('periode').padStart(7, '0') : '';
+  }
+  return { rows, headerRow, headers, mapping, meta, titled: headerRow >= 0 };
 }
 
 export function toNumber(value) {
@@ -120,7 +130,8 @@ export function toNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-export function toIsoDate(value) {
+// monthHint: month (1-12) of the period, used to read 11/4/2026 as 4 November rather than 11 April.
+export function toIsoDate(value, monthHint) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     // Excel dates come back at UTC midnight: read them in UTC to keep the day.
     return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
@@ -136,7 +147,12 @@ export function toIsoDate(value) {
   match = text.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/);
   if (match) {
     const year = match[3].length === 2 ? `20${match[3]}` : match[3];
-    return `${year}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+    const first = Number(match[1]);
+    const second = Number(match[2]);
+    // dd/mm/yyyy by default; month-first (mm/dd/yyyy) when the first number cannot be a day or the period says so.
+    const monthFirst = first > 12 ? false : second > 12 ? true : Boolean(monthHint) && first === monthHint && second !== monthHint;
+    const [month, day] = monthFirst ? [first, second] : [second, first];
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
   return null;
 }
@@ -148,7 +164,7 @@ const toText = (value) => {
 };
 
 // Rows -> lines. Rows without a policy number (totals, blanks, notes) are ignored.
-export function buildLines({ rows, headerRow, mapping }) {
+export function buildLines({ rows, headerRow, mapping }, { periodMonth } = {}) {
   const lines = [];
   rows.slice(headerRow + 1).forEach((row) => {
     const read = (key) => (mapping[key] === undefined || mapping[key] === '' ? '' : row[mapping[key]]);
@@ -158,7 +174,7 @@ export function buildLines({ rows, headerRow, mapping }) {
       num_police: numPolice,
       code_client: toText(read('code_client')).slice(0, 12) || null,
       nom_client: toText(read('nom_client')).replace(/\s+/g, ' ').slice(0, 120) || null,
-      echeance: toIsoDate(read('echeance')),
+      echeance: toIsoDate(read('echeance'), periodMonth),
       num_quittance: toText(read('num_quittance')).replace(/\s/g, '').slice(0, 30) || null,
       prime_net: toNumber(read('prime_net')),
       commission: toNumber(read('commission')),
@@ -167,3 +183,16 @@ export function buildLines({ rows, headerRow, mapping }) {
   });
   return lines;
 }
+
+// Some exports give amounts in millimes (726050 = 726.050 TND): integers only, and big.
+export function looksLikeMillimes(lines) {
+  const totals = lines.map((line) => line.prime_total).filter((value) => value != null);
+  return totals.length > 0 && lines.every((line) => ['prime_net', 'commission', 'prime_total'].every((key) => line[key] == null || Number.isInteger(line[key]))) && Math.max(...totals) >= 10000;
+}
+
+export const scaleMillimes = (lines) => lines.map((line) => ({
+  ...line,
+  prime_net: line.prime_net == null ? null : line.prime_net / 1000,
+  commission: line.commission == null ? null : line.commission / 1000,
+  prime_total: line.prime_total == null ? null : line.prime_total / 1000,
+}));
