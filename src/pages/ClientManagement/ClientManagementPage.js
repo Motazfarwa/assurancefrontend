@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EMPTY_CLIENT, useClient } from '../../contexts/ClientContext';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientByCode, getNextClientCode, saveClient, searchClients } from '../../services/clientApi';
 import ModuleModal from '../../components/ModuleModal/ModuleModal';
+import PolicyForm from '../../components/ModuleModal/PolicyForm';
 import FicheImportModal from '../../components/FicheImportModal/FicheImportModal';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
 import ClientListModal from '../ClientListModal/ClientListModal';
@@ -96,6 +97,12 @@ export default function ClientManagementPage({ modal = false }) {
   const [activeAction, setActiveAction] = useState(null);
   const [ficheFile, setFicheFile] = useState(null);
   const [policyPrefill, setPolicyPrefill] = useState(null);
+  // New client = one flow: identity (1), coordinates (2), then policy and first receipt (3, shown as steps 3 and 4).
+  const [policyStep, setPolicyStep] = useState(1);
+  const [jump, setJump] = useState(null);
+  const [prefillKey, setPrefillKey] = useState(0);
+  const [flowStarted, setFlowStarted] = useState(false);
+  const clientSavedRef = useRef(false);
   const fileInputRef = useRef(null);
   const windowRef = useRef(null);
 
@@ -134,6 +141,34 @@ export default function ClientManagementPage({ modal = false }) {
     return () => window.clearTimeout(timeout);
   }, [successToast]);
 
+  const newFlow = !client._persisted || flowStarted;
+  const handlePolicyStep = useCallback((value) => setPolicyStep(value), []);
+
+  function openAction(action) {
+    if (newFlow && action.key === 'policy') { changeStep(3); setJump({ to: 1, at: Date.now() }); return; }
+    if (newFlow && action.key === 'receipt') { changeStep(3); setJump({ to: 2, at: Date.now() }); return; }
+    setActiveAction(action);
+  }
+
+  // Runs just before the policy is stored: the client has to exist first.
+  async function createClientBeforePolicy() {
+    if (clientSavedRef.current) return;
+    if (!client.clientCode.trim()) throw new Error('Le code client est obligatoire.');
+    if (client.homePostalCode === '' || !Number.isInteger(Number(client.homePostalCode))) {
+      throw new Error('Le code postal du domicile (étape Coordonnées) est obligatoire et doit être un nombre.');
+    }
+    setFlowStarted(true);
+    const saved = await saveClient(accessToken, client, false);
+    const record = { ...saved, _persisted: true };
+    clientSavedRef.current = true;
+    setClient(record);
+    setClients((current) => [...current.filter((item) => item.clientCode !== record.clientCode), record]);
+  }
+
+  function handlePolicySaved() {
+    setSuccessToast('Client, police et quittance enregistrés avec succès.');
+  }
+
   function changeStep(nextStep) {
     setStep(nextStep);
     windowRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -166,6 +201,8 @@ export default function ClientManagementPage({ modal = false }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    // A new client is created at the end of the flow (with its policy and first receipt), never alone.
+    if (newFlow) { goToNextStep(); return; }
     if (!client.clientCode.trim()) { setNotice('Le code client est obligatoire.'); return; }
     if (client.homePostalCode === '' || !Number.isInteger(Number(client.homePostalCode))) { setNotice('Le code postal du domicile est obligatoire et doit être un nombre.'); return; }
     setSaving(true);
@@ -188,6 +225,7 @@ export default function ClientManagementPage({ modal = false }) {
   function applyFiche({ client: clientPatch, policy }) {
     setClient((current) => ({ ...current, ...clientPatch }));
     setPolicyPrefill(Object.keys(policy).length ? policy : null);
+    setPrefillKey((current) => current + 1);
     setFicheFile(null);
     setNotice(`Fiche importée : ${Object.keys(clientPatch).length} champ(s) client remplis${Object.keys(policy).length ? `, ${Object.keys(policy).length} champ(s) police / quittance prêts dans « Gestion police »` : ''}.`);
   }
@@ -223,11 +261,11 @@ export default function ClientManagementPage({ modal = false }) {
           <button type="button" className="client-action-button client-import-button" onClick={() => fileInputRef.current?.click()} title="Importer une fiche scannée (français ou arabe) et remplir les champs">⬆ Importer une fiche</button>
           <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setFicheFile(file); }} />
           <span>Gérer pour ce client</span>
-          {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
+          {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => openAction(action)}>{action.label}</button>)}
         </div>
-        <div className="client-form-progress" aria-label={`Étape ${step} sur 2`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : ''}><span>2</span><strong>Coordonnées</strong></div></div>
+        <div className="client-form-progress" aria-label={`Étape ${step === 3 ? 2 + policyStep : step} sur ${newFlow ? 4 : 2}`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div>{newFlow && <><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step === 3 ? 'is-complete' : ''}><span>3</span><strong>Gestion police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : ''}><span>4</span><strong>Gestion quittance</strong></div></>}</div>
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
-        <form className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
+        {step <= 2 && <form className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
           {step === 1 && <>
           <div className="client-record-options client-step-full client-type-row"><fieldset><legend>Type client</legend>{['Particulier', 'Societe'].map((value) => <label key={value}><input type="radio" name="clientType" checked={client.clientType === value} onChange={() => changeClientType(value)} />{value === 'Societe' ? 'Société' : value}</label>)}<label><input type="checkbox" checked={client.taxExempt} onChange={(event) => updateField('taxExempt', event.target.checked)} />Exonéré</label></fieldset></div>
           <FormSection title="Client" className="client-section-primary">
@@ -281,8 +319,24 @@ export default function ClientManagementPage({ modal = false }) {
           {step === 2 && <FormSection title="Observation" className="client-observation-section client-step-full"><label className="client-field client-field-wide"><span>Remarques sur le client</span><textarea rows={4} maxLength={500} value={client.notes || ''} placeholder="Saisir une observation (facultatif)" onChange={(event) => updateField('notes', event.target.value)} /><small className="client-observation-count">{(client.notes || '').length} / 500</small></label></FormSection>}
           {step === 2 && <div className="client-record-options client-step-full"><fieldset><legend>Adresse de correspondance</legend>{['Bureau', 'Domicile'].map((value) => <label key={value}><input type="radio" name="correspondence" checked={client.correspondence === value} onChange={() => updateField('correspondence', value)} />{value}</label>)}</fieldset></div>}
           {notice && <p className="client-save-notice" role="status">{notice}</p>}
-          <div className="client-form-actions">{step === 1 ? <><button type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button><button type="submit" className="client-primary-button" disabled={saving}>{saving ? 'Enregistrement…' : client._persisted ? 'Enregistrer les modifications' : 'Créer le client'}</button></>}</div>
-        </form>
+          <div className="client-form-actions">{step === 1 ? <><button type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button>{newFlow ? <button type="button" className="client-primary-button" onClick={goToNextStep}>Suivant : police →</button> : <button type="submit" className="client-primary-button" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>}</>}</div>
+        </form>}
+        {newFlow && client.clientCode && (
+          <div className={`policy-modal-expanded client-policy-embedded${step === 3 ? '' : ' is-hidden'}`}>
+            <PolicyForm
+              key={prefillKey}
+              embedded
+              clientCode={client.clientCode}
+              prefill={policyPrefill}
+              onStepChange={handlePolicyStep}
+              onClose={() => changeStep(2)}
+              beforeSave={createClientBeforePolicy}
+              onSaved={handlePolicySaved}
+              finalLabel="Créer le client"
+              jump={jump}
+            />
+          </div>
+        )}
         <footer className="client-payment-footer"><div className="payment-method"><img src="/logos/attijari.svg" alt="Attijari Bank" /><strong>Virement &agrave; Attijari</strong></div><div className="payment-method"><strong>En esp&egrave;ces &agrave;</strong><img src="/logos/stb.svg" alt="STB Bank" /></div></footer>
       </section>
       {activeAction && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}

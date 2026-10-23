@@ -162,7 +162,9 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
     };
 }
 
-export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose }) {
+// embedded: used as steps 3 and 4 of the "new client" flow. beforeSave runs first (it creates the client) and onSaved
+// runs once the policy and its first receipt are stored; jump = { to: 1 | 2 } moves to the policy / receipt step.
+export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, embedded = false, beforeSave, onSaved, finalLabel = "Soumettre", jump = null }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
@@ -358,6 +360,16 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     const loadedExisting = loadedRef.current.num !== "" && loadedRef.current.num === values.num_police;
 
+    // A first receipt must be filled in before a new client can be created.
+    const quittanceComplete = Boolean(values.date_emission && values.prime_net !== "" && values.prime_total !== "" && values.montant_quittance !== "");
+
+    useEffect(() => {
+        if (!jump) return;
+        if (jump.to === 1) setStep(1);
+        else goToReceipt();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [jump]);
+
     function goToReceipt() {
         setError("");
         if (!/^\d{12}$/.test(values.num_police)) {
@@ -411,6 +423,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
         setSaving(true);
         try {
+            if (beforeSave) await beforeSave();
             const response = await fetch(`${API_URL}/api/polices`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -425,6 +438,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             }
             setSaved(true);
             setMessage(`Police ${result.num_police} enregistrée. Quittance : ${result.num_quittance}`);
+            if (onSaved) onSaved(result);
         } catch (err) {
             setError(
                 err instanceof TypeError
@@ -891,8 +905,13 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             Suivant : quittance →
                         </button>
                     ) : (
-                        <button type="submit" className="pf-primary" disabled={saving || saved}>
-                            {saving ? "Enregistrement..." : saved ? "Enregistré" : "Soumettre"}
+                        <button
+                            type="submit"
+                            className="pf-primary"
+                            disabled={saving || saved || (embedded && !quittanceComplete)}
+                            title={embedded && !quittanceComplete ? "Renseignez la date d'émission, la prime nette, la prime totale et le montant de la quittance" : undefined}
+                        >
+                            {saving ? "Enregistrement..." : saved ? "Enregistré" : finalLabel}
                         </button>
                     )}
                 </footer>

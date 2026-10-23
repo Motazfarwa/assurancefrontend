@@ -283,3 +283,7 @@
 .client-records-filters label { display: flex; flex-direction: column; gap: 4px; color: #587079; font-size: 10px; font-weight: 700; }
 .client-records-filters input { width: 170px; height: 32px; padding: 4px 10px; border: 1px solid #d3dfe5; border-radius: 7px; background: #fff; font: inherit; font-size: 12px; font-weight: 500; color: #173247; }
 .client-records-filters input:focus { outline: none; border-color: #63b9a9; box-shadow: 0 0 0 3px rgba(99, 185, 169, .14); }
+
+/* New-client flow: the policy / receipt steps are embedded in the client window */
+.client-policy-embedded.is-hidden { display: none; }
+.client-policy-embedded { padding: 0 6px 6px; }
