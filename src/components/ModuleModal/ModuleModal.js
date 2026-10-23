@@ -116,9 +116,9 @@ return (
       </header>
 
       {isPolicy ? (
-        <PolicyForm clientCode={clientCode} prefill={prefill} onStepChange={setPolicyStep} onClose={onClose} />
+        <PolicyForm initialClient={clientCode} prefill={prefill} onStepChange={setPolicyStep} onClose={onClose} />
       ) : isReceiptManager ? (
-        <ReceiptManager clientCode={clientCode} onClose={onClose} />
+        <ReceiptManager clientCode={clientCode} />
       ) : submitted ? (
         <div className="module-form-success">
           <span className="success-mark">✓</span>

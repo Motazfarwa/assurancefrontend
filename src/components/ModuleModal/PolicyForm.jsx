@@ -164,7 +164,7 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
 
 // embedded: used as steps 3 and 4 of the "new client" flow. beforeSave runs first (it creates the client) and onSaved
 // runs once the policy and its first receipt are stored; jump = { to: 1 | 2 } moves to the policy / receipt step.
-export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, embedded = false, beforeSave, onSaved, finalLabel = "Soumettre", jump = null }) {
+export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onSaved, finalLabel = "Soumettre", jump = null }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
@@ -179,7 +179,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const [quittances, setQuittances] = useState([]);
     const [nomClient, setNomClient] = useState("");
     const [values, setValues] = useState(
-        clientCode ? { ...initialValues, ...(prefill || {}), code_client: clientCode } : initialValues
+        clientCode ? { ...initialValues, ...(prefill || {}), code_client: clientCode } : initialClient ? { ...initialValues, code_client: initialClient } : initialValues
     );
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");

@@ -1,130 +1,98 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
-import { createQuittance, listClientRecords } from "../../services/clientRecordsApi";
+import { listClientRecords, searchRecords } from "../../services/clientRecordsApi";
 import "./ReceiptManager.css";
 
-const today = () => new Date().toISOString().slice(0, 10);
-const blank = () => ({
-  num_police: "", num_quittance: "", tc: "T", date_saisie: today(), date_emission: "", echeance: "", date_m: today(),
-  prime_net: "", commission: "", montant_quittance: "", solde_quittance: "", date_reglement: ""
-});
+const shortDate = (value) => (value ? String(value).slice(0, 10).split("-").reverse().join("/") : "");
+const money = (value) => (value == null || value === "" ? "" : Number(value).toLocaleString("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
+const text = (value) => (value == null ? "" : String(value).trim());
 
-// Entry form for a client's receipt, with the fields of the legacy receipts grid.
-export default function ReceiptManager({ clientCode, onClose }) {
+// Read-only view of a client's receipts with the fields of the legacy receipts grid:
+// pick the policy, then one of its receipts, and the related information is displayed.
+export default function ReceiptManager({ clientCode }) {
   const { accessToken } = useAuth();
   const [policies, setPolicies] = useState([]);
-  const [values, setValues] = useState(blank);
-  const [soldeTouched, setSoldeTouched] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [policy, setPolicy] = useState("");
+  const [receipts, setReceipts] = useState([]);
+  const [receipt, setReceipt] = useState("");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let active = true;
     listClientRecords(accessToken, "policies", clientCode, { limit: 1000 })
-      .then((rows) => { if (active) setPolicies(rows); })
-      .catch((requestError) => { if (active) setError(requestError.message); });
+      .then((rows) => {
+        if (!active) return;
+        setPolicies(rows);
+        setPolicy(rows[0] ? text(rows[0].num_int) : "");
+        if (!rows.length) setLoading(false);
+      })
+      .catch((requestError) => { if (active) { setError(requestError.message); setLoading(false); } });
     return () => { active = false; };
   }, [accessToken, clientCode]);
 
-  function update(key, value) {
-    setValues((current) => {
-      const next = { ...current, [key]: value };
-      // The balance follows the amount (and is zero once settled) until it is typed by hand.
-      if (!soldeTouched && ["montant_quittance", "date_reglement"].includes(key)) {
-        next.solde_quittance = next.date_reglement ? "0" : next.montant_quittance;
-      }
-      return next;
-    });
-    setNotice("");
-  }
-
-  async function submit(event) {
-    event.preventDefault();
+  useEffect(() => {
+    if (!policy) return undefined;
+    let active = true;
+    setLoading(true);
     setError("");
-    setNotice("");
-    const policy = policies.find((row) => String(row.num_int).trim() === values.num_police);
-    if (!policy) { setError("Choisissez la police de cette quittance."); return; }
-    const number = (value) => (value === "" ? null : Number(value));
-    setSaving(true);
-    try {
-      const result = await createQuittance(accessToken, {
-        num_int: String(policy.num_int).trim(),
-        code_client: clientCode,
-        num_quittance: values.num_quittance.trim() || null,
-        tc: values.tc || null,
-        date_saisie: values.date_saisie || null,
-        date_emission: values.date_emission || null,
-        echeance: values.echeance || null,
-        date_m: values.date_m || null,
-        date_reglement: values.date_reglement || null,
-        prime_net: number(values.prime_net),
-        commission: number(values.commission),
-        montant_quittance: number(values.montant_quittance),
-        solde_quittance: number(values.solde_quittance),
-      });
-      setNotice(`Quittance ${result.num_quittance} enregistrée.`);
-      setValues((current) => ({ ...blank(), num_police: current.num_police, tc: current.tc }));
-      setSoldeTouched(false);
-    } catch (saveError) {
-      setError(saveError.message);
-    } finally {
-      setSaving(false);
-    }
-  }
+    searchRecords(accessToken, "receipts", { num_int: policy })
+      .then((rows) => {
+        if (!active) return;
+        setReceipts(rows);
+        setReceipt(rows[0] ? text(rows[0].num_quittance) : "");
+      })
+      .catch((requestError) => { if (active) { setReceipts([]); setError(requestError.message); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [accessToken, policy]);
 
-  const field = (key, label, type = "text", extra = {}) => (
-    <label>
-      <span>{label}</span>
-      <input type={type} step={type === "number" ? "any" : undefined} value={values[key]} onChange={(event) => update(key, event.target.value)} {...extra} />
-    </label>
+  const current = useMemo(() => receipts.find((row) => text(row.num_quittance) === receipt) || null, [receipts, receipt]);
+  const view = (value) => value ?? "";
+
+  const readOnly = (label, value, extra = "") => (
+    <label className={extra}><span>{label}</span><input value={value} readOnly /></label>
   );
 
   return (
-    <form className="rm-form" onSubmit={submit}>
-      <p className="module-modal-description">Saisie d’une quittance pour le client {clientCode}.</p>
+    <div className="rm-form">
+      <p className="module-modal-description">Quittances du client {clientCode} (consultation) : choisissez la police puis la quittance.</p>
 
       <div className="rm-fields">
-        <label><span>Code client</span><input value={clientCode} readOnly /></label>
+        {readOnly("Code client", clientCode)}
         <label className="rm-span-2">
-          <span>N° police *</span>
-          <select value={values.num_police} onChange={(event) => update("num_police", event.target.value)} required>
-            <option value="">{policies.length ? "Sélectionner la police" : "Aucune police pour ce client"}</option>
+          <span>N° police</span>
+          <select value={policy} onChange={(event) => setPolicy(event.target.value)}>
+            {policies.length === 0 && <option value="">Aucune police pour ce client</option>}
             {policies.map((row) => (
-              <option key={row.num_int} value={String(row.num_int).trim()}>{String(row.num_police).trim()}{row.num_imat ? ` · ${String(row.num_imat).trim()}` : ""}</option>
+              <option key={text(row.num_int)} value={text(row.num_int)}>{text(row.num_police)}{row.num_imat ? ` · ${text(row.num_imat)}` : ""}</option>
             ))}
           </select>
         </label>
-        {field("num_quittance", "N° quittance", "text", { maxLength: 15, placeholder: "Automatique si vide" })}
-
-        {field("date_saisie", "Date Saisie", "date")}
-        {field("date_emission", "Effet", "date")}
-        {field("echeance", "Échéance", "date")}
         <label>
-          <span>TC</span>
-          <select value={values.tc} onChange={(event) => update("tc", event.target.value)}><option value="T">T — Terme</option><option value="C">C — Comptant</option></select>
+          <span>N° quittance</span>
+          <select value={receipt} onChange={(event) => setReceipt(event.target.value)}>
+            {receipts.length === 0 && <option value="">{loading ? "Chargement…" : "Aucune quittance"}</option>}
+            {receipts.map((row) => <option key={text(row.num_quittance)} value={text(row.num_quittance)}>{text(row.num_quittance)}</option>)}
+          </select>
         </label>
 
-        {field("prime_net", "P. Net", "number")}
-        {field("commission", "MM. Comp", "number")}
-        {field("montant_quittance", "Mont. Quit.", "number")}
-        <label>
-          <span>Solde</span>
-          <input type="number" step="any" value={values.solde_quittance} onChange={(event) => { setSoldeTouched(true); setValues((current) => ({ ...current, solde_quittance: event.target.value })); }} />
-        </label>
+        {readOnly("Date Saisie", shortDate(current?.date_saisie))}
+        {readOnly("Effet", shortDate(current?.date_emission))}
+        {readOnly("Échéance", shortDate(current?.echeance))}
+        {readOnly("TC", view(text(current?.tc)))}
 
-        <label><span>Reg</span><input value={values.date_reglement ? "O" : "N"} readOnly /></label>
-        {field("date_reglement", "Date Reg", "date")}
-        {field("date_m", "Date Mvt", "date")}
+        {readOnly("P. Net", money(current?.prime_net))}
+        {readOnly("MM. Comp", money(current?.commission))}
+        {readOnly("Mont. Quit.", money(current?.montant_quittance))}
+        {readOnly("Solde", money(current?.solde_quittance))}
+
+        {readOnly("Reg", current ? (current.Date_Reglement ? "O" : "N") : "")}
+        {readOnly("Date Reg", shortDate(current?.Date_Reglement))}
+        {readOnly("Date Mvt", shortDate(current?.Date_M))}
       </div>
 
       {error && <p className="rm-error" role="alert">{error}</p>}
-      {notice && !error && <p className="rm-notice" role="status">{notice}</p>}
-
-      <footer className="module-modal-actions">
-        <button type="button" className="module-secondary-button" onClick={onClose}>Fermer</button>
-        <button type="submit" className="module-primary-button" disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
-      </footer>
-    </form>
+    </div>
   );
 }
