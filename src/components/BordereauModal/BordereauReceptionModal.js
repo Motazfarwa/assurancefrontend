@@ -198,7 +198,7 @@ export default function BordereauReceptionModal({ onClose }) {
           <button type="button" className="bd-tool" disabled={selected < 0} onClick={removeLine}>Supprimer</button>
           <button type="button" className="bd-tool" disabled={!lines.length} onClick={preview}>Aperçu</button>
           <span className="bd-spacer" />
-          <input ref={fileInput} type="file" accept=".xlsx,.csv,.txt" hidden onChange={chooseFile} />
+          <input ref={fileInput} type="file" accept=".xls,.xlsx,.csv,.txt" hidden onChange={chooseFile} />
           <button type="button" className="bd-import" onClick={() => fileInput.current?.click()} disabled={busy}>Importer Terme</button>
           <button type="button" className="bd-save" onClick={save} disabled={busy || !lines.length}>{busy ? 'Patientez…' : dirty ? 'Enregistrer le bordereau' : 'Enregistré'}</button>
         </div>

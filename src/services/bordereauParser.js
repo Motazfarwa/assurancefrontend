@@ -54,7 +54,15 @@ function parseCsv(text) {
 async function readRows(file) {
   const name = file.name.toLowerCase();
   if (name.endsWith('.csv') || name.endsWith('.txt')) return parseCsv(await file.text());
-  if (name.endsWith('.xls')) throw new Error('Le format .xls n’est pas pris en charge : ouvrez le fichier dans Excel et enregistrez-le en .xlsx (ou .csv).');
+  if (name.endsWith('.xls')) {
+    // Legacy Excel 97-2003 files (what the legacy software exports): read with SheetJS. Dates stay Excel serial numbers.
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const sheets = workbook.SheetNames.map((sheetName) => XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: true, defval: '', blankrows: false }));
+    const rows = sheets.find((candidate) => candidate.length > 1) || sheets[0];
+    if (!rows) throw new Error('Le fichier ne contient aucune feuille.');
+    return rows;
+  }
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await file.arrayBuffer());
@@ -116,6 +124,11 @@ export function toIsoDate(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     // Excel dates come back at UTC midnight: read them in UTC to keep the day.
     return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
+  }
+  // Excel serial day number (1900 date system), e.g. 46348 -> 2026-11-22
+  if (typeof value === 'number' && value > 20000 && value < 80000) {
+    const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000);
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
   }
   const text = String(value ?? '').trim();
   let match = text.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})/);
