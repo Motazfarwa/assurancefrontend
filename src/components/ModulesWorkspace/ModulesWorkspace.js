@@ -11,6 +11,7 @@ import DocumentEntryModal from '../DocumentEntryModal/DocumentEntryModal';
 import AgencyUnpaidModal from '../AgencyUnpaidModal/AgencyUnpaidModal';
 import BordereauReceptionModal from '../BordereauModal/BordereauReceptionModal';
 import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontationModal';
+import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
 import './ModulesWorkspace.css';
 
 export default function ModulesWorkspace() {
@@ -60,7 +61,7 @@ export default function ModulesWorkspace() {
       setShowDocumentModal(true);
       return;
     }
-    if (module.form === 'bordereau-reception' || module.form === 'bordereau-confrontation') {
+    if (module.form === 'bordereau-reception' || module.form === 'bordereau-confrontation' || module.form === 'bordereau-fusion') {
       setActiveModuleId(module.id);
       setBordereauModal(module.form);
       return;
@@ -136,6 +137,7 @@ export default function ModulesWorkspace() {
       {showUnpaidModal && <AgencyUnpaidModal onClose={() => setShowUnpaidModal(false)} />}
       {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
+      {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
     </main>
   );
 }

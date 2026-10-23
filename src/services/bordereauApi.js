@@ -33,3 +33,6 @@ export const getConfrontation = (token, params) => request(`/api/bordereaux/conf
 // "2026-11" (month input) <-> "11/2026" (period stored with the bordereau)
 export const monthToPeriode = (month) => (/^\d{4}-\d{2}$/.test(month) ? `${month.slice(5)}/${month.slice(0, 4)}` : '');
 export const currentMonth = () => new Date().toISOString().slice(0, 7);
+
+export const fuseBordereau = (token, id, forcer = false) => request(`/api/bordereaux/${id}/fusion`, token, { method: 'POST', body: JSON.stringify({ forcer }) });
+export const cancelFusion = (token, id) => request(`/api/bordereaux/${id}/fusion`, token, { method: 'DELETE' });

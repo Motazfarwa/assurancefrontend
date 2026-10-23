@@ -105,7 +105,9 @@ export default function BordereauConfrontationModal({ onClose }) {
   }
 
   const heading = `Nom Compagnie : ${companyName}    TC : ${form.tc === 'T' ? 'Terme' : 'Comptant'}    Période : ${periode}`;
-  const fusionText = result?.resume.fusion ? 'Bordereau fusionné (aucun écart)' : 'Bordereau N\'est Pas Encore Fusionné';
+  const fusionText = result?.resume.fusionne
+    ? `Bordereau fusionné le ${shortDate(result.bordereau.date_fusion)}`
+    : result?.resume.fusion ? 'Aucun écart : prêt à fusionner (module Fusion bordereau)' : 'Bordereau N\'est Pas Encore Fusionné';
   const sections = {
     confrontation: [
       { title: 'Terme non parvenu', columns: COLUMNS.notReceived, rows: result?.non_parvenus || [] },
@@ -162,7 +164,7 @@ export default function BordereauConfrontationModal({ onClose }) {
             </div>
 
             <div className="bd-report">
-              <p className="bd-report-meta"><span>{heading}</span><span className={result.resume.fusion ? 'is-ok' : 'is-warn'}>Fusion : {fusionText}</span></p>
+              <p className="bd-report-meta"><span>{heading}</span><span className={result.resume.fusionne || result.resume.fusion ? 'is-ok' : 'is-warn'}>Fusion : {fusionText}</span></p>
               {tab === 'confrontation' && (
                 <>
                   <h3>Terme non parvenu <small>({result.non_parvenus.length})</small></h3>
