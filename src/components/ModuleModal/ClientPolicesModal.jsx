@@ -28,12 +28,16 @@ function formatMoney(value) {
   });
 }
 
+const PAGE_SIZE = 50;
+
 export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
   const { accessToken } = useAuth();
   const [code, setCode] = useState(codeClient || "");
   const [statut, setStatut] = useState("tous");
   const [nomClient, setNomClient] = useState("");
   const [polices, setPolices] = useState([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -94,7 +98,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
       setLoading(true);
       try {
         // Without a client code the filter applies to every client's policies.
-        const params = new URLSearchParams({ statut });
+        const params = new URLSearchParams({ statut, page: String(page), page_size: String(PAGE_SIZE) });
         if (value) params.set("code_client", value);
         const response = await fetch(`${API_URL}/api/polices/search?${params}`, {
           credentials: "include",
@@ -106,8 +110,9 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
             typeof data?.detail === "string" ? data.detail : `Erreur de recherche (${response.status})`
           );
         }
-        if (!Array.isArray(data)) throw new Error("Format de réponse invalide du serveur.");
-        setPolices(data);
+        if (!Array.isArray(data?.items)) throw new Error("Format de réponse invalide du serveur.");
+        setPolices(data.items);
+        setTotal(Number(data.total) || 0);
         setSearched(true);
       } catch (err) {
         if (err.name !== "AbortError") {
@@ -123,7 +128,9 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [code, statut]);
+  }, [code, statut, page]);
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const current = STATUTS.find((item) => item.value === statut);
 
@@ -155,7 +162,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
               <input
                 ref={codeRef}
                 value={code}
-                onChange={(event) => setCode(event.target.value)}
+                onChange={(event) => { setCode(event.target.value); setPage(1); }}
                 maxLength={8}
                 placeholder="Ex : 4909"
               />
@@ -219,7 +226,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                 type="button"
                 key={item.value}
                 className={statut === item.value ? "is-active" : undefined}
-                onClick={() => setStatut(item.value)}
+                onClick={() => { setStatut(item.value); setPage(1); }}
               >
                 {item.label}
               </button>
@@ -228,10 +235,14 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
         </div>
 
         <footer className="client-polices-footer">
-          <span>
-            {searched && !loading ? `${polices.length} police(s)` : ""}
-            {polices.length === 100 && " — limité à 100, précisez un code client"}
-          </span>
+          <div className="client-polices-pager">
+            <span>{searched && !loading ? `${total.toLocaleString("fr-FR")} police(s)` : ""}</span>
+            <button type="button" onClick={() => setPage(1)} disabled={page <= 1 || loading} aria-label="Première page">«</button>
+            <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading} aria-label="Page précédente">‹</button>
+            <strong>Page {page} / {pageCount}</strong>
+            <button type="button" onClick={() => setPage((current) => Math.min(pageCount, current + 1))} disabled={page >= pageCount || loading} aria-label="Page suivante">›</button>
+            <button type="button" onClick={() => setPage(pageCount)} disabled={page >= pageCount || loading} aria-label="Dernière page">»</button>
+          </div>
           <div>
             <button
               type="button"

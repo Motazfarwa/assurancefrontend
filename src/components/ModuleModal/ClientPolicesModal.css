@@ -351,3 +351,10 @@
 .client-polices-footer > div { display: flex; gap: 8px; }
 .client-polices-footer .client-polices-primary { border-color: #187d78; background: #187d78; color: #fff; }
 .client-polices-footer .client-polices-primary:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Pagination */
+.client-polices-footer .client-polices-pager { align-items: center; gap: 6px; color: #587079; font-size: 11px; }
+.client-polices-footer .client-polices-pager > span { margin-right: 10px; color: #778b97; }
+.client-polices-footer .client-polices-pager strong { min-width: 84px; text-align: center; color: #173247; font-size: 12px; }
+.client-polices-footer .client-polices-pager button { min-width: 30px; padding: 6px 8px; font-size: 14px; line-height: 1; }
+.client-polices-footer .client-polices-pager button:disabled { opacity: .4; cursor: not-allowed; }
