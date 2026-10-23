@@ -99,7 +99,6 @@ export default function ClientManagementPage({ modal = false }) {
   const [policyPrefill, setPolicyPrefill] = useState(null);
   // New client = one flow: identity (1), coordinates (2), then policy and first receipt (3, shown as steps 3 and 4).
   const [policyStep, setPolicyStep] = useState(1);
-  const [jump, setJump] = useState(null);
   const [prefillKey, setPrefillKey] = useState(0);
   const [flowStarted, setFlowStarted] = useState(false);
   const clientSavedRef = useRef(false);
@@ -143,12 +142,6 @@ export default function ClientManagementPage({ modal = false }) {
 
   const newFlow = !client._persisted || flowStarted;
   const handlePolicyStep = useCallback((value) => setPolicyStep(value), []);
-
-  function openAction(action) {
-    if (newFlow && action.key === 'policy') { changeStep(3); setJump({ to: 1, at: Date.now() }); return; }
-    if (newFlow && action.key === 'receipt') { changeStep(3); setJump({ to: 2, at: Date.now() }); return; }
-    setActiveAction(action);
-  }
 
   // Runs just before the policy is stored: the client has to exist first.
   async function createClientBeforePolicy() {
@@ -261,7 +254,7 @@ export default function ClientManagementPage({ modal = false }) {
           <button type="button" className="client-action-button client-import-button" onClick={() => fileInputRef.current?.click()} title="Importer une fiche scannée (français ou arabe) et remplir les champs">⬆ Importer une fiche</button>
           <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setFicheFile(file); }} />
           <span>Gérer pour ce client</span>
-          {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => openAction(action)}>{action.label}</button>)}
+          {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
         </div>
         <div className="client-form-progress" aria-label={`Étape ${step === 3 ? 2 + policyStep : step} sur ${newFlow ? 4 : 2}`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div>{newFlow && <><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step === 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : ''}><span>4</span><strong>Saisir quittance</strong></div></>}</div>
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
@@ -333,7 +326,6 @@ export default function ClientManagementPage({ modal = false }) {
               beforeSave={createClientBeforePolicy}
               onSaved={handlePolicySaved}
               finalLabel="Créer le client"
-              jump={jump}
             />
           </div>
         )}

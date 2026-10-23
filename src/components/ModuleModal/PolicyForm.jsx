@@ -163,8 +163,8 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
 }
 
 // embedded: used as steps 3 and 4 of the "new client" flow. beforeSave runs first (it creates the client) and onSaved
-// runs once the policy and its first receipt are stored; jump = { to: 1 | 2 } moves to the policy / receipt step.
-export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onSaved, finalLabel = "Soumettre", jump = null }) {
+// runs once the policy and its first receipt are stored.
+export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onSaved, finalLabel = "Soumettre" }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
@@ -362,13 +362,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     // A first receipt must be filled in before a new client can be created.
     const quittanceComplete = Boolean(values.date_emission && values.prime_net !== "" && values.prime_total !== "" && values.montant_quittance !== "");
-
-    useEffect(() => {
-        if (!jump) return;
-        if (jump.to === 1) setStep(1);
-        else goToReceipt();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [jump]);
 
     function goToReceipt() {
         setError("");
