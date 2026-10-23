@@ -110,9 +110,11 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
             typeof data?.detail === "string" ? data.detail : `Erreur de recherche (${response.status})`
           );
         }
-        if (!Array.isArray(data?.items)) throw new Error("Format de réponse invalide du serveur.");
-        setPolices(data.items);
-        setTotal(Number(data.total) || 0);
+        // A backend without paging still answers with a plain list (first 100 policies).
+        const items = Array.isArray(data) ? data : data?.items;
+        if (!Array.isArray(items)) throw new Error("Format de réponse invalide du serveur.");
+        setPolices(items);
+        setTotal(Array.isArray(data) ? items.length : Number(data.total) || 0);
         setSearched(true);
       } catch (err) {
         if (err.name !== "AbortError") {
