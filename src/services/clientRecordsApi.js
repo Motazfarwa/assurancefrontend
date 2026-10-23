@@ -35,3 +35,22 @@ export async function updateClientRecord(accessToken, kind, id, changes) {
   }
   return body;
 }
+
+export async function createQuittance(accessToken, payload) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/quittances`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error(`Impossible de joindre l’API (${API_BASE_URL}). Vérifiez que le serveur FastAPI est démarré.`);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = Array.isArray(body.detail) ? body.detail.map((item) => item.msg).join(' ; ') : body.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Impossible d’enregistrer la quittance.');
+  }
+  return body;
+}

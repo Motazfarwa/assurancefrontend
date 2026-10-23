@@ -1,88 +1,71 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
-import { listClientRecords, updateClientRecord } from "../../services/clientRecordsApi";
+import { createQuittance, listClientRecords } from "../../services/clientRecordsApi";
 import "./ReceiptManager.css";
 
-// Same columns as the legacy receipts grid. Effet = receipt start (emission) date; Reg = settled (has a settlement date).
-const COLUMNS = [
-  ["num_quittance", "N° quittance"], ["date_saisie", "Date Saisie", "date"], ["date_emission", "Effet", "date"],
-  ["tc", "TC"], ["prime_net", "P. Net", "money"], ["reg", "Reg"], ["Date_Reglement", "Date Reg", "date"],
-  ["commission", "MM. Comp", "money"], ["Date_M", "Date Mvt", "date"], ["montant_quittance", "Mont. Quit.", "money"],
-  ["solde_quittance", "Solde", "money"]
-];
+const today = () => new Date().toISOString().slice(0, 10);
+const blank = () => ({
+  num_police: "", num_quittance: "", tc: "T", date_saisie: today(), date_emission: "", echeance: "", date_m: today(),
+  prime_net: "", commission: "", montant_quittance: "", solde_quittance: "", date_reglement: ""
+});
 
-// key = field of the receipt record, api = field accepted by the update endpoint.
-const FIELDS = [
-  { key: "date_saisie", api: "date_saisie", label: "Date Saisie", type: "date" },
-  { key: "date_emission", api: "date_emission", label: "Effet", type: "date" },
-  { key: "tc", api: "tc", label: "TC", type: "text" },
-  { key: "prime_net", api: "prime_net", label: "P. Net", type: "number" },
-  { key: "Date_Reglement", api: "date_reglement", label: "Date Reg", type: "date" },
-  { key: "commission", api: "commission", label: "MM. Comp", type: "number" },
-  { key: "Date_M", api: "date_m", label: "Date Mvt", type: "date" },
-  { key: "montant_quittance", api: "montant_quittance", label: "Mont. Quit.", type: "number" },
-  { key: "solde_quittance", api: "solde_quittance", label: "Solde", type: "number" }
-];
-
-const shortDate = (value) => (value ? String(value).slice(0, 10).split("-").reverse().join("/") : "");
-const money = (value) => (value == null || value === "" ? "" : Number(value).toLocaleString("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
-const initial = (row, field) => {
-  const value = row?.[field.key];
-  if (value == null) return "";
-  return field.type === "date" ? String(value).slice(0, 10) : String(value).trim();
-};
-
+// Entry form for a client's receipt, with the fields of the legacy receipts grid.
 export default function ReceiptManager({ clientCode, onClose }) {
   const { accessToken } = useAuth();
-  const [receipts, setReceipts] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [values, setValues] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [policies, setPolicies] = useState([]);
+  const [values, setValues] = useState(blank);
+  const [soldeTouched, setSoldeTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const load = useCallback(async (keep) => {
-    setLoading(true);
-    setError("");
-    try {
-      const rows = await listClientRecords(accessToken, "receipts", clientCode, { limit: 1000 });
-      setReceipts(rows);
-      const again = keep ? rows.find((row) => row.num_quittance === keep) : null;
-      setSelected(again || null);
-      setValues(again ? Object.fromEntries(FIELDS.map((field) => [field.key, initial(again, field)])) : {});
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let active = true;
+    listClientRecords(accessToken, "policies", clientCode, { limit: 1000 })
+      .then((rows) => { if (active) setPolicies(rows); })
+      .catch((requestError) => { if (active) setError(requestError.message); });
+    return () => { active = false; };
   }, [accessToken, clientCode]);
 
-  useEffect(() => { load(null); }, [load]);
-
-  function choose(row) {
-    setSelected(row);
-    setValues(Object.fromEntries(FIELDS.map((field) => [field.key, initial(row, field)])));
+  function update(key, value) {
+    setValues((current) => {
+      const next = { ...current, [key]: value };
+      // The balance follows the amount (and is zero once settled) until it is typed by hand.
+      if (!soldeTouched && ["montant_quittance", "date_reglement"].includes(key)) {
+        next.solde_quittance = next.date_reglement ? "0" : next.montant_quittance;
+      }
+      return next;
+    });
     setNotice("");
-    setError("");
   }
 
-  async function save(event) {
+  async function submit(event) {
     event.preventDefault();
-    if (!selected) return;
-    const changes = {};
-    FIELDS.forEach((field) => {
-      if (values[field.key] === initial(selected, field)) return;
-      const raw = values[field.key];
-      changes[field.api] = raw === "" ? null : field.type === "number" ? Number(raw) : raw;
-    });
-    if (!Object.keys(changes).length) { setNotice("Aucune modification à enregistrer."); return; }
-    setSaving(true);
     setError("");
+    setNotice("");
+    const policy = policies.find((row) => String(row.num_int).trim() === values.num_police);
+    if (!policy) { setError("Choisissez la police de cette quittance."); return; }
+    const number = (value) => (value === "" ? null : Number(value));
+    setSaving(true);
     try {
-      await updateClientRecord(accessToken, "receipts", selected.num_quittance, changes);
-      setNotice(`Quittance ${selected.num_quittance} enregistrée.`);
-      await load(selected.num_quittance);
+      const result = await createQuittance(accessToken, {
+        num_int: String(policy.num_int).trim(),
+        code_client: clientCode,
+        num_quittance: values.num_quittance.trim() || null,
+        tc: values.tc || null,
+        date_saisie: values.date_saisie || null,
+        date_emission: values.date_emission || null,
+        echeance: values.echeance || null,
+        date_m: values.date_m || null,
+        date_reglement: values.date_reglement || null,
+        prime_net: number(values.prime_net),
+        commission: number(values.commission),
+        montant_quittance: number(values.montant_quittance),
+        solde_quittance: number(values.solde_quittance),
+      });
+      setNotice(`Quittance ${result.num_quittance} enregistrée.`);
+      setValues((current) => ({ ...blank(), num_police: current.num_police, tc: current.tc }));
+      setSoldeTouched(false);
     } catch (saveError) {
       setError(saveError.message);
     } finally {
@@ -90,60 +73,57 @@ export default function ReceiptManager({ clientCode, onClose }) {
     }
   }
 
-  const rows = receipts.map((row) => ({ ...row, reg: row.Date_Reglement ? "O" : "N" }));
-  const reg = values.Date_Reglement ? "O" : "N";
+  const field = (key, label, type = "text", extra = {}) => (
+    <label>
+      <span>{label}</span>
+      <input type={type} step={type === "number" ? "any" : undefined} value={values[key]} onChange={(event) => update(key, event.target.value)} {...extra} />
+    </label>
+  );
 
   return (
-    <form className="rm-form" onSubmit={save}>
-      <p className="module-modal-description">Quittances du client {clientCode} : sélectionnez une ligne pour consulter ou modifier ses champs.</p>
+    <form className="rm-form" onSubmit={submit}>
+      <p className="module-modal-description">Saisie d’une quittance pour le client {clientCode}.</p>
 
-      <div className="rm-table-wrap">
-        <table className="rm-table">
-          <thead><tr>{COLUMNS.map(([, label]) => <th key={label}>{label}</th>)}</tr></thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={COLUMNS.length} className="rm-empty">Chargement des quittances…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={COLUMNS.length} className="rm-empty">Aucune quittance pour ce client.</td></tr>
-            ) : rows.map((row) => (
-              <tr key={row.num_quittance} className={selected?.num_quittance === row.num_quittance ? "is-selected" : undefined} onClick={() => choose(row)}>
-                {COLUMNS.map(([key, , kind]) => (
-                  <td key={key} className={kind === "money" ? "is-number" : undefined}>
-                    {kind === "money" ? money(row[key]) : kind === "date" ? shortDate(row[key]) : row[key] ?? ""}
-                  </td>
-                ))}
-              </tr>
+      <div className="rm-fields">
+        <label><span>Code client</span><input value={clientCode} readOnly /></label>
+        <label className="rm-span-2">
+          <span>N° police *</span>
+          <select value={values.num_police} onChange={(event) => update("num_police", event.target.value)} required>
+            <option value="">{policies.length ? "Sélectionner la police" : "Aucune police pour ce client"}</option>
+            {policies.map((row) => (
+              <option key={row.num_int} value={String(row.num_int).trim()}>{String(row.num_police).trim()}{row.num_imat ? ` · ${String(row.num_imat).trim()}` : ""}</option>
             ))}
-          </tbody>
-        </table>
+          </select>
+        </label>
+        {field("num_quittance", "N° quittance", "text", { maxLength: 15, placeholder: "Automatique si vide" })}
+
+        {field("date_saisie", "Date Saisie", "date")}
+        {field("date_emission", "Effet", "date")}
+        {field("echeance", "Échéance", "date")}
+        <label>
+          <span>TC</span>
+          <select value={values.tc} onChange={(event) => update("tc", event.target.value)}><option value="T">T — Terme</option><option value="C">C — Comptant</option></select>
+        </label>
+
+        {field("prime_net", "P. Net", "number")}
+        {field("commission", "MM. Comp", "number")}
+        {field("montant_quittance", "Mont. Quit.", "number")}
+        <label>
+          <span>Solde</span>
+          <input type="number" step="any" value={values.solde_quittance} onChange={(event) => { setSoldeTouched(true); setValues((current) => ({ ...current, solde_quittance: event.target.value })); }} />
+        </label>
+
+        <label><span>Reg</span><input value={values.date_reglement ? "O" : "N"} readOnly /></label>
+        {field("date_reglement", "Date Reg", "date")}
+        {field("date_m", "Date Mvt", "date")}
       </div>
 
       {error && <p className="rm-error" role="alert">{error}</p>}
       {notice && !error && <p className="rm-notice" role="status">{notice}</p>}
 
-      {selected && (
-        <fieldset className="rm-fields">
-          <legend>Quittance {selected.num_quittance}</legend>
-          <label><span>N° quittance</span><input value={selected.num_quittance} readOnly /></label>
-          {FIELDS.map((field) => (
-            <label key={field.key}>
-              <span>{field.label}</span>
-              <input
-                type={field.type}
-                step={field.type === "number" ? "any" : undefined}
-                maxLength={field.key === "tc" ? 1 : undefined}
-                value={values[field.key] ?? ""}
-                onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
-              />
-            </label>
-          ))}
-          <label><span>Reg</span><input value={reg} readOnly /></label>
-        </fieldset>
-      )}
-
       <footer className="module-modal-actions">
         <button type="button" className="module-secondary-button" onClick={onClose}>Fermer</button>
-        <button type="submit" className="module-primary-button" disabled={!selected || saving}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
+        <button type="submit" className="module-primary-button" disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
       </footer>
     </form>
   );
