@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './ModuleModal.css';
 import PolicyForm from './PolicyForm';
+import ReceiptManager from './ReceiptManager';
 
 const FORM_FIELDS = {
   client: [
@@ -66,6 +67,8 @@ export default function ModuleModal({ module, category, onClose, clientCode = ''
     : baseFields;
   const isReport = module.form === 'report';
   const isPolicy = module.form === 'policy';
+  // Opened from a client file: the client's receipts with the legacy columns, editable.
+  const isReceiptManager = module.form === 'receipt' && Boolean(clientCode);
   useEffect(() => {
     function onKeyDown(event) {
       if (event.key === 'Escape') onClose();
@@ -88,7 +91,7 @@ return (
     }
   >
 <section
-  className={`module-modal ${isPolicy ? "policy-modal-expanded" : ""}`}
+  className={`module-modal ${isPolicy ? "policy-modal-expanded" : ""}${isReceiptManager ? " receipt-modal-wide" : ""}`}
   role="dialog"
   aria-modal="true"
   aria-labelledby="module-modal-title"
@@ -114,6 +117,8 @@ return (
 
       {isPolicy ? (
         <PolicyForm clientCode={clientCode} prefill={prefill} onStepChange={setPolicyStep} />
+      ) : isReceiptManager ? (
+        <ReceiptManager clientCode={clientCode} onClose={onClose} />
       ) : submitted ? (
         <div className="module-form-success">
           <span className="success-mark">✓</span>
