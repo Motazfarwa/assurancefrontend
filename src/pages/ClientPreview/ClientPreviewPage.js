@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { useClient } from '../../contexts/ClientContext';
 import { navigate } from '../../navigation';
-import { listClientRecords, updateClientRecord } from '../../services/clientRecordsApi';
+import { listClientRecords, searchRecords, updateClientRecord } from '../../services/clientRecordsApi';
 import { downloadClientExcel } from '../../services/clientExcelExport';
 import '../ClientManagement/ClientManagementPage.css';
 
@@ -53,11 +53,12 @@ const initialValue = (record, field) => {
   return field.type === 'date' ? String(value).slice(0, 10) : String(value);
 };
 
-function RecordsDialog({ kicker, title, columns: fixedColumns, records, loading, error, onClose, actions, nested = false }) {
+function RecordsDialog({ kicker, title, columns: fixedColumns, records, loading, error, onClose, actions, nested = false, filters, onFilterChange }) {
   const columns = fixedColumns || Object.keys(records[0] || {}).map((key) => [key, key]);
   return <div className={`client-records-backdrop${nested ? ' is-nested' : ''}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="client-records-dialog" role="dialog" aria-modal="true" aria-label={title}>
       <header><div><span>{kicker}</span><h2>{title}</h2></div><button type="button" onClick={onClose} aria-label="Fermer">×</button></header>
+      {filters && <div className="client-records-filters">{filters.map((filter) => <label key={filter.key}><span>{filter.label}</span><input value={filter.value} onChange={(event) => onFilterChange(filter.key, event.target.value)} placeholder={filter.placeholder} maxLength={filter.maxLength} /></label>)}</div>}
       {loading ? <p className="client-records-message">Chargement des enregistrements…</p> : error ? <p className="client-records-message is-error">{error}</p> : records.length === 0 ? <p className="client-records-message">Aucun enregistrement trouvé.</p> : <div className="client-records-table-wrap"><table><thead><tr>{columns.map(([, label]) => <th key={label}>{label}</th>)}{actions && <th />}</tr></thead><tbody>{records.map((record, index) => <tr key={`${record.num_quittance || record.num_int || record.num_police || ''}-${index}`}>{columns.map(([key]) => <td key={key}>{formatValue(record[key])}</td>)}{actions && <td><div className="client-row-actions">{actions(record)}</div></td>}</tr>)}</tbody></table></div>}
       <footer><span>{loading ? '' : `${records.length} résultat${records.length > 1 ? 's' : ''}`}</span><button className="client-secondary-button" type="button" onClick={onClose}>Fermer</button></footer>
     </section>
@@ -109,34 +110,53 @@ export default function ClientPreviewPage() {
   const [receiptsState, setReceiptsState] = useState({ loading: false, error: '', records: [] });
   const [claimsPolicy, setClaimsPolicy] = useState(null);
   const [claimsState, setClaimsState] = useState({ loading: false, error: '', records: [] });
+  const [policyFilters, setPolicyFilters] = useState({ code_client: '', nom_client: '', num_police: '' });
+  const [receiptFilters, setReceiptFilters] = useState({ code_client: '', nom_client: '', code_branche: '' });
+  const [receiptsScoped, setReceiptsScoped] = useState(true); // until a filter is edited, only the opened policy's receipts
   const [editing, setEditing] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const fullName = [client.firstName, client.lastName].filter(Boolean).join(' ') || 'Nouveau client';
 
-  async function loadPolicies() {
+  // Policies matching the filters (the client's own code is pre-filled; clear it to search every client).
+  async function loadPolicies(filters = policyFilters) {
     setPoliciesState((current) => ({ ...current, loading: true, error: '' }));
     try {
-      setPoliciesState({ loading: false, error: '', records: await listClientRecords(accessToken, 'policies', client.clientCode) });
+      setPoliciesState({ loading: false, error: '', records: await searchRecords(accessToken, 'policies', filters) });
     } catch (error) {
       setPoliciesState({ loading: false, error: error.message, records: [] });
     }
   }
 
-  async function loadReceipts(policy) {
+  async function loadReceipts(policy = receiptsPolicy, filters = receiptFilters, scoped = receiptsScoped) {
     setReceiptsState((current) => ({ ...current, loading: true, error: '' }));
     try {
-      const receipts = await listClientRecords(accessToken, 'receipts', client.clientCode);
-      setReceiptsState({ loading: false, error: '', records: receipts.filter((receipt) => receipt.num_int === policy.num_int).map((receipt) => ({ ...receipt, reg: receipt.Date_Reglement ? 'O' : 'N' })) });
+      const query = scoped ? { num_int: String(policy.num_int).trim() } : filters;
+      const receipts = await searchRecords(accessToken, 'receipts', query);
+      setReceiptsState({ loading: false, error: '', records: receipts.map((receipt) => ({ ...receipt, reg: receipt.Date_Reglement ? 'O' : 'N' })) });
     } catch (error) {
       setReceiptsState({ loading: false, error: error.message, records: [] });
     }
   }
 
+  useEffect(() => {
+    if (!policiesOpen) return undefined;
+    const timer = setTimeout(() => loadPolicies(policyFilters), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [policiesOpen, policyFilters]);
+
+  useEffect(() => {
+    if (!receiptsPolicy) return undefined;
+    const timer = setTimeout(() => loadReceipts(receiptsPolicy, receiptFilters, receiptsScoped), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiptsPolicy, receiptFilters, receiptsScoped]);
+
   function showPolicies() {
-    setPoliciesOpen(true);
+    setPolicyFilters({ code_client: client.clientCode || '', nom_client: '', num_police: '' });
     setPoliciesState({ loading: true, error: '', records: [] });
-    loadPolicies();
+    setPoliciesOpen(true);
   }
 
   async function showClaims(policy) {
@@ -150,9 +170,10 @@ export default function ClientPreviewPage() {
   }
 
   function showReceipts(policy) {
-    setReceiptsPolicy(policy);
+    setReceiptFilters({ code_client: String(policy.code_client || client.clientCode || '').trim(), nom_client: '', code_branche: String(policy.code_branche || '').trim() });
+    setReceiptsScoped(true);
     setReceiptsState({ loading: true, error: '', records: [] });
-    loadReceipts(policy);
+    setReceiptsPolicy(policy);
   }
 
   async function saveEdit(changes) {
@@ -160,7 +181,7 @@ export default function ClientPreviewPage() {
     await updateClientRecord(accessToken, editing.kind, isPolicy ? editing.record.num_int : editing.record.num_quittance, changes);
     setEditing(null);
     if (isPolicy) await loadPolicies();
-    else await loadReceipts(receiptsPolicy);
+    else await loadReceipts();
   }
 
   async function exportExcel() {
@@ -237,9 +258,9 @@ export default function ClientPreviewPage() {
         <DetailSection title="Informations du dossier"><Detail label="Type client" value={client.clientType} /><Detail label="Exonéré" value={client.taxExempt ? 'Oui' : 'Non'} /><Detail label="Observation" value={client.notes} /></DetailSection>
         <footer className="client-payment-footer"><div className="payment-method"><img src="/logos/attijari.svg" alt="Attijari Bank" /><strong>Virement à Attijari</strong></div><div className="payment-method"><strong>En espèces à </strong><img src="/logos/stb.svg" alt="STB Bank" /></div></footer>
       </article>
-      {policiesOpen && <RecordsDialog kicker="DOSSIER CLIENT · MODULE 110" title="Polices du client" columns={POLICY_COLUMNS} {...policiesState} onClose={() => setPoliciesOpen(false)} actions={(policy) => <><button type="button" onClick={() => showReceipts(policy)}>Quittances</button><button type="button" onClick={() => showClaims(policy)}>Sinistres</button><button type="button" onClick={() => setEditing({ kind: 'policies', record: policy })}>Modifier</button></>} />}
+      {policiesOpen && <RecordsDialog kicker="DOSSIER CLIENT · MODULE 110" title="Polices du client" columns={POLICY_COLUMNS} {...policiesState} filters={[{ key: 'num_police', label: 'N° police', value: policyFilters.num_police, placeholder: 'Ex : 0522…' }, { key: 'nom_client', label: 'Nom client', value: policyFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'code_client', label: 'Code client', value: policyFilters.code_client, placeholder: 'Tous les clients', maxLength: 8 }]} onFilterChange={(key, value) => setPolicyFilters((current) => ({ ...current, [key]: value }))} onClose={() => setPoliciesOpen(false)} actions={(policy) => <><button type="button" onClick={() => showReceipts(policy)}>Quittances</button><button type="button" onClick={() => showClaims(policy)}>Sinistres</button><button type="button" onClick={() => setEditing({ kind: 'policies', record: policy })}>Modifier</button></>} />}
       {claimsPolicy && <RecordsDialog nested kicker={`POLICE ${claimsPolicy.num_police || claimsPolicy.num_int} · SINISTRES`} title="Sinistres de la police" columns={CLAIM_COLUMNS} {...claimsState} onClose={() => setClaimsPolicy(null)} />}
-      {receiptsPolicy && <RecordsDialog nested kicker={`POLICE ${receiptsPolicy.num_police || receiptsPolicy.num_int} · MODULE 130`} title="Quittances de la police" columns={RECEIPT_COLUMNS} {...receiptsState} onClose={() => setReceiptsPolicy(null)} actions={(receipt) => <button type="button" onClick={() => setEditing({ kind: 'receipts', record: receipt })}>Modifier</button>} />}
+      {receiptsPolicy && <RecordsDialog nested kicker={`POLICE ${receiptsPolicy.num_police || receiptsPolicy.num_int} · MODULE 130`} title="Quittances de la police" columns={RECEIPT_COLUMNS} {...receiptsState} filters={[{ key: 'code_client', label: 'Code client', value: receiptFilters.code_client, placeholder: 'Tous', maxLength: 8 }, { key: 'nom_client', label: 'Nom client', value: receiptFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'code_branche', label: 'Code branche', value: receiptFilters.code_branche, placeholder: 'Ex : 052', maxLength: 3 }]} onFilterChange={(key, value) => { setReceiptsScoped(false); setReceiptFilters((current) => ({ ...current, [key]: value })); }} onClose={() => setReceiptsPolicy(null)} actions={(receipt) => <button type="button" onClick={() => setEditing({ kind: 'receipts', record: receipt })}>Modifier</button>} />}
       {editing && <EditRecordDialog key={editing.record.num_quittance || editing.record.num_int} kicker={editing.kind === 'policies' ? 'MODULE 110' : 'MODULE 130'} title={editing.kind === 'policies' ? `Modifier la police ${editing.record.num_police || editing.record.num_int}` : `Modifier la quittance ${editing.record.num_quittance}`} fields={editing.kind === 'policies' ? POLICY_FIELDS : RECEIPT_FIELDS} record={editing.record} onSave={saveEdit} onClose={() => setEditing(null)} />}
     </main>
   );

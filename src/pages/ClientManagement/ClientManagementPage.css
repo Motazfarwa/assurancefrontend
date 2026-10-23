@@ -277,3 +277,9 @@
 /* Type client row (step 1) */
 .client-record-form .client-type-row { grid-template-columns: 1fr; margin-bottom: 4px; }
 .client-record-form .client-type-row fieldset { padding: 6px 12px 8px; }
+
+/* Filters of the policies / receipts windows */
+.client-records-filters { display: flex; flex-wrap: wrap; gap: 10px 14px; padding: 12px 22px; border-bottom: 1px solid #e4eaec; background: #fafcfc; }
+.client-records-filters label { display: flex; flex-direction: column; gap: 4px; color: #587079; font-size: 10px; font-weight: 700; }
+.client-records-filters input { width: 170px; height: 32px; padding: 4px 10px; border: 1px solid #d3dfe5; border-radius: 7px; background: #fff; font: inherit; font-size: 12px; font-weight: 500; color: #173247; }
+.client-records-filters input:focus { outline: none; border-color: #63b9a9; box-shadow: 0 0 0 3px rgba(99, 185, 169, .14); }

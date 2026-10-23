@@ -16,6 +16,22 @@ export async function listClientRecords(accessToken, kind, clientCode, query = {
   return Array.isArray(body.items) ? body.items : [];
 }
 
+// Search across clients (filters of the policies / receipts windows). kind: 'policies' | 'receipts'.
+export async function searchRecords(accessToken, kind, filters) {
+  const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== '' && value != null));
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/records/${kind}?${params.toString()}`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new Error(`Impossible de joindre l’API (${API_BASE_URL}). Vérifiez que le serveur FastAPI est démarré.`);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Recherche impossible.');
+  return Array.isArray(body.items) ? body.items : [];
+}
+
 export async function updateClientRecord(accessToken, kind, id, changes) {
   const path = kind === 'policies' ? `polices/${encodeURIComponent(id)}` : `quittances/${encodeURIComponent(id)}`;
   let response;
