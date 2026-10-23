@@ -32,7 +32,7 @@ const initialValues = {
     g_bdg: "2000",
     g_personnes: "",
     g_ind_cond: "",
-    g_remarquage: "",
+    g_remarquage: true, // "Remarquage": yes by default
 
     // Quittance
     date_saisie: new Date().toISOString().slice(0, 10),
@@ -65,7 +65,7 @@ const GARANTIES = [
     ["g_vol", "Vol"], ["g_incendie", "Incendie"], ["g_bdg", "BDG"],
     ["g_personnes", "Personnes transportées"], ["g_ind_cond", "IND conducteur"], ["g_remarquage", "Remarquage"]
 ];
-const TERMS = [{ value: "12", label: "Année" }, { value: "6", label: "6 mois" }];
+const TERMS = [{ value: "1", label: "1 mois" }, { value: "3", label: "3 mois" }, { value: "6", label: "6 mois" }, { value: "12", label: "1 année" }];
 const pad2 = (n) => String(n).padStart(2, "0");
 
 // effet + months, keeping the day when the target month is shorter (31 Aug + 6 months -> 28/29 Feb).
@@ -409,7 +409,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             bdg: amount(values.g_bdg),
             personnes_transportees: amount(values.g_personnes),
             ind_conducteur: amount(values.g_ind_cond),
-            remarquage: amount(values.g_remarquage)
+            remarquage: values.g_remarquage ? 1 : 0
         };
         if (values.effet) police.heure_effet = `${values.effet}T${values.heure_effet}:00`;
         quittance.observation = values.observation || "";
@@ -501,7 +501,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             const g = data.garanties || {};
             const guarantees = {
                 g_vol: asText(g.vol), g_incendie: asText(g.incendie), g_bdg: asText(g.bdg),
-                g_personnes: asText(g.personnes_transportees), g_ind_cond: asText(g.ind_conducteur), g_remarquage: asText(g.remarquage)
+                g_personnes: asText(g.personnes_transportees), g_ind_cond: asText(g.ind_conducteur), g_remarquage: g.remarquage != null && Number(g.remarquage) !== 0
             };
             setValues(prev => ({ ...prev, ...loaded, ...guarantees }));
             setNomBranche(data.nom_branche || '');
@@ -788,7 +788,19 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             <section className="pf-section pf-garanties pf-span-full">
                 <h3>Garanties véhicule</h3>
                 <div className="pf-grid pf-grid-garanties">
-                    {GARANTIES.map(([key, label]) => (
+                    {GARANTIES.map(([key, label]) => key === "g_remarquage" ? (
+                        <div className="pf-field" key={key}>
+                            <span>{label}</span>
+                            <label className="pf-check pf-check-yesno">
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(values.g_remarquage)}
+                                    onChange={e => update("g_remarquage", e.target.checked)}
+                                />
+                                {values.g_remarquage ? "Oui" : "Non"}
+                            </label>
+                        </div>
+                    ) : (
                         <label className="pf-field" key={key}>
                             <span>{label}</span>
                             <input

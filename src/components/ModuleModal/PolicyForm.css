@@ -518,3 +518,6 @@
   border-top: 1px solid #e4eaec;
   background: #fff;
 }
+
+/* Remarquage yes / no sits on the same line as the other inputs */
+.policy-modal-expanded .pf-check-yesno { min-height: clamp(24px, 4.1vh, 32px); font-size: clamp(12px, 1.9vh, 13px); font-weight: 600; }

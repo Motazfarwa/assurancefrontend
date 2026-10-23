@@ -33,7 +33,7 @@ const PAGE_SIZE = 50;
 export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
   const { accessToken } = useAuth();
   const [code, setCode] = useState(codeClient || "");
-  const [statut, setStatut] = useState("tous");
+  const [statut, setStatut] = useState("vigueur");
   const [nomClient, setNomClient] = useState("");
   const [polices, setPolices] = useState([]);
   const [page, setPage] = useState(1);
