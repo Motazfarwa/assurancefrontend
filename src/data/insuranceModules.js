@@ -25,6 +25,8 @@ export const INSURANCE_MODULES = [
   { id: '500', category: 'accounting', title: 'Depenses techniques', description: 'Suivre les depenses techniques.', permission: P.REPORTS_VIEW, form: 'report' },
   { id: '510', category: 'accounting', title: 'Moins percus et trop percus', description: 'Rechercher les ecarts de perception.', permission: P.REPORTS_VIEW, form: 'report' },
   { id: '520', category: 'accounting', title: 'Recus supprimes', description: 'Consulter l’historique des recus annules.', permission: P.REPORTS_VIEW, form: 'report' },
+  { id: '530', category: 'accounting', title: 'Reception bordereau', description: 'Importer le bordereau Excel recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-reception' },
+  { id: '540', category: 'accounting', title: 'Confrontation bordereau', description: 'Comparer le bordereau du siege avec vos polices et quittances.', permission: P.REPORTS_VIEW, form: 'bordereau-confrontation' },
 
   { id: '300', category: 'collections', title: 'Suivi du recouvrement', description: 'Consulter les paiements en attente.', permission: P.REPORTS_VIEW, form: 'search' },
   { id: '310', category: 'collections', title: 'Dossiers en retard', description: 'Identifier les echeances impayees.', permission: P.REPORTS_VIEW, form: 'report' },

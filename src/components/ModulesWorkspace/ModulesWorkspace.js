@@ -9,6 +9,8 @@ import CompanyManagementModal from '../CompanyManagementModal/CompanyManagementM
 import BranchManagementModal from '../BranchManagementModal/BranchManagementModal';
 import DocumentEntryModal from '../DocumentEntryModal/DocumentEntryModal';
 import AgencyUnpaidModal from '../AgencyUnpaidModal/AgencyUnpaidModal';
+import BordereauReceptionModal from '../BordereauModal/BordereauReceptionModal';
+import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontationModal';
 import './ModulesWorkspace.css';
 
 export default function ModulesWorkspace() {
@@ -21,6 +23,7 @@ export default function ModulesWorkspace() {
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
+  const [bordereauModal, setBordereauModal] = useState(null);
   const [activeModuleId, setActiveModuleId] = useState(null);
   const visibleModules = useMemo(
     () => user.role ? INSURANCE_MODULES.filter((module) => hasPermission(user, module.permission)) : INSURANCE_MODULES,
@@ -55,6 +58,11 @@ export default function ModulesWorkspace() {
     if (module.form === 'documents') {
       setActiveModuleId(module.id);
       setShowDocumentModal(true);
+      return;
+    }
+    if (module.form === 'bordereau-reception' || module.form === 'bordereau-confrontation') {
+      setActiveModuleId(module.id);
+      setBordereauModal(module.form);
       return;
     }
     if (module.form === 'unpaid-agency') {
@@ -126,6 +134,8 @@ export default function ModulesWorkspace() {
       {showBranchModal && <BranchManagementModal onClose={() => setShowBranchModal(false)} />}
       {showDocumentModal && <DocumentEntryModal onClose={() => setShowDocumentModal(false)} />}
       {showUnpaidModal && <AgencyUnpaidModal onClose={() => setShowUnpaidModal(false)} />}
+      {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal onClose={() => setBordereauModal(null)} />}
+      {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
     </main>
   );
 }
