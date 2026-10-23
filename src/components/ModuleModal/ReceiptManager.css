@@ -9,3 +9,4 @@
 .rm-error { border: 1px solid #f1cccc; background: #fff7f7; color: #b34747; }
 .rm-notice { border: 1px solid #cfe6df; background: #f3faf8; color: #1d6b62; }
 @media (max-width: 700px) { .rm-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rm-fields input:not([readonly]) { background: #fff; }
