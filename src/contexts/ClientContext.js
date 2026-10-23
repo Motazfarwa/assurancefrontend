@@ -11,7 +11,7 @@ export const EMPTY_CLIENT = {
   officeAddress: '', officeCity: '', officePostalCode: '', officeFax: '',
   officePhones: Array.from({ length: 4 }, () => ({ value: '', label: '' })),
   officeEmails: Array.from({ length: 3 }, () => ({ value: '', label: '' })),
-  correspondence: 'Bureau', clientType: 'Societe', taxExempt: false, notes: '',
+  correspondence: 'Bureau', clientType: 'Particulier', taxExempt: false, notes: '',
   companyName: 'Assurance Jemmali', companyCode: '', companyAgency: 'Siege', companyPhone: '', companyEmail: '',
   agencyCode: '', companyContact: '', companyMobile: '', createdAt: new Date().toISOString().slice(0, 10),
 };

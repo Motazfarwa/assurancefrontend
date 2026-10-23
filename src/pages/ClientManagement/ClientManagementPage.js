@@ -157,6 +157,13 @@ export default function ClientManagementPage({ modal = false }) {
     setNotice('');
   }
 
+  // A company has a single "raison sociale" (kept in the Nom field) and no first name.
+  function changeClientType(value) {
+    setClient((current) => ({ ...current, clientType: value, firstName: value === 'Societe' ? '' : current.firstName }));
+    setNotice('');
+  }
+  const isCompany = client.clientType === 'Societe';
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!client.clientCode.trim()) { setNotice('Le code client est obligatoire.'); return; }
@@ -222,10 +229,15 @@ export default function ClientManagementPage({ modal = false }) {
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
         <form className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
           {step === 1 && <>
+          <div className="client-record-options client-step-full client-type-row"><fieldset><legend>Type client</legend>{['Particulier', 'Societe'].map((value) => <label key={value}><input type="radio" name="clientType" checked={client.clientType === value} onChange={() => changeClientType(value)} />{value === 'Societe' ? 'Société' : value}</label>)}<label><input type="checkbox" checked={client.taxExempt} onChange={(event) => updateField('taxExempt', event.target.checked)} />Exonéré</label></fieldset></div>
           <FormSection title="Client" className="client-section-primary">
             <ClientField client={client} onChange={updateField} name="clientCode" label="Code client" required maxLength={8} readOnly />
-            <NameAutocomplete client={client} onChange={updateField} name="lastName" label="Nom" accessToken={accessToken} onPick={pickExistingClient} />
-            <NameAutocomplete client={client} onChange={updateField} name="firstName" label="Prenom" accessToken={accessToken} onPick={pickExistingClient} />
+            {isCompany
+              ? <NameAutocomplete client={client} onChange={updateField} name="lastName" label="Raison sociale" accessToken={accessToken} onPick={pickExistingClient} />
+              : <>
+                <NameAutocomplete client={client} onChange={updateField} name="lastName" label="Nom" accessToken={accessToken} onPick={pickExistingClient} />
+                <NameAutocomplete client={client} onChange={updateField} name="firstName" label="Prenom" accessToken={accessToken} onPick={pickExistingClient} />
+              </>}
             <ClientField client={client} onChange={updateField} name="nationality" label="Nationalite" type="select" options={['Tunisienne', 'Italienne', 'Autre']} />
             {client.nationality === 'Autre' && <ClientField client={client} onChange={updateField} name="nationalityOther" label="Precisez la nationalite" />}
             <ClientField client={client} onChange={updateField} name="country" label="Pays" />
@@ -234,7 +246,7 @@ export default function ClientManagementPage({ modal = false }) {
             <ClientField client={client} onChange={updateField} name="profession" label="Profession" />
             <ClientField client={client} onChange={updateField} name="civilStatus" label="Situation familiale" type="select" options={['Celibataire', 'Marie(e)', 'Divorce(e)', 'Veuf / Veuve']} />
             <ClientField client={client} onChange={updateField} name="title" label="Titre" type="select" options={['M.', 'Mme', 'Mlle', 'Soc.']} />
-            <ClientField client={client} onChange={updateField} name="identityNumber" label="N° C.I.N." />
+            <ClientField client={client} onChange={updateField} name="identityNumber" label={isCompany ? 'Matricule fiscale' : 'N° C.I.N.'} />
             <ClientField client={client} onChange={updateField} name="identityDate" label="Date C.I.N." type="date" />
             <ClientField client={client} onChange={updateField} name="identityPlace" label="Lieu C.I.N." />
             <ClientField client={client} onChange={updateField} name="licenseNumber" label="N° permis" />
@@ -265,7 +277,7 @@ export default function ClientManagementPage({ modal = false }) {
           </FormSection>
           </>}
           {step === 2 && <FormSection title="Observation" className="client-observation-section client-step-full"><label className="client-field client-field-wide"><span>Remarques sur le client</span><textarea rows={4} maxLength={500} value={client.notes || ''} placeholder="Saisir une observation (facultatif)" onChange={(event) => updateField('notes', event.target.value)} /><small className="client-observation-count">{(client.notes || '').length} / 500</small></label></FormSection>}
-          {step === 2 && <div className="client-record-options client-step-full"><fieldset><legend>Adresse de correspondance</legend>{['Bureau', 'Domicile'].map((value) => <label key={value}><input type="radio" name="correspondence" checked={client.correspondence === value} onChange={() => updateField('correspondence', value)} />{value}</label>)}</fieldset><fieldset><legend>Type client</legend>{['Societe', 'Particulier'].map((value) => <label key={value}><input type="radio" name="clientType" checked={client.clientType === value} onChange={() => updateField('clientType', value)} />{value}</label>)}<label><input type="checkbox" checked={client.taxExempt} onChange={(event) => updateField('taxExempt', event.target.checked)} />Exonere</label></fieldset></div>}
+          {step === 2 && <div className="client-record-options client-step-full"><fieldset><legend>Adresse de correspondance</legend>{['Bureau', 'Domicile'].map((value) => <label key={value}><input type="radio" name="correspondence" checked={client.correspondence === value} onChange={() => updateField('correspondence', value)} />{value}</label>)}</fieldset></div>}
           {notice && <p className="client-save-notice" role="status">{notice}</p>}
           <div className="client-form-actions">{step === 1 ? <><button type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button><button type="submit" className="client-primary-button" disabled={saving}>{saving ? 'Enregistrement…' : client._persisted ? 'Enregistrer les modifications' : 'Créer le client'}</button></>}</div>
         </form>
