@@ -9,7 +9,7 @@ import './BordereauModal.css';
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyLine = () => ({ num_police: '', code_client: '', nom_client: '', echeance: '', num_quittance: '', prime_net: '', commission: '', prime_total: '' });
 const GRID = [
-  ['num_police', 'N° Police'], ['code_client', 'Code Clt'], ['nom_client', 'Nom Client'], ['echeance', 'Échéance', 'date'],
+  ['num_police', 'N° Police (num_int)'], ['code_client', 'Code Clt'], ['nom_client', 'Nom Client'], ['echeance', 'Échéance', 'date'],
   ['num_quittance', 'N° Quit.'], ['prime_net', 'P.Net+C.Q.', 'money'], ['commission', 'Com.', 'money'], ['prime_total', 'Prime Total', 'money'],
 ];
 

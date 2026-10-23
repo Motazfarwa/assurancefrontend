@@ -10,13 +10,13 @@ const nameOf = (code, name) => [code, name].filter(Boolean).join(' ');
 
 const COLUMNS = {
   notReceived: [
-    { key: 'num_police', label: 'N° Police' },
+    { key: 'num_int', label: 'N° Police (num_int)' },
     { label: 'Code et Nom Client', value: (row) => nameOf(row.code_client, row.nom_client) },
     { key: 'echeance', label: 'Échéance' }, { key: 'unite', label: 'Unité' }, { key: 'duree', label: 'Durée' },
     { key: 'etat', label: 'État' }, { key: 'observation', label: 'Observation' },
   ],
   anomalies: [
-    { key: 'ligne', label: 'Ligne' }, { key: 'num_police', label: 'N° Police' },
+    { key: 'ligne', label: 'Ligne' }, { key: 'num_police', label: 'N° Police (num_int)' },
     { label: 'Client (bordereau)', value: (row) => nameOf(row.code_client, row.nom_client) },
     { label: 'Client (chez nous)', value: (row) => nameOf(row.code_client_notre, row.nom_client_notre) },
     { key: 'echeance', label: 'Échéance', kind: 'date' }, { key: 'prime_total', label: 'Prime totale', kind: 'money' },
@@ -24,7 +24,7 @@ const COLUMNS = {
     { key: 'motifs', label: 'Motifs' },
   ],
   bordereau: [
-    { key: 'ligne', label: 'Ligne' }, { key: 'num_quittance', label: 'N° Quittance' }, { key: 'num_police', label: 'N° Police' },
+    { key: 'ligne', label: 'Ligne' }, { key: 'num_quittance', label: 'N° Quittance' }, { key: 'num_police', label: 'N° Police (num_int)' },
     { key: 'code_client', label: 'C. Client' }, { key: 'echeance', label: 'Échéance', kind: 'date' },
     { key: 'prime_net', label: 'P. Net + C.Q.', kind: 'money' }, { key: 'prime_total', label: 'Prime Total', kind: 'money' },
     { key: 'commission', label: 'Commission', kind: 'money' },

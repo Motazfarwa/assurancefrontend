@@ -127,7 +127,7 @@ export default function BordereauFusionModal({ onClose }) {
             {anomalies.length > 0 && (
               <div className="bd-grid-wrap bd-report-table">
                 <table className="bd-grid">
-                  <thead><tr><th>Ligne</th><th>N° Police</th><th>Client</th><th>Motifs</th></tr></thead>
+                  <thead><tr><th>Ligne</th><th>N° Police (num_int)</th><th>Client</th><th>Motifs</th></tr></thead>
                   <tbody>{anomalies.slice(0, 100).map((line) => (
                     <tr key={line.id_ligne} className={line.statut === 'inconnue' ? 'is-unknown' : 'is-gap'}>
                       <td>{line.ligne}</td><td>{line.num_police}</td><td>{line.nom_client || line.nom_client_notre || ''}</td><td>{line.motifs.join(' ; ')}</td>
