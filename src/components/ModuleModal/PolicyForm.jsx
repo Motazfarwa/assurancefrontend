@@ -791,14 +791,24 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     {GARANTIES.map(([key, label]) => key === "g_remarquage" ? (
                         <div className="pf-field" key={key}>
                             <span>{label}</span>
-                            <label className="pf-check pf-check-yesno">
-                                <input
-                                    type="checkbox"
-                                    checked={Boolean(values.g_remarquage)}
-                                    onChange={e => update("g_remarquage", e.target.checked)}
-                                />
-                                {values.g_remarquage ? "Oui" : "Non"}
-                            </label>
+                            <div className="pf-check-row pf-check-yesno-row">
+                                <label className="pf-check pf-check-yesno">
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(values.g_remarquage)}
+                                        onChange={() => update("g_remarquage", true)}
+                                    />
+                                    Oui
+                                </label>
+                                <label className="pf-check pf-check-yesno">
+                                    <input
+                                        type="checkbox"
+                                        checked={!values.g_remarquage}
+                                        onChange={() => update("g_remarquage", false)}
+                                    />
+                                    Non
+                                </label>
+                            </div>
                         </div>
                     ) : (
                         <label className="pf-field" key={key}>
