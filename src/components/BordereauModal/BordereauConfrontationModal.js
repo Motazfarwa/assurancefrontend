@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listCompanies } from '../../services/companyApi';
-import { currentMonth, getConfrontation, monthToPeriode } from '../../services/bordereauApi';
+import { getConfrontation, monthToPeriode, nextMonth } from '../../services/bordereauApi';
 import { exportReportExcel, money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
@@ -61,7 +61,7 @@ function Table({ columns, rows, empty, rowClass }) {
 export default function BordereauConfrontationModal({ onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
-  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: currentMonth() });
+  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: nextMonth() });
   const [result, setResult] = useState(null);
   const [tab, setTab] = useState('confrontation');
   const [loading, setLoading] = useState(false);
@@ -134,7 +134,7 @@ export default function BordereauConfrontationModal({ onClose }) {
             </select>
           </label>
           <label>TC
-            <select value={form.tc} onChange={(event) => setForm((current) => ({ ...current, tc: event.target.value }))}><option value="T">Terme</option><option value="C">Comptant</option></select>
+            <select value="T" disabled><option value="T">Terme</option></select>
           </label>
           <label>Période<input type="month" value={form.month} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} /></label>
           <button type="button" className="bd-save" onClick={() => run('confrontation')} disabled={loading}>{loading ? 'Comparaison…' : 'Confrontation'}</button>

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listCompanies } from '../../services/companyApi';
-import { cancelFusion, currentMonth, fuseBordereau, getConfrontation, monthToPeriode } from '../../services/bordereauApi';
+import { cancelFusion, fuseBordereau, getConfrontation, monthToPeriode, nextMonth } from '../../services/bordereauApi';
 import { money, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
 export default function BordereauFusionModal({ onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
-  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: currentMonth() });
+  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: nextMonth() });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -97,7 +97,7 @@ export default function BordereauFusionModal({ onClose }) {
             </select>
           </label>
           <label>TC
-            <select value={form.tc} onChange={(event) => change({ tc: event.target.value })}><option value="T">Terme</option><option value="C">Comptant</option></select>
+            <select value="T" disabled><option value="T">Terme</option></select>
           </label>
           <label>Période<input type="month" value={form.month} onChange={(event) => change({ month: event.target.value })} /></label>
           <button type="button" className="bd-tool" onClick={verify} disabled={loading}>{loading ? 'Vérification…' : 'Vérifier le bordereau'}</button>

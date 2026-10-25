@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
-import { currentMonth, deleteBordereau, getBordereau, listBordereaux, monthToPeriode, saveBordereau } from '../../services/bordereauApi';
+import { deleteBordereau, getBordereau, listBordereaux, monthToPeriode, nextMonth, saveBordereau } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
@@ -21,7 +21,7 @@ export default function BordereauReceptionModal({ onClose }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
   const [companies, setCompanies] = useState([]);
-  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: currentMonth(), date_reception: today() });
+  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: nextMonth(), date_reception: today() });
   const [lines, setLines] = useState([]);
   const [savedId, setSavedId] = useState(null);
   const [fichier, setFichier] = useState('');
@@ -94,7 +94,7 @@ export default function BordereauReceptionModal({ onClose }) {
       const { meta } = info;
       const company = companies.find((item) => String(item.code_compagnie) === String(meta.code_compagnie));
       const nextMonth = /^\d{2}\/\d{4}$/.test(meta.periode || '') ? `${meta.periode.slice(3)}-${meta.periode.slice(0, 2)}` : form.month;
-      const nextForm = { ...form, code_compagnie: company ? String(company.code_compagnie) : form.code_compagnie, tc: ['T', 'C'].includes(meta.tc) ? meta.tc : form.tc, month: nextMonth };
+      const nextForm = { ...form, code_compagnie: company ? String(company.code_compagnie) : form.code_compagnie, tc: 'T', month: nextMonth };
       const raw = buildLines(info);
       const scale = looksLikeMillimes(raw);
       const parsedLines = makeLines(info, scale, nextMonth.slice(5));
@@ -241,7 +241,7 @@ export default function BordereauReceptionModal({ onClose }) {
           </label>
           <label>Date réception<input type="date" value={form.date_reception} onChange={(event) => setForm((current) => ({ ...current, date_reception: event.target.value }))} /></label>
           <label>TC
-            <select value={form.tc} onChange={(event) => changeForm({ tc: event.target.value })}><option value="T">Terme</option><option value="C">Comptant</option></select>
+            <select value="T" disabled><option value="T">Terme</option></select>
           </label>
           <label>Période<input type="month" value={form.month} onChange={(event) => changeForm({ month: event.target.value })} /></label>
           <div className="bd-total"><span>Total</span><strong>{money(total)}</strong></div>
