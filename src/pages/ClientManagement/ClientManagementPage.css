@@ -287,3 +287,24 @@
 /* New-client flow: the policy / receipt steps are embedded in the client window */
 .client-policy-embedded.is-hidden { display: none; }
 .client-policy-embedded { padding: 0 6px 6px; }
+
+/* ===== Smaller client dialog: every row of step 1 visible from the start ===== */
+.client-page-modal .client-window-modal .client-page-header { padding-top: clamp(4px, .9vh, 9px); padding-bottom: clamp(4px, .9vh, 9px); }
+.client-page-modal .client-window-modal .client-view-tabs button { padding-top: clamp(3px, .7vh, 8px); padding-bottom: clamp(3px, .7vh, 8px); }
+.client-page-modal .client-window-modal .client-action-bar { padding: clamp(2px, .5vh, 5px) 28px; }
+.client-page-modal .client-window-modal .client-action-button { padding: clamp(3px, .7vh, 6px) 12px; font-size: clamp(10px, 1.8vh, 13px); }
+.client-page-modal .client-window-modal .client-form-progress { padding-top: clamp(2px, .5vh, 6px); padding-bottom: clamp(2px, .5vh, 6px); }
+.client-page-modal .client-window-modal .client-form-progress > div { font-size: clamp(10px, 1.8vh, 13px); }
+.client-page-modal .client-window-modal .client-current-summary { padding: clamp(1px, .3vh, 4px) 18px; }
+.client-page-modal .client-window-modal .client-record-form { gap: clamp(4px, .8vh, 9px); padding-top: clamp(4px, .8vh, 9px); }
+.client-page-modal .client-window-modal .client-fields { gap: clamp(3px, .7vh, 8px) 14px; }
+.client-page-modal .client-window-modal .client-section { padding: clamp(5px, .9vh, 10px) 12px clamp(5px, .9vh, 10px); }
+.client-page-modal .client-window-modal .client-section legend { font-size: clamp(10px, 1.8vh, 13px); }
+.client-page-modal .client-window-modal .client-field { gap: clamp(1px, .3vh, 3px); font-size: clamp(9px, 1.6vh, 12px); }
+.client-page-modal .client-window-modal .client-field input,
+.client-page-modal .client-window-modal .client-field select { height: clamp(22px, 4vh, 32px); padding: 0 10px; font-size: clamp(10px, 1.7vh, 13px); }
+.client-page-modal .client-window-modal .client-type-row fieldset { padding: clamp(2px, .5vh, 6px) 12px clamp(3px, .6vh, 7px); }
+.client-page-modal .client-window-modal .client-record-options label,
+.client-page-modal .client-window-modal .client-record-options legend { font-size: clamp(10px, 1.7vh, 13px); }
+.client-page-modal .client-window-modal .client-form-actions { padding: clamp(4px, .9vh, 9px) 28px; }
+.client-page-modal .client-window-modal .client-form-actions button { padding: clamp(4px, .9vh, 9px) 20px; font-size: clamp(11px, 1.8vh, 14px); }

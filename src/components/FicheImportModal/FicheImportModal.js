@@ -15,7 +15,7 @@ function buildPatches(rows) {
   rows.filter((row) => row.use && row.value).forEach((row) => {
     if (row.group === 'client') {
       if (row.key === 'nationality') {
-        const known = ['Tunisienne', 'Italienne'].find((item) => item.toLowerCase() === row.value.toLowerCase());
+        const known = ['Tunisienne', 'Italienne', 'Française'].find((item) => item.toLowerCase() === row.value.toLowerCase());
         client.nationality = known || 'Autre';
         if (!known) client.nationalityOther = row.value;
       } else if (row.key === 'phone') {

@@ -35,3 +35,6 @@
 .assistant-panel form button.is-stop { background: #b45309; }
 .assistant-note { padding: 0 14px 10px; color: #8a9aa2; font-size: 10.5px; background: #fff; }
 @media (max-width: 520px) { .assistant-panel { right: 6px; bottom: 6px; width: calc(100vw - 12px); height: calc(100vh - 12px); } }
+
+/* The assistant button moves to the bottom-left so it never covers the dialogs action buttons */
+.assistant-fab { right: auto; left: 18px; }

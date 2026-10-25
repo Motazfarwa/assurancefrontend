@@ -52,7 +52,7 @@ export const FIELD_DEFS = [
   { key: 'lastName', group: 'client', label: 'Nom', labels: ['nom\\b(?!\\s*/)(?!\\s+du\\s+contact)', 'اللقب'], type: 'text' },
   { key: 'firstName', group: 'client', label: 'Prénom', labels: ['pr[ée]nom', 'الاسم'], type: 'text' },
   { key: 'birthDate', group: 'client', label: 'Date de naissance', labels: ['date\\s+de\\s+naissance', 'n[ée]\\(?e?\\)?\\s+le', 'تاريخ\\s+الولادة'], type: 'date' },
-  { key: 'birthPlace', group: 'client', label: 'Lieu de naissance', labels: ['lieu\\s+de\\s+naissance', '[àa]\\s+naissance', 'مكان\\s+الولادة'], type: 'text' },
+  { key: 'birthPlace', group: 'client', label: 'Pays de naissance', labels: ['lieu\\s+de\\s+naissance', '[àa]\\s+naissance', 'مكان\\s+الولادة'], type: 'text' },
   { key: 'nationality', group: 'client', label: 'Nationalité', labels: ['nationalit[ée]', 'الجنسية'], type: 'text' },
   { key: 'profession', group: 'client', label: 'Profession', labels: ['profession', 'المهنة'], type: 'text' },
   { key: 'identityNumber', group: 'client', label: 'N° C.I.N.', labels: ['c\\.?i\\.?n\\.?', 'n[°o]\\s*(?:de\\s+)?c\\.?i\\.?n', 'بطاقة\\s+التعريف'], type: 'cin' },
@@ -312,6 +312,7 @@ async function enhanceImage(file, targetSide = 2600) {
 // Runs OCR on an image file (French first, then French + Arabic) and merges the readings.
 // Progress is reported as 0..1.
 export async function scanFiche(file, onProgress) {
+  if (isPdf(file)) throw new Error('Un PDF est lu par le serveur (OCR) : la lecture locale ne traite que les images (JPG, PNG). Réessayez, ou importez le document en JPG.');
   const { createWorker } = await import('tesseract.js');
   const passes = [
     { langs: ['fra'], pageMode: '4', enhanced: true },
@@ -361,14 +362,19 @@ function mergeReadings(texts, source) {
 export async function scanFicheWithServerOcr(file, accessToken) {
   if (!accessToken) throw new Error('session sans jeton serveur');
   let image = '';
-  for (const [side, quality] of [[2200, 0.85], [1800, 0.75], [1500, 0.65], [1200, 0.6]]) {
-    image = await toJpegBase64(file, side, quality);
-    if (image.length < 1_300_000) break; // the free plan accepts files up to 1 MB
+  if (isPdf(file)) {
+    image = await fileToBase64(file);
+    if (image.length > 1_400_000) throw new Error('PDF trop volumineux pour l’OCR gratuit (plus de 1 Mo) : importez-le en JPG ou réduisez-le.');
+  } else {
+    for (const [side, quality] of [[2200, 0.85], [1800, 0.75], [1500, 0.65], [1200, 0.6]]) {
+      image = await toJpegBase64(file, side, quality);
+      if (image.length < 1_300_000) break; // the free plan accepts files up to 1 MB
+    }
   }
   const response = await fetch(`${API_BASE_URL}/api/assistant/ocr-text`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ image_base64: image, media_type: 'image/jpeg' }),
+    body: JSON.stringify({ image_base64: image, media_type: isPdf(file) ? 'application/pdf' : 'image/jpeg' }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `erreur ${response.status}`);
@@ -390,6 +396,16 @@ const AI_MAP = {
   taxes: 'taxe', stamp: 'timbre', commission: 'commission', total_premium: 'prime_total', period: 'periode',
 };
 
+const isPdf = (file) => file?.type === 'application/pdf' || /\.pdf$/i.test(file?.name || '');
+
+// A PDF is sent as it is (base64), the server reads it.
+async function fileToBase64(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  return btoa(binary);
+}
+
 // Shrinks a phone photo before upload (text stays readable, size stays well under the limit).
 async function toJpegBase64(file, maxSide = 2000, quality = 0.88) {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -404,11 +420,12 @@ async function toJpegBase64(file, maxSide = 2000, quality = 0.88) {
 
 export async function scanFicheWithAI(file, accessToken) {
   if (!accessToken) throw new Error('session sans jeton serveur');
-  const image = await toJpegBase64(file);
+  const pdf = isPdf(file);
+  const image = pdf ? await fileToBase64(file) : await toJpegBase64(file);
   const response = await fetch(`${API_BASE_URL}/api/assistant/extract-fiche`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ image_base64: image, media_type: 'image/jpeg' }),
+    body: JSON.stringify({ image_base64: image, media_type: pdf ? 'application/pdf' : 'image/jpeg' }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `erreur ${response.status}`);

@@ -522,3 +522,13 @@
 /* Remarquage yes / no sits on the same line as the other inputs */
 .policy-modal-expanded .pf-check-yesno { min-height: clamp(24px, 4.1vh, 32px); font-size: clamp(12px, 1.9vh, 13px); font-weight: 600; }
 .policy-modal-expanded .pf-check-yesno-row { margin: 0; gap: 18px; min-height: clamp(24px, 4.1vh, 32px); align-items: center; }
+
+/* Right column: the "Tous risques" box sits right above the vehicle guarantees */
+.policy-modal-expanded .pf-right-column { display: flex; flex-direction: column; gap: clamp(6px, 1.2vh, 12px); min-width: 0; }
+.policy-modal-expanded .pf-right-column > .pf-garanties { flex: 1 1 auto; }
+.policy-modal-expanded .is-view > .pf-right-column { grid-column: 2; grid-row: 3; }
+.policy-modal-expanded .is-create > .pf-right-column { grid-column: 2; grid-row: 3 / span 2; }
+.policy-modal-expanded .pf-tousrisque { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; padding: clamp(4px, .9vh, 8px) 12px; border: 1px solid #dce5eb; border-radius: 8px; background: #fff; }
+.policy-modal-expanded .pf-tousrisque .pf-franchise input { width: 84px; }
+/* Renouvelable / Fermé / Durée / Échéance / Date effet / Expiration on one row */
+.policy-modal-expanded .pf-term-row { grid-template-columns: auto auto minmax(80px, 1fr) repeat(3, minmax(105px, 1.2fr)); }

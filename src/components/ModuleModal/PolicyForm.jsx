@@ -3,6 +3,13 @@ import "./PolicyForm.css";
 import ClientPolicesModal from "./ClientPolicesModal";
 import { useAuth } from "../../auth/AuthContext";
 
+// Default due date: the day after today, as "dd/mm" (how the policy table stores it).
+const tomorrowEcheance = (() => {
+    const day = new Date();
+    day.setDate(day.getDate() + 1);
+    return `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
+})();
+
 const initialValues = {
     // Police
     num_police: "",
@@ -14,7 +21,7 @@ const initialValues = {
     duree: "12",
     effet: "",
     heure_effet: "00:00",
-    echeance: "",
+    echeance: tomorrowEcheance,
     expiration: "",
     etat: "AN",
     date_mvt: "",
@@ -25,6 +32,8 @@ const initialValues = {
     num_imat: "",
     obser: "",
     franchise: "0",
+    neuf: "",
+    venale: "",
 
     // Vehicle guarantees (screen only: the policy table has no matching columns)
     g_vol: "",
@@ -58,12 +67,12 @@ const POLICE_FIELDS = [
     "duree", "effet", "heure_effet", "echeance",
     "expiration", "etat", "date_mvt", "risque",
     "hors_taxe", "tous_risque", "participation",
-    "num_imat", "obser", "franchise"
+    "num_imat", "obser", "franchise", "neuf", "venale"
 ];
 
 const GARANTIES = [
     ["g_vol", "Vol"], ["g_incendie", "Incendie"], ["g_bdg", "BDG"],
-    ["g_personnes", "Personnes transportées"], ["g_ind_cond", "IND conducteur"], ["g_remarquage", "Remarquage"]
+    ["g_personnes", "Personnes transportées"], ["g_ind_cond", "IND conducteur"], ["g_remarquage", "Remorquage"]
 ];
 const TERMS = [{ value: "1", label: "1 mois" }, { value: "3", label: "3 mois" }, { value: "6", label: "6 mois" }, { value: "12", label: "1 année" }];
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -92,7 +101,7 @@ const termDates = (effet, duree) => {
 };
 
 const MONEY_FIELDS = [
-    "prime_net", "commission", "prime_total",
+    "prime_net", "commission", "prime_total", "neuf", "venale",
     "taxe", "timbre", "cout_attestation",
     "montant_quittance", "solde_quittance"
 ];
@@ -158,6 +167,8 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
         participation: asFlag(p.participation),
         num_imat: asText(p.num_imat),
         franchise: asText(p.franchise ?? 0),
+        neuf: asText(p.neuf),
+        venale: asText(p.venale),
         observation: asText(p.obser ?? q.observation)
     };
 }
@@ -652,6 +663,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         />
                     </label>
 
+                    {!isCreate && (
                     <label className="pf-field pf-field-narrow">
                         <span>Code client</span>
                         <input
@@ -660,6 +672,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             onChange={e => update("code_client", e.target.value)}
                         />
                     </label>
+                    )}
 
                     {!isCreate && (
                     <label className="pf-field pf-field-wide">
@@ -728,6 +741,14 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         />
                     </label>
                     <label className="pf-field">
+                        <span>Date effet</span>
+                        <input
+                            type="date"
+                            value={values.effet}
+                            onChange={e => setValues(prev => ({ ...prev, effet: e.target.value, ...termDates(e.target.value, prev.duree) }))}
+                        />
+                    </label>
+                    <label className="pf-field">
                         <span>Expiration</span>
                         <input
                             type="date"
@@ -739,32 +760,10 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
                 <div className="pf-check-row">
                     {check("Hors taxe", "hors_taxe")}
-                    {check("Tous risques", "tous_risque")}
-                    {values.tous_risque && (
-                        <label className="pf-franchise">
-                            <span>Franchise</span>
-                            <input
-                                type="number"
-                                min="0"
-                                step="any"
-                                value={values.franchise}
-                                onChange={e => update("franchise", e.target.value)}
-                            />
-                            <b>%</b>
-                        </label>
-                    )}
-                    {check("Participation", "participation")}
+                    {check("Bonification", "participation")}
                 </div>
 
                 <div className="pf-grid">
-                    <label className="pf-field">
-                        <span>Date effet</span>
-                        <input
-                            type="date"
-                            value={values.effet}
-                            onChange={e => setValues(prev => ({ ...prev, effet: e.target.value, ...termDates(e.target.value, prev.duree) }))}
-                        />
-                    </label>
                     {field("Heure effet", "heure_effet", "time")}
                     {field("État", "etat")}
                     {field("Date mouvement", "date_mvt", "date")}
@@ -785,6 +784,27 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             )}
 
             {!(isCreate && step === 2) && (
+            <div className="pf-right-column">
+            <div className="pf-tousrisque">
+                {check("Tous risques", "tous_risque")}
+                {values.tous_risque && (
+                    <>
+                        <label className="pf-franchise">
+                            <span>Franchise</span>
+                            <input type="number" min="0" step="any" value={values.franchise} onChange={e => update("franchise", e.target.value)} />
+                            <b>%</b>
+                        </label>
+                        <label className="pf-franchise">
+                            <span>Valeur à neuf</span>
+                            <input type="number" min="0" step="any" value={values.neuf} onChange={e => update("neuf", e.target.value)} />
+                        </label>
+                        <label className="pf-franchise">
+                            <span>Valeur vénale</span>
+                            <input type="number" min="0" step="any" value={values.venale} onChange={e => update("venale", e.target.value)} />
+                        </label>
+                    </>
+                )}
+            </div>
             <section className="pf-section pf-garanties pf-span-full">
                 <h3>Garanties véhicule</h3>
                 <div className="pf-grid pf-grid-garanties">
@@ -830,6 +850,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     ))}
                 </div>
             </section>
+            </div>
             )}
 
             {isCreate && step === 2 && (
@@ -837,10 +858,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 <h3>Informations Quittance</h3>
 
                 <div className="pf-grid">
-                    <label className="pf-field">
-                        <span>Code client</span>
-                        <input value={values.code_client} readOnly />
-                    </label>
                     <label className="pf-field">
                         <span>N° Police</span>
                         <input value={values.num_police} readOnly />

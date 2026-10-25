@@ -252,7 +252,7 @@ export default function ClientManagementPage({ modal = false }) {
         <nav className="client-view-tabs" aria-label="Vue du dossier client"><button type="button" onClick={() => setShowClientList(true)}><span aria-hidden="true">◉</span> Rechercher</button><button type="button" className="is-current" aria-current="page"><span aria-hidden="true">✎</span> Modifier</button><button type="button" className="client-new-button" onClick={() => setShowUnpaidClients(true)}><span aria-hidden="true">◎</span> Visualiser</button></nav>
         <div className="client-action-bar" role="group" aria-label="Gestion du client">
           <button type="button" className="client-action-button client-import-button" onClick={() => fileInputRef.current?.click()} title="Importer une fiche scannée (français ou arabe) et remplir les champs">⬆ Importer une fiche</button>
-          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setFicheFile(file); }} />
+          <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setFicheFile(file); }} />
           <span>Gérer pour ce client</span>
           {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
         </div>
@@ -262,18 +262,17 @@ export default function ClientManagementPage({ modal = false }) {
           {step === 1 && <>
           <div className="client-record-options client-step-full client-type-row"><fieldset><legend>Type client</legend>{['Particulier', 'Societe'].map((value) => <label key={value}><input type="radio" name="clientType" checked={client.clientType === value} onChange={() => changeClientType(value)} />{value === 'Societe' ? 'Société' : value}</label>)}<label><input type="checkbox" checked={client.taxExempt} onChange={(event) => updateField('taxExempt', event.target.checked)} />Exonéré</label></fieldset></div>
           <FormSection title="Client" className="client-section-primary">
-            <ClientField client={client} onChange={updateField} name="clientCode" label="Code client" required maxLength={8} readOnly />
             {isCompany
               ? <NameAutocomplete client={client} onChange={updateField} name="lastName" label="Raison sociale" accessToken={accessToken} onPick={pickExistingClient} />
               : <>
                 <NameAutocomplete client={client} onChange={updateField} name="lastName" label="Nom" accessToken={accessToken} onPick={pickExistingClient} />
                 <NameAutocomplete client={client} onChange={updateField} name="firstName" label="Prenom" accessToken={accessToken} onPick={pickExistingClient} />
               </>}
-            <ClientField client={client} onChange={updateField} name="nationality" label="Nationalite" type="select" options={['Tunisienne', 'Italienne', 'Autre']} />
+            <ClientField client={client} onChange={updateField} name="nationality" label="Nationalite" type="select" options={['Tunisienne', 'Italienne', 'Française', 'Autre']} />
             {client.nationality === 'Autre' && <ClientField client={client} onChange={updateField} name="nationalityOther" label="Precisez la nationalite" />}
             <ClientField client={client} onChange={updateField} name="country" label="Pays" />
             <ClientField client={client} onChange={updateField} name="birthDate" label="Date de naissance" type="date" />
-            <ClientField client={client} onChange={updateField} name="birthPlace" label="Lieu de naissance" />
+            <ClientField client={client} onChange={updateField} name="birthPlace" label="Pays de naissance" />
             <ClientField client={client} onChange={updateField} name="profession" label={isCompany ? 'Secteur' : 'Profession'} />
             {!isCompany && <ClientField client={client} onChange={updateField} name="civilStatus" label="Situation familiale" type="select" options={['Celibataire', 'Marie(e)', 'Divorce(e)', 'Veuf / Veuve']} />}
             <ClientField client={client} onChange={updateField} name="title" label="Titre" type="select" options={['M.', 'Mme', 'Mlle', 'Soc.']} />
@@ -297,7 +296,6 @@ export default function ClientManagementPage({ modal = false }) {
             <ClientField client={client} onChange={updateField} name="homeAddress" label="Adresse" wide />
             <ClientField client={client} onChange={updateField} name="homeCity" label="Ville" />
             <ClientField client={client} onChange={updateField} name="homePostalCode" label="Code postal" type="number" required />
-            <ClientField client={client} onChange={updateField} name="homeFax" label="Fax" type="tel" />
             <ContactFields client={client} onChange={updateField} kind="home" />
           </FormSection>
 
@@ -305,7 +303,6 @@ export default function ClientManagementPage({ modal = false }) {
             <ClientField client={client} onChange={updateField} name="officeAddress" label="Adresse" wide />
             <ClientField client={client} onChange={updateField} name="officeCity" label="Ville" />
             <ClientField client={client} onChange={updateField} name="officePostalCode" label="Code postal" />
-            <ClientField client={client} onChange={updateField} name="officeFax" label="Fax" type="tel" />
             <ContactFields client={client} onChange={updateField} kind="office" />
           </FormSection>
           </>}
