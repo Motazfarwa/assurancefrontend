@@ -805,7 +805,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         </label>
                         <label className="pf-franchise">
                             <span>Valeur vénale</span>
-                            <input type="number" min="0" step="any" value={values.venale} onChange={e => update("venale", e.target.value)} />
+                            <input type="number" min="0" step="any" value={values.venale} onChange={e => { const value = e.target.value; setValues(prev => ({ ...prev, venale: value, g_vol: value, g_incendie: value })); }} />
                         </label>
                     </>
                 )}
