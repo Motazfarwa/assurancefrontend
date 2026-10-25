@@ -39,7 +39,7 @@ const clean = (value) => String(value || '').replace(/[|_]+/g, ' ').replace(/\s{
 
 // Value written after one of the labels, on the same line.
 function after(lines, labels) {
-  const pattern = new RegExp(`(?:${labels.join('|')})\\s*[.:]?\\s*[:\\-]?\\s*(.*)$`, 'i');
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(?:${labels.join('|')})(?![\\p{L}\\p{N}])\\s*[.:]?\\s*[:\\-]?\\s*(.*)$`, 'iu');
   for (const line of lines) {
     const match = line.match(pattern);
     if (match && clean(match[1])) return clean(match[1]);
@@ -103,12 +103,13 @@ function convert(type, raw) {
 // Forms laid out as tables ("Nom | BENSALEM | Prenom | AMIRA"): a cell holding exactly a known label is followed by its value.
 const PAIR_LABELS = {
   lastName: /^nom$/i,
+  fullName: /^nom\s*\/\s*(?:raison\s+sociale|r\.?\s*s\.?)$/i,
   firstName: /^pr[ée]nom$/i,
   birthDate: /^date\s+de\s+naissance$/i,
   birthPlace: /^lieu\s+de\s+naissance$/i,
   nationality: /^nationalit[ée]$/i,
   profession: /^profession$/i,
-  identityNumber: /^n\s*[°o]?\s*c\.?\s*i\.?\s*n\.?(?:\s*\/\s*identifiant.*)?$/i,
+  identityNumber: /^n\s*[°o]?\s*c\.?\s*i\.?\s*n\.?(?:\s*\/\s*(?:identifiant.*|r\.?\s*c\.?))?$/i,
   identityDate: /^date\s+c\.?\s*i\.?\s*n\.?$/i,
   identityPlace: /^lieu\s+c\.?\s*i\.?\s*n\.?$/i,
   licenseNumber: /^n\s*[°o]?\s*permis$/i,
@@ -117,10 +118,10 @@ const PAIR_LABELS = {
   homePostalCode: /^code\s+postal$/i,
   phone: /^(?:t[ée]l[ée]phone|t[ée]l\.?|gsm|mobile)$/i,
   email: /^e-?mail$/i,
-  num_police: /^n\s*[°o]?\s*(?:de\s+)?police$/i,
+  num_police: /^(?:n\s*[°o]?\s*(?:de\s+)?(?:police|contrat)|contrat\s*n\s*[°o]?)$/i,
   effet: /^date\s+(?:d['’]\s*)?effet$/i,
   expiration: /^(?:date\s+d['’]\s*)?(?:expiration|[ée]ch[ée]ance)$/i,
-  num_imat: /^(?:immatriculation|immat\.?)$/i,
+  num_imat: /^(?:n\s*[°o]?\s*)?(?:immatriculation|immat\.?)$/i,
   prime_net: /^(?:prime\s+nette|contribution\s+nette)$/i,
   taxe: /^taxes?$/i,
   timbre: /^timbre$/i,
@@ -132,24 +133,55 @@ const PAIR_LABELS = {
 function readPairs(lines) {
   const found = {};
   const labelOf = (cell) => Object.keys(PAIR_LABELS).find((key) => PAIR_LABELS[key].test(clean(cell)));
+  const isLabelCell = (cell) => {
+    const left = cell.trim().match(/^([^:]{2,45}?)\s*:/)?.[1];
+    return Boolean(labelOf(cell) || (left && labelOf(left)) || /:\s*$/.test(cell.trim()));
+  };
   lines.forEach((line) => {
     const cells = line.split(/\t+| {3,}/).map((cell) => cell.trim()).filter(Boolean);
-    for (let index = 0; index < cells.length - 1; index += 1) {
-      const key = labelOf(cells[index]);
+    for (let index = 0; index < cells.length; index += 1) {
+      let label = cells[index];
+      let inline = '';
+      const colon = label.match(/^([^:]{2,45}?)\s*:\s*(.*)$/);
+      if (colon && labelOf(colon[1])) [, label, inline] = colon;
+      const key = labelOf(label);
       if (!key || found[key] !== undefined) continue;
-      if (labelOf(cells[index + 1])) continue; // the next cell is another label: this one is empty
-      found[key] = cells[index + 1];
+      let value = inline;
+      if (!value && cells[index + 1] !== undefined && !isLabelCell(cells[index + 1])) value = cells[index + 1]; // an empty value never takes the next label
+      if (value) found[key] = value;
     }
   });
   return found;
 }
 
+// The company's letterhead (address, phone, fax, email of the insurer) must not be read as the client's data.
+function stripLetterhead(lines) {
+  const marker = lines.findIndex((line) => /souscripteur|assur[ée](?![\p{L}])|nom\s*\/\s*raison|n[°o]\s*contrat|contrat\s*n[°o]/iu.test(line));
+  const head = marker > 0 ? lines.slice(0, marker) : [];
+  return marker > 0 && marker < 15 && head.some((line) => /fax|r\.?c\s*[:.]|m\.?f\s*[:.]|e-?mail|tél|tel\s*[.:]/i.test(line)) ? lines.slice(marker) : lines;
+}
+
 export function extractFields(rawText) {
-  const text = normalize(rawText);
-  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  const lines = stripLetterhead(normalize(rawText).split('\n').map((line) => line.trim()).filter(Boolean));
+  const text = lines.join('\n');
   const found = [];
   const layout = readLayout(lines, text);
   const pairs = readPairs(lines);
+  // "Nom/Raison Sociale : RIARIO SFORZA GIAN" -> first word is the family name, the rest the given names.
+  if (pairs.fullName && !pairs.lastName) {
+    const [family, ...given] = clean(pairs.fullName).split(/\s+/);
+    pairs.lastName = family;
+    if (given.length && !pairs.firstName) pairs.firstName = given.join(' ');
+  }
+  // "239 RUE ABOU DHABI MREZGA, 8050 HAMMAMET" -> street, postal code and city.
+  if (pairs.homeAddress && !pairs.homePostalCode) {
+    const parts = clean(pairs.homeAddress).match(/^(.*?)[,\s]+(\d{4})\s+([\p{L}][\p{L}' -]{2,})$/u);
+    if (parts) {
+      pairs.homeAddress = parts[1].replace(/[,\s]+$/, '');
+      pairs.homePostalCode = parts[2];
+      if (!pairs.homeCity) pairs.homeCity = clean(parts[3]);
+    }
+  }
   FIELD_DEFS.forEach((def) => {
     // Generic "label: value" reading, kept only when the value looks sane (OCR noise is common).
     let generic = convert(def.type, after(lines, def.labels));
@@ -191,7 +223,7 @@ function readLayout(lines, text) {
   const flat = text.replace(/\n/g, ' ');
 
   // Contract number: after "Contrat N°" (same or next line), otherwise the longest digit run starting like a policy.
-  const contract = flat.match(/contrat\s*n[°o]?\s*[:._-]*\s*(\d{9,14})/i);
+  const contract = flat.match(/contrat\s*n[°o]?\s*[:._-]*\s*(\d{9,14})/i) || flat.match(/n[°o]\s*contrat\s*[:._-]*\s*(\d{9,14})/i);
   if (contract) result.num_police = contract[1];
 
   // Tunisian plate: "209 TU 222", "123 تونس 4567".
@@ -243,9 +275,29 @@ function readLayout(lines, text) {
     }
   }
 
+  // Titles "P.N.A | Taxe An. | Prime Nette | Accessoires | Timbre/FGA | Taxes | ... | Prime TTC" over a row of amounts.
+  let tableMapped = false;
+  const titleLine = lines.findIndex((line) => /prime\s+nette/i.test(line) && /taxes/i.test(line) && /timbre/i.test(line));
+  if (titleLine >= 0) {
+    const titles = [...lines[titleLine].matchAll(/taxe\s+an\.?|prime\s+nette|p\.?\s*n\.?\s*a(?![\p{L}])|accessoires|timbre(?:\s*\/\s*fga)?|taxes|pr[ée]v\.?\s*routi[èe]re(?:\s*\/\s*fpac)?|prime\s+ttc(?:\s+cpt)?/giu)]
+      .map((match) => match[0].toLowerCase().replace(/\s+/g, ' '));
+    const valuesLine = lines.slice(titleLine + 1, titleLine + 3).find((line) => (line.match(/\d{1,3}(?: \d{3})*[.,]\d{2,3}/g) || []).length >= 4);
+    const values = valuesLine ? valuesLine.match(/\d{1,3}(?: \d{3})*[.,]\d{2,3}/g) : [];
+    if (titles.length > 0 && titles.length === values.length) {
+      titles.forEach((title, index) => {
+        const amount = toNumber(values[index].replace(/\s/g, ''));
+        if (title.startsWith('prime nette')) result.prime_net = amount;
+        else if (title === 'taxes') result.taxe = amount;
+        else if (title.startsWith('timbre')) result.timbre = amount;
+        else if (title.startsWith('prime ttc')) result.prime_total = amount;
+      });
+      tableMapped = true;
+    }
+  }
+
   // Amounts line: "140,000DT 30,000DT 48,449DT 3,400DT ... 459,394" in the order Net / Frais / Taxes / FGA / FSSR / FPAC / FA / Total.
   const amountLines = lines.map((line) => line.match(AMOUNT_RE)).filter((list) => list && list.length >= 5);
-  if (amountLines.length) {
+  if (!tableMapped && amountLines.length) {
     const amounts = amountLines[0].map((value) => toNumber(value.replace(/\s/g, '').replace(/\.(?=\d{3}\b)/, ',')));
     result.prime_net = amounts[0];
     result.taxe = amounts[2];
