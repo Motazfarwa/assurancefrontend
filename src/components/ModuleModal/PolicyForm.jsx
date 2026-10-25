@@ -56,6 +56,9 @@ const initialValues = {
     montant_quittance: "",
     solde_quittance: "",
     num_attestation: "",
+    carte_verte: false,
+    cv_du: "",
+    cv_au: "",
     observation: ""
 };
 
@@ -372,7 +375,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const loadedExisting = loadedRef.current.num !== "" && loadedRef.current.num === values.num_police;
 
     // A first receipt must be filled in before a new client can be created.
-    const quittanceComplete = Boolean(values.date_emission && values.prime_net !== "" && values.prime_total !== "" && values.montant_quittance !== "");
+    const carteVerteValid = !values.carte_verte || Boolean(values.cv_du && values.cv_au && values.cv_du <= values.cv_au);
+    const quittanceComplete = Boolean(values.date_emission && values.prime_net !== "" && values.prime_total !== "" && values.montant_quittance !== "" && carteVerteValid);
 
     function goToReceipt() {
         setError("");
@@ -401,7 +405,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         const quittance = {};
 
         for (const [key, value] of Object.entries(values)) {
-            if (key === "heure_effet" || key.startsWith("g_")) continue;
+            if (key === "heure_effet" || key === "carte_verte" || key.startsWith("g_") || key.startsWith("cv_")) continue;
 
             let converted = value === "" ? null : value;
             if (DATE_FIELDS.includes(key)) converted = toTimestamp(value);
@@ -422,6 +426,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             ind_conducteur: amount(values.g_ind_cond),
             remarquage: values.g_remarquage ? 1 : 0
         };
+        const carte_verte = values.carte_verte ? { du: values.cv_du || null, au: values.cv_au || null } : null;
         if (values.effet) police.heure_effet = `${values.effet}T${values.heure_effet}:00`;
         quittance.observation = values.observation || "";
 
@@ -432,7 +437,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ police, quittance, garanties })
+                body: JSON.stringify({ police, quittance, garanties, carte_verte })
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -874,6 +879,18 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     {field("Montant quittance", "montant_quittance", "number")}
                     {field("Solde quittance", "solde_quittance", "number")}
                     {field("N° Attestation", "num_attestation")}
+                    <div className="pf-field">
+                        <span>&nbsp;</span>
+                        <div className="pf-check-row pf-check-yesno-row">
+                            {check("Carte verte", "carte_verte")}
+                        </div>
+                    </div>
+                    {values.carte_verte && (
+                        <>
+                            {field("Carte verte : du", "cv_du", "date")}
+                            {field("Carte verte : au", "cv_au", "date")}
+                        </>
+                    )}
                 </div>
             </section>
             )}
