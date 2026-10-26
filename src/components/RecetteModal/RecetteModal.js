@@ -62,32 +62,38 @@ export default function RecetteModal({ onClose }) {
   }, [accessToken, code]);
 
   const paid = useMemo(() => rows.reduce((sum, row) => sum + row.aRegler, 0), [rows]);
-  const solde = num(piece.montant) - paid;
+  const unpaid = useMemo(() => quittances.reduce((sum, row) => sum + Number(row.solde), 0), [quittances]);
   // Quittances still unpaid and not yet added to this règlement.
   const available = quittances.filter((row) => !rows.some((added) => added.num_quittance === row.num_quittance));
   const current = quittances.find((row) => row.num_quittance === selected);
   const editedRow = rows.find((row) => row.num_quittance === selectedRow);
+  // Solde règlement: what the client still owes on its unpaid quittances once this règlement is applied,
+  // including the quittance being picked or modified.
+  const pending = current ? num(toPay) : editedRow ? num(toPay) - editedRow.aRegler : 0;
+  const solde = unpaid - paid - pending;
+  // What the amount typed in "Montant règlement" can still cover (no limit while it is empty).
+  const room = num(piece.montant) > 0 ? num(piece.montant) - paid : Infinity;
   const bankName = banks.find((bank) => bank.code_banque === piece.code_banque)?.nom_banque || '';
   const patch = (changes) => setPiece((value) => ({ ...value, ...changes }));
 
-  // Picking a quittance fills its amounts; the amount to pay proposes what the règlement can cover.
+  // Picking a quittance fills its amounts; the amount to pay proposes its balance, within what the règlement covers.
   function pickQuittance(value) {
     setSelected(value); setSelectedRow(''); setError('');
     const row = quittances.find((item) => item.num_quittance === value);
-    setToPay(row ? Math.max(0, Math.min(Number(row.solde), solde)).toFixed(3) : '');
+    setToPay(row ? Math.max(0, Math.min(Number(row.solde), room)).toFixed(3) : '');
   }
 
-  function checkAmount(amount, quittanceSolde, room) {
+  function checkAmount(amount, quittanceSolde, limit) {
     if (amount <= 0) return 'Le montant à régler doit être supérieur à zéro.';
     if (amount > quittanceSolde + 0.0005) return 'Le montant dépasse le solde de la quittance.';
-    if (amount > room + 0.0005) return 'Le montant dépasse le solde du règlement.';
+    if (amount > limit + 0.0005) return 'Le montant dépasse le montant du règlement.';
     return '';
   }
 
   function addQuittance() {
     if (!current) { setError('Choisissez une quittance.'); return; }
     const amount = num(toPay);
-    const message = checkAmount(amount, Number(current.solde), solde);
+    const message = checkAmount(amount, Number(current.solde), room);
     if (message) { setError(message); return; }
     setRows((list) => [...list, { num_quittance: current.num_quittance, montant: Number(current.solde), aRegler: amount }]);
     setSelected(''); setToPay(''); setError('');
@@ -96,7 +102,7 @@ export default function RecetteModal({ onClose }) {
   function modifyRow() {
     if (!editedRow) { setError('Sélectionnez une ligne du tableau à modifier.'); return; }
     const amount = num(toPay);
-    const message = checkAmount(amount, editedRow.montant, solde + editedRow.aRegler);
+    const message = checkAmount(amount, editedRow.montant, room + editedRow.aRegler);
     if (message) { setError(message); return; }
     setRows((list) => list.map((row) => (row.num_quittance === selectedRow ? { ...row, aRegler: amount } : row)));
     setSelectedRow(''); setToPay(''); setError('');
@@ -173,7 +179,7 @@ export default function RecetteModal({ onClose }) {
             <label>N° pièce<input value={piece.nump} onChange={(event) => patch({ nump: event.target.value })} maxLength={20} disabled={fictif} /></label>
             <label>N° Acompte sans quit.<input value={piece.acompte} onChange={(event) => patch({ acompte: event.target.value })} /></label>
             <label>Montant règlement<input type="number" step="any" min="0" value={piece.montant} onChange={(event) => patch({ montant: event.target.value })} /></label>
-            <label>Solde règlement<input value={money(solde)} readOnly className={solde < -0.0005 ? 'is-over' : ''} /></label>
+            <label>Solde règlement<input value={money(solde)} readOnly className={room < -0.0005 ? 'is-over' : ''} title="Total des quittances impayées du client moins les montants réglés" /></label>
           </fieldset>
 
           <div className="rct-row">
