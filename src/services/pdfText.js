@@ -30,6 +30,21 @@ function layoutText(items) {
     .join('\n');
 }
 
+// Text items in the order the PDF writes them: follows each column / block, so a label is followed by its value.
+function streamText(items) {
+  let text = '';
+  let previousY = null;
+  items.forEach((item) => {
+    const y = item.transform[5];
+    const height = Math.abs(item.transform[3]) || 10;
+    if (text && !text.endsWith('\n')) text += previousY !== null && Math.abs(previousY - y) > height * 0.5 ? '\n' : ' ';
+    text += item.str || '';
+    if (item.hasEOL) text += '\n';
+    previousY = y;
+  });
+  return text.split('\n').map((line) => line.replace(/\s{2,}/g, ' ').trim()).filter(Boolean).join('\n');
+}
+
 async function renderPage(page, scale = 2.5) {
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
@@ -42,17 +57,21 @@ async function renderPage(page, scale = 2.5) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
-// Returns the text of all pages. Progress is reported as 0..1.
-export async function pdfToText(file, onProgress) {
+// Returns two readings of all pages: [reading order, row by row]. A scanned page gives the same OCR text in both.
+// Progress is reported as 0..1.
+export async function pdfReadings(file, onProgress) {
   const pdf = await openPdf(file);
   const pages = [];
+  const rows = [];
   const scanned = [];
   for (let number = 1; number <= pdf.numPages; number += 1) {
     const page = await pdf.getPage(number);
-    const text = layoutText((await page.getTextContent()).items);
+    const { items } = await page.getTextContent();
+    const text = streamText(items);
     // Fewer than a few words: an image of a page, OCR it.
     if (text.replace(/\s/g, '').length < 30) scanned.push({ index: pages.length, image: await renderPage(page) });
     pages.push(text);
+    rows.push(layoutText(items));
     if (onProgress) onProgress((number / pdf.numPages) * (scanned.length ? 0.2 : 1));
   }
 
@@ -69,10 +88,11 @@ export async function pdfToText(file, onProgress) {
       for (current = 0; current < scanned.length; current += 1) {
         const { data } = await worker.recognize(scanned[current].image);
         pages[scanned[current].index] = data.text || '';
+        rows[scanned[current].index] = data.text || '';
       }
     } finally {
       await worker.terminate();
     }
   }
-  return pages.join('\n\n');
+  return [pages.join('\n\n'), rows.join('\n\n')];
 }

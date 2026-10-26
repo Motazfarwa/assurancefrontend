@@ -1,6 +1,6 @@
 // In-browser OCR of a client file (fiche client), French and Arabic, and extraction of the
 // client / policy / receipt fields. Everything is returned to the caller to be reviewed before use.
-import { pdfToText } from './pdfText';
+import { pdfReadings } from './pdfText';
 
 const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 
@@ -365,7 +365,7 @@ async function enhanceImage(file, targetSide = 2600) {
 // Runs OCR on an image file (French first, then French + Arabic) and merges the readings.
 // A PDF is read page by page (text layer, or OCR of scanned pages). Progress is reported as 0..1.
 export async function scanFiche(file, onProgress) {
-  if (isPdf(file)) return mergeReadings([await pdfToText(file, onProgress)], 'pdf');
+  if (isPdf(file)) return mergeReadings(await pdfReadings(file, onProgress), 'pdf');
   const { createWorker } = await import('tesseract.js');
   const passes = [
     { langs: ['fra'], pageMode: '4', enhanced: true },

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { createPiece, deletePiece, getClientOverview, getPiece, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
+import { importNotes, NO_CLIENT_NOTE, spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
 import ScanSummary from '../ScanSummary/ScanSummary';
 import './ChequeModal.css';
@@ -13,18 +14,13 @@ const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reve
 const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
 const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: true, en_instance: true });
 
-// Amounts for the quittances named on an imported document, each up to what is left to pay on it.
-function importedAlloc(list, { numbers, montant }) {
-  let left = num(montant);
-  const next = {};
-  numbers.forEach((number) => {
-    const row = list.find((item) => String(item.num_quittance) === String(number));
-    if (!row || left <= 0.0005) return;
-    const part = Math.max(0, Math.min(left, Number(row.solde) - Number(row.instance)));
-    if (part > 0) next[row.num_quittance] = part.toFixed(3);
-    left -= part;
-  });
-  return next;
+// Unpaid quittances paid by an imported document: amounts per quittance, and the summary lines.
+function applyImport(client, list, request) {
+  const parts = spreadImported(list, request, (row) => Number(row.solde) - Number(row.instance));
+  return {
+    alloc: Object.fromEntries(parts.map((part) => [part.row.num_quittance, part.amount.toFixed(3)])),
+    notes: importNotes(client, list, parts, request.nomClient),
+  };
 }
 
 export default function ChequeModal({ onClose }) {
@@ -75,12 +71,19 @@ export default function ChequeModal({ onClose }) {
         setClient(overview.client);
         setQuittances(overview.quittances);
         setPieces(overview.pieces);
-        setAlloc(pendingImport.current ? importedAlloc(overview.quittances, pendingImport.current) : {});
+        if (pendingImport.current) {
+          const { alloc: next, notes } = applyImport(overview.client, overview.quittances, pendingImport.current);
+          setAlloc(next);
+          setScan((current) => current && { ...current, found: [...current.found, ...notes] });
+        } else {
+          setAlloc({});
+        }
         pendingImport.current = null;
         setEditing(false);
       } catch (requestError) {
         if (!active) return;
         setClient(null); setQuittances([]); setPieces([]);
+        pendingImport.current = null;
         setError(requestError.message);
       }
     }, 400);
@@ -227,16 +230,21 @@ export default function ChequeModal({ onClose }) {
         montant: values.montant ? String(Number(values.montant)) : current.montant,
         datep: values.echeance || current.datep,
         code_banque: values.code_banque || current.code_banque,
+        a_verser: values.aVerser ?? current.a_verser,
+        en_instance: values.enInstance ?? current.en_instance,
       }));
       setEditing(false);
-      const montant = values.montant || form.montant;
-      if (values.quittances?.length) {
-        // A new client code reloads the quittances: the amounts are spread once they are loaded.
-        if (values.code && values.code !== code.trim()) pendingImport.current = { numbers: values.quittances, montant };
-        else if (client) setAlloc(importedAlloc(quittances, { numbers: values.quittances, montant }));
-      }
+      const request = { numbers: values.quittances, montant: values.montant || form.montant, nomClient: values.nomClient };
+      const extra = [];
+      // A new client code reloads the client: its unpaid quittances are paid once they are loaded.
+      if (values.code && values.code !== code.trim()) pendingImport.current = request;
+      else if (client) {
+        const { alloc: next, notes } = applyImport(client, quittances, request);
+        setAlloc(next);
+        extra.push(...notes);
+      } else extra.push(NO_CLIENT_NOTE);
       if (values.code) setCode(values.code);
-      setScan({ fileName: file.name, found, text });
+      setScan({ fileName: file.name, found: [...found, ...extra], text });
     } catch (requestError) {
       setError(`Lecture du document impossible : ${requestError.message}`);
     } finally {

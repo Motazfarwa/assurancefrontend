@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientOverview, listBanks } from '../../services/chequeApi';
+import { importNotes, NO_CLIENT_NOTE, spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
 import ScanSummary from '../ScanSummary/ScanSummary';
 import './RecetteModal.css';
@@ -11,18 +12,13 @@ const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
 const money = (value) => num(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const blankPiece = () => ({ typeReglement: 'Chèque', nump: '', acompte: '', montant: '', echeance: today(), code_banque: '', a_verser: true, en_instance: false });
 
-// Rows for the quittances named on an imported document, each paid up to what the amount still covers.
-function importedRows(list, { numbers, montant }) {
-  let room = num(montant);
-  const added = [];
-  numbers.forEach((number) => {
-    const row = list.find((item) => String(item.num_quittance) === String(number));
-    if (!row || room <= 0.0005) return;
-    const amount = Math.min(Number(row.solde), room);
-    room -= amount;
-    added.push({ num_quittance: row.num_quittance, montant: Number(row.solde), aRegler: amount });
-  });
-  return added;
+// Unpaid quittances paid by an imported document: rows of the règlement, and the summary lines.
+function applyImport(client, list, request) {
+  const parts = spreadImported(list, request);
+  return {
+    rows: parts.map((part) => ({ num_quittance: part.row.num_quittance, montant: Number(part.row.solde), aRegler: part.amount })),
+    notes: importNotes(client, list, parts, request.nomClient),
+  };
 }
 
 export default function RecetteModal({ onClose }) {
@@ -61,9 +57,15 @@ export default function RecetteModal({ onClose }) {
         const overview = await getClientOverview(accessToken, value);
         if (!active) return;
         setClient(overview.client); setQuittances(overview.quittances); setError('');
-        if (pendingImport.current) { setRows(importedRows(overview.quittances, pendingImport.current)); pendingImport.current = null; }
+        if (pendingImport.current) {
+          const { rows: added, notes } = applyImport(overview.client, overview.quittances, pendingImport.current);
+          setRows(added);
+          setScan((current) => current && { ...current, found: [...current.found, ...notes] });
+          pendingImport.current = null;
+        }
       } catch (requestError) {
         if (!active) return;
+        pendingImport.current = null;
         setClient(null); setQuittances([]); setError(requestError.message);
       }
     }, 400);
@@ -131,18 +133,22 @@ export default function RecetteModal({ onClose }) {
     setScanning(0); setError(''); setScan(null);
     try {
       const { values, found, text } = await scanPayment(file, { accessToken, banks, onProgress: (progress) => setScanning(progress) });
-      const { code: importedCode, quittances: numbers } = values;
       if (!found.length) { setError('Aucune information reconnue dans le document. Saisissez les champs manuellement.'); return; }
       const pieceValues = Object.fromEntries(['typeReglement', 'nump', 'montant', 'echeance', 'code_banque'].filter((key) => values[key]).map((key) => [key, values[key]]));
+      if (values.aVerser !== undefined) pieceValues.a_verser = values.aVerser;
+      if (values.enInstance !== undefined) pieceValues.en_instance = values.enInstance;
       patch(pieceValues);
-      const montant = pieceValues.montant ?? piece.montant;
-      if (numbers?.length) {
-        // A new client code reloads the quittances: they are added once loaded.
-        if (importedCode && importedCode !== code.trim()) pendingImport.current = { numbers, montant };
-        else if (client) setRows(importedRows(quittances, { numbers, montant }));
-      }
-      if (importedCode) setCode(importedCode);
-      setScan({ fileName: file.name, found, text });
+      const request = { numbers: values.quittances, montant: pieceValues.montant ?? piece.montant, nomClient: values.nomClient };
+      const extra = [];
+      // A new client code reloads the client: its unpaid quittances are added once they are loaded.
+      if (values.code && values.code !== code.trim()) pendingImport.current = request;
+      else if (client) {
+        const { rows: added, notes } = applyImport(client, quittances, request);
+        setRows(added); setSelected(''); setSelectedRow(''); setToPay('');
+        extra.push(...notes);
+      } else extra.push(NO_CLIENT_NOTE);
+      if (values.code) setCode(values.code);
+      setScan({ fileName: file.name, found: [...found, ...extra], text });
     } catch (scanError) {
       setError(`Lecture du document impossible : ${scanError.message}`);
     } finally {
