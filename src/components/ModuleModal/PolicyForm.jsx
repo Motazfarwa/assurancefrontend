@@ -3,12 +3,24 @@ import "./PolicyForm.css";
 import ClientPolicesModal from "./ClientPolicesModal";
 import { useAuth } from "../../auth/AuthContext";
 
-// Default due date: the day after today, as "dd/mm" (how the policy table stores it).
-const tomorrowEcheance = (() => {
+// A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
+// month only, "dd/mm" as the policy table stores it) on the same day.
+const tomorrowIso = (() => {
     const day = new Date();
     day.setDate(day.getDate() + 1);
-    return `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
+    return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
 })();
+const tomorrowEcheance = `${tomorrowIso.slice(8, 10)}/${tomorrowIso.slice(5, 7)}`;
+
+// "Dommages cumulés" cover: each guarantee is ticked, then given an amount.
+const DC_GUARANTEES = [
+    ["collision", "Dommages collision"],
+    ["acc_conducteur", "Accident corporel conducteur"],
+    ["securite_passager", "Sécurité passager"],
+    ["incendie_emeutes", "Incendie émeutes / mouvements populaires"],
+    ["force_nature", "Force de la nature"],
+    ["autre", "Autre"]
+];
 
 const initialValues = {
     // Police
@@ -19,16 +31,23 @@ const initialValues = {
     date_creation: new Date().toISOString().slice(0, 10),
     renouvelable: true,
     duree: "12",
-    effet: "",
+    effet: tomorrowIso,
     heure_effet: "00:00",
     echeance: tomorrowEcheance,
-    expiration: "",
+    expiration: addMonths(tomorrowIso, 12),
     etat: "AN",
     date_mvt: "",
     risque: "",
     hors_taxe: false,
     tous_risque: false,
     participation: false,
+
+    // Revalorisation and "Dommages cumulés" (screen + their own payload: no policy table columns)
+    revalorisation: false,
+    date_revalorisation: "",
+    date_envoi: "",
+    dommages_cumules: false,
+    ...Object.fromEntries(DC_GUARANTEES.flatMap(([key]) => [[`dc_${key}`, false], [`dc_${key}_montant`, ""]])),
     num_imat: "",
     obser: "",
     franchise: "0",
@@ -81,7 +100,6 @@ const GARANTIES = [
     ["g_personnes", "Personnes transportées"], ["g_ind_cond", "IND conducteur"], ["g_remarquage", "Remorquage"]
 ];
 const TERMS = [{ value: "1", label: "1 mois" }, { value: "3", label: "3 mois" }, { value: "6", label: "6 mois" }, { value: "12", label: "1 année" }];
-const pad2 = (n) => String(n).padStart(2, "0");
 
 // effet + months, keeping the day when the target month is shorter (31 Aug + 6 months -> 28/29 Feb).
 function addMonths(iso, months) {
@@ -90,16 +108,20 @@ function addMonths(iso, months) {
     return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
 }
 
-// The policy table stores the due date as "dd/mm"; the form shows it as a real date.
-function echeanceToDate(echeance, effet) {
-    const match = /^(\d{1,2})\/(\d{1,2})$/.exec(echeance || "");
-    if (!match) return /^\d{4}-\d{2}-\d{2}$/.test(echeance || "") ? echeance : "";
-    let year = /^\d{4}/.test(effet || "") ? Number(effet.slice(0, 4)) : new Date().getFullYear();
-    let iso = `${year}-${pad2(match[2])}-${pad2(match[1])}`;
-    if (effet && iso < effet) { year += 1; iso = `${year}-${pad2(match[2])}-${pad2(match[1])}`; }
-    return iso;
-}
+// The policy table stores the due date as "dd/mm" (day and month only), which is what the form shows.
 const dateToEcheance = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : "");
+const echeanceText = (echeance) => (/^\d{4}-\d{2}-\d{2}/.test(echeance || "") ? dateToEcheance(echeance) : echeance || "");
+// Typing "2810" gives "28/10".
+const maskEcheance = (text) => {
+    const digits = text.replace(/\D/g, "").slice(0, 4);
+    return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+};
+const validEcheance = (echeance) => {
+    const match = /^(\d{2})\/(\d{2})$/.exec(echeance || "");
+    if (!match) return false;
+    const [day, month] = [Number(match[1]), Number(match[2])];
+    return month >= 1 && month <= 12 && day >= 1 && day <= new Date(2024, month, 0).getDate(); // leap year: 29/02 allowed
+};
 const termDates = (effet, duree) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(effet || "")) return {};
     const months = Number(duree) || 12;
@@ -395,6 +417,14 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             setError("Veuillez sélectionner la compagnie.");
             return;
         }
+        if (values.echeance && !validEcheance(values.echeance)) {
+            setError("L'échéance doit être un jour et un mois valides (jj/mm).");
+            return;
+        }
+        if (values.revalorisation && !values.date_revalorisation) {
+            setError("Renseignez la date de revalorisation.");
+            return;
+        }
         setStep(2);
     }
 
@@ -408,13 +438,14 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         const quittance = {};
 
         for (const [key, value] of Object.entries(values)) {
-            if (key === "heure_effet" || key === "carte_verte" || key.startsWith("g_") || key.startsWith("cv_")) continue;
+            if (key === "heure_effet" || key === "carte_verte" || key.startsWith("g_") || key.startsWith("cv_") || key.startsWith("dc_")) continue;
+            if (["revalorisation", "date_revalorisation", "date_envoi", "dommages_cumules"].includes(key)) continue;
 
             let converted = value === "" ? null : value;
             if (DATE_FIELDS.includes(key)) converted = toTimestamp(value);
             if (MONEY_FIELDS.includes(key) && value !== "") converted = Number(value);
             if (["code_compagnie", "duree"].includes(key) && value !== "") converted = Number(value);
-            if (key === "franchise") converted = values.tous_risque && value !== "" ? Math.round(Number(value)) || 0 : null;
+            if (key === "franchise") converted = (values.tous_risque || values.dommages_cumules) && value !== "" ? Math.round(Number(value)) || 0 : null;
 
             if (POLICE_FIELDS.includes(key)) police[key] = converted;
             else quittance[key] = converted;
@@ -430,6 +461,13 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             remarquage: values.g_remarquage ? 1 : 0
         };
         const carte_verte = values.carte_verte ? { du: values.cv_du || null, au: values.cv_au || null } : null;
+        // Ticked "Dommages cumulés" guarantees with their amounts.
+        const dommages_cumules = values.dommages_cumules
+            ? Object.fromEntries(DC_GUARANTEES.filter(([key]) => values[`dc_${key}`]).map(([key]) => [key, amount(values[`dc_${key}_montant`])]))
+            : null;
+        const revalorisation = values.revalorisation
+            ? { date_revalorisation: values.date_revalorisation || null, date_envoi: values.date_envoi || null }
+            : null;
         if (values.effet) police.heure_effet = `${values.effet}T${values.heure_effet}:00`;
         quittance.observation = values.observation || "";
 
@@ -440,7 +478,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ police, quittance, garanties, carte_verte })
+                body: JSON.stringify({ police, quittance, garanties, carte_verte, dommages_cumules, revalorisation })
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -522,7 +560,16 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 g_vol: asText(g.vol), g_incendie: asText(g.incendie), g_bdg: asText(g.bdg),
                 g_personnes: asText(g.personnes_transportees), g_ind_cond: asText(g.ind_conducteur), g_remarquage: g.remarquage != null && Number(g.remarquage) !== 0
             };
-            setValues(prev => ({ ...prev, ...loaded, ...guarantees }));
+            const dc = data.dommages_cumules || null;
+            const reval = data.revalorisation || null;
+            const extras = {
+                dommages_cumules: Boolean(dc),
+                ...Object.fromEntries(DC_GUARANTEES.flatMap(([key]) => [[`dc_${key}`, Boolean(dc && key in dc)], [`dc_${key}_montant`, asText(dc?.[key])]])),
+                revalorisation: Boolean(reval),
+                date_revalorisation: asDate(reval?.date_revalorisation),
+                date_envoi: asDate(reval?.date_envoi)
+            };
+            setValues(prev => ({ ...prev, ...loaded, ...guarantees, ...extras }));
             setNomBranche(data.nom_branche || '');
             if (data.nom_client) setNomClient(data.nom_client);
             setQuittances(Array.isArray(data.quittances) ? data.quittances.map(normalizeReceipt) : []);
@@ -746,9 +793,12 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     <label className="pf-field">
                         <span>Échéance</span>
                         <input
-                            type="date"
-                            value={echeanceToDate(values.echeance, values.effet)}
-                            onChange={e => update("echeance", dateToEcheance(e.target.value))}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="jj/mm"
+                            maxLength={5}
+                            value={echeanceText(values.echeance)}
+                            onChange={e => update("echeance", maskEcheance(e.target.value))}
                         />
                     </label>
                     <label className="pf-field">
@@ -772,13 +822,29 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 <div className="pf-check-row">
                     {check("Hors taxe", "hors_taxe")}
                     {check("Bonification", "participation")}
+                    {check("Revalorisation", "revalorisation")}
+                    {values.revalorisation && (
+                        <>
+                            <label className="pf-franchise pf-inline-date">
+                                <span>Date de revalorisation</span>
+                                <input type="date" value={values.date_revalorisation} onChange={e => update("date_revalorisation", e.target.value)} />
+                            </label>
+                            <label className="pf-franchise pf-inline-date">
+                                <span>Date d'envoi</span>
+                                <input type="date" value={values.date_envoi} onChange={e => update("date_envoi", e.target.value)} />
+                            </label>
+                        </>
+                    )}
                 </div>
 
                 <div className="pf-grid">
                     {field("Heure effet", "heure_effet", "time")}
                     {field("État", "etat")}
                     {field("Date mouvement", "date_mvt", "date")}
-                    {field("Risque", "risque")}
+                    <label className="pf-field pf-risque">
+                        <span>Risque</span>
+                        <textarea rows={3} value={values.risque} onChange={e => update("risque", e.target.value)} />
+                    </label>
                 </div>
             </section>
             {!isCreate && (
@@ -797,8 +863,16 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             {!(isCreate && step === 2) && (
             <div className="pf-right-column">
             <div className="pf-tousrisque">
-                {check("Tous risques", "tous_risque")}
-                {values.tous_risque && (
+                {/* Tous risques and Dommages cumulés are two kinds of cover: one or the other. */}
+                <label className="pf-check">
+                    <input type="checkbox" checked={values.tous_risque} onChange={e => { const on = e.target.checked; setValues(prev => ({ ...prev, tous_risque: on, dommages_cumules: on ? false : prev.dommages_cumules })); }} />
+                    Tous risques
+                </label>
+                <label className="pf-check">
+                    <input type="checkbox" checked={values.dommages_cumules} onChange={e => { const on = e.target.checked; setValues(prev => ({ ...prev, dommages_cumules: on, tous_risque: on ? false : prev.tous_risque })); }} />
+                    Dommages cumulés
+                </label>
+                {(values.tous_risque || values.dommages_cumules) && (
                     <>
                         <label className="pf-franchise">
                             <span>Franchise</span>
@@ -814,6 +888,21 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             <input type="number" min="0" step="any" value={values.venale} onChange={e => { const value = e.target.value; setValues(prev => ({ ...prev, venale: value, g_vol: value, g_incendie: value })); }} />
                         </label>
                     </>
+                )}
+                {values.dommages_cumules && (
+                    <div className="pf-dc-list">
+                        {DC_GUARANTEES.map(([key, label]) => (
+                            <div className="pf-dc-item" key={key}>
+                                {check(label, `dc_${key}`)}
+                                {values[`dc_${key}`] && (
+                                    <label className="pf-franchise">
+                                        <span>Montant</span>
+                                        <input type="number" min="0" step="any" value={values[`dc_${key}_montant`]} onChange={e => update(`dc_${key}_montant`, e.target.value)} />
+                                    </label>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
             <section className="pf-section pf-garanties pf-span-full">

@@ -532,3 +532,17 @@
 .policy-modal-expanded .pf-tousrisque .pf-franchise input { width: 84px; }
 /* Renouvelable / Fermé / Durée / Échéance / Date effet / Expiration on one row */
 .policy-modal-expanded .pf-term-row { grid-template-columns: auto auto minmax(80px, 1fr) repeat(3, minmax(105px, 1.2fr)); }
+
+/* Risque: a text area across the whole width of the section */
+.policy-modal-expanded .pf-grid > .pf-field.pf-risque { grid-column: 1 / -1; }
+.policy-modal-expanded .pf-field.pf-risque textarea { height: auto; min-height: clamp(54px, 9vh, 84px); padding: 6px 9px; line-height: 1.35; resize: vertical; }
+
+/* Revalorisation dates, next to the checkbox */
+.policy-modal-expanded .pf-franchise.pf-inline-date input { width: 132px; text-align: left; }
+
+/* Dommages cumulés: one line per guarantee, its amount appears once ticked */
+.policy-modal-expanded .pf-dc-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; width: 100%; padding-top: 6px; border-top: 1px dashed #dce5eb; }
+.policy-modal-expanded .pf-dc-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: clamp(26px, 4.4vh, 32px); }
+.policy-modal-expanded .pf-dc-item .pf-check { min-width: 0; }
+.policy-modal-expanded .pf-dc-item .pf-franchise input { width: 96px; }
+@media (max-width: 760px) { .policy-modal-expanded .pf-dc-list { grid-template-columns: 1fr; } }
