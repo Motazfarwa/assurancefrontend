@@ -155,7 +155,13 @@ export default function RecetteModal({ onClose }) {
       <section className="rct-dialog" role="dialog" aria-modal="true" aria-labelledby="rct-title">
         <header className="rct-header">
           <div><span>COMPTABILITE · MODULE 570</span><h2 id="rct-title">Recette Technique</h2></div>
-          <button type="button" onClick={leave} aria-label="Fermer">×</button>
+          <div className="rct-header-actions">
+            <input ref={fileInput} type="file" accept="image/*,application/pdf,.pdf" onChange={importDocument} hidden />
+            <button type="button" className="rct-tool rct-import" onClick={() => fileInput.current?.click()} disabled={scanning !== null} title="Scanner une image ou un PDF pour remplir le formulaire">
+              {scanning === null ? 'Importer' : `Lecture… ${Math.round(scanning * 100)}%`}
+            </button>
+            <button type="button" className="rct-close" onClick={leave} aria-label="Fermer">×</button>
+          </div>
         </header>
 
         <div className="rct-body">
@@ -245,10 +251,6 @@ export default function RecetteModal({ onClose }) {
           {error && <p className="rct-error" role="alert">{error}</p>}        </div>
 
         <footer className="rct-footer">
-          <input ref={fileInput} type="file" accept="image/*,application/pdf,.pdf" onChange={importDocument} hidden />
-          <button type="button" className="rct-tool rct-import" onClick={() => fileInput.current?.click()} disabled={scanning !== null} title="Scanner une image ou un PDF pour remplir le formulaire">
-            {scanning === null ? 'Importer' : `Lecture… ${Math.round(scanning * 100)}%`}
-          </button>
           <button type="button" className="rct-tool" onClick={() => patch({ typeReglement: 'Fictif' })} disabled={fictif}>Règlement fictif</button>
           <button type="button" className="rct-tool" onClick={leave}>Quitter transaction</button>
         </footer>

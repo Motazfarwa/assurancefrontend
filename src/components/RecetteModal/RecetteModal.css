@@ -3,7 +3,8 @@
 .rct-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #e5ecef; }
 .rct-header span { color: #187d78; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
 .rct-header h2 { margin: 3px 0 0; color: #173247; font-size: 16px; }
-.rct-header button { width: 30px; height: 30px; border: 1px solid #d8e3e8; border-radius: 8px; background: #fff; font-size: 19px; cursor: pointer; }
+.rct-header-actions { display: flex; align-items: center; gap: 8px; }
+.rct-header .rct-close { width: 30px; height: 30px; border: 1px solid #d8e3e8; border-radius: 8px; background: #fff; font-size: 19px; cursor: pointer; }
 .rct-body { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; padding: 10px 20px 14px; }
 .rct-group { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; min-width: 0; margin: 0; padding: 8px 12px 10px; border: 1px solid #dce5eb; border-radius: 8px; }
 .rct-group:disabled { opacity: .55; }
@@ -32,7 +33,8 @@
 .rct-table .rct-empty { padding: 22px 10px; text-align: center; color: #7b8b95; }
 .rct-table tr.is-clickable { cursor: pointer; }
 .rct-table tr.is-clickable:hover, .rct-table tr.is-selected { background: #eaf5f2; }
-.rct-import { margin-right: auto; }
+.rct-import { border-color: #187d78; background: #187d78; color: #fff; }
+.rct-import:hover:not(:disabled) { background: #13665f; }
 .rct-error { margin: 0; padding: 7px 12px; border: 1px solid #f1cccc; border-radius: 7px; background: #fff7f7; color: #b34747; }
 .rct-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 20px; border-top: 1px solid #edf1f2; background: #f8fbfb; }
 @media (max-width: 760px) { .rct-row { grid-template-columns: 1fr; } }
