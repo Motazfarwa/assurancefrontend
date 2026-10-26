@@ -326,7 +326,6 @@ export default function ClientManagementPage({ modal = false }) {
             />
           </div>
         )}
-        <footer className="client-payment-footer"><div className="payment-method"><img src="/logos/attijari.svg" alt="Attijari Bank" /><strong>Virement &agrave; Attijari</strong></div><div className="payment-method"><strong>En esp&egrave;ces &agrave;</strong><img src="/logos/stb.svg" alt="STB Bank" /></div></footer>
       </section>
       {activeAction && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}
       {ficheFile && <FicheImportModal file={ficheFile} accessToken={accessToken} onClose={() => setFicheFile(null)} onApply={applyFiche} />}
