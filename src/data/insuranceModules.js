@@ -28,6 +28,8 @@ export const INSURANCE_MODULES = [
   { id: '530', category: 'accounting', title: 'Reception bordereau', description: 'Importer le bordereau Excel recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-reception' },
   { id: '540', category: 'accounting', title: 'Confrontation bordereau', description: 'Comparer le bordereau du siege avec vos polices et quittances.', permission: P.REPORTS_VIEW, form: 'bordereau-confrontation' },
   { id: '550', category: 'accounting', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
+  { id: '560', category: 'accounting', title: 'Gestion des cheques', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
+  { id: '570', category: 'accounting', title: 'Recette Technique', description: 'Saisir un reglement et l’affecter aux quittances impayees.', permission: P.REPORTS_VIEW, form: 'recette' },
 
   { id: '300', category: 'collections', title: 'Suivi du recouvrement', description: 'Consulter les paiements en attente.', permission: P.REPORTS_VIEW, form: 'search' },
   { id: '310', category: 'collections', title: 'Dossiers en retard', description: 'Identifier les echeances impayees.', permission: P.REPORTS_VIEW, form: 'report' },

@@ -12,6 +12,8 @@ import AgencyUnpaidModal from '../AgencyUnpaidModal/AgencyUnpaidModal';
 import BordereauReceptionModal from '../BordereauModal/BordereauReceptionModal';
 import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontationModal';
 import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
+import ChequeModal from '../ChequeModal/ChequeModal';
+import RecetteModal from '../RecetteModal/RecetteModal';
 import './ModulesWorkspace.css';
 
 export default function ModulesWorkspace() {
@@ -25,6 +27,8 @@ export default function ModulesWorkspace() {
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
   const [bordereauModal, setBordereauModal] = useState(null);
+  const [showChequeModal, setShowChequeModal] = useState(false);
+  const [showRecetteModal, setShowRecetteModal] = useState(false);
   const [activeModuleId, setActiveModuleId] = useState(null);
   const visibleModules = useMemo(
     () => user.role ? INSURANCE_MODULES.filter((module) => hasPermission(user, module.permission)) : INSURANCE_MODULES,
@@ -64,6 +68,16 @@ export default function ModulesWorkspace() {
     if (module.form === 'bordereau-reception' || module.form === 'bordereau-confrontation' || module.form === 'bordereau-fusion') {
       setActiveModuleId(module.id);
       setBordereauModal(module.form);
+      return;
+    }
+    if (module.form === 'cheques') {
+      setActiveModuleId(module.id);
+      setShowChequeModal(true);
+      return;
+    }
+    if (module.form === 'recette') {
+      setActiveModuleId(module.id);
+      setShowRecetteModal(true);
       return;
     }
     if (module.form === 'unpaid-agency') {
@@ -138,6 +152,8 @@ export default function ModulesWorkspace() {
       {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
+      {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
+      {showRecetteModal && <RecetteModal onClose={() => setShowRecetteModal(false)} />}
     </main>
   );
 }

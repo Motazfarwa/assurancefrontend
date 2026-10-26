@@ -62,6 +62,9 @@ const initialValues = {
     observation: ""
 };
 
+// Companies not offered in the list (STAR, SALIM, EUROP ASSISTANCE, MAE, EL AMANA TAKAFUL), by company code.
+const HIDDEN_COMPANIES = new Set([1, 7, 8, 11, 13]);
+
 const API_URL = import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com";
 
 const POLICE_FIELDS = [
@@ -612,7 +615,10 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         >
                             <option value="">Sélectionner une compagnie</option>
 
-                            {compagnies.map((compagnie) => (
+                            {compagnies
+                                // a hidden company stays visible when the loaded policy belongs to it
+                                .filter((compagnie) => !HIDDEN_COMPANIES.has(Number(compagnie.code_compagnie)) || String(compagnie.code_compagnie) === String(values.code_compagnie))
+                                .map((compagnie) => (
                                 <option
                                     key={compagnie.code_compagnie}
                                     value={compagnie.code_compagnie}

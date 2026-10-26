@@ -448,10 +448,10 @@ const AI_MAP = {
   taxes: 'taxe', stamp: 'timbre', commission: 'commission', total_premium: 'prime_total', period: 'periode',
 };
 
-const isPdf = (file) => file?.type === 'application/pdf' || /\.pdf$/i.test(file?.name || '');
+export const isPdf = (file) => file?.type === 'application/pdf' || /\.pdf$/i.test(file?.name || '');
 
 // A PDF is sent as it is (base64), the server reads it.
-async function fileToBase64(file) {
+export async function fileToBase64(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = '';
   for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
@@ -459,7 +459,7 @@ async function fileToBase64(file) {
 }
 
 // Shrinks a phone photo before upload (text stays readable, size stays well under the limit).
-async function toJpegBase64(file, maxSide = 2000, quality = 0.88) {
+export async function toJpegBase64(file, maxSide = 2000, quality = 0.88) {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
