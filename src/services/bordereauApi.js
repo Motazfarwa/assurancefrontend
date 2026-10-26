@@ -28,11 +28,16 @@ export const listBordereaux = (token, params) => request(`/api/bordereaux?${quer
 export const getBordereau = (token, id) => request(`/api/bordereaux/${id}`, token);
 export const saveBordereau = (token, payload) => request('/api/bordereaux', token, { method: 'POST', body: JSON.stringify(payload) });
 export const deleteBordereau = (token, id) => request(`/api/bordereaux/${id}`, token, { method: 'DELETE' });
-export const getConfrontation = (token, params) => request(`/api/bordereaux/confrontation?${query(params)}`, token);
+// Policy numbers (num_int) -> { code_client, nom_client } of the agency's policies.
+export const getBordereauClients = (token, numeros) => request('/api/bordereaux/clients', token, { method: 'POST', body: JSON.stringify({ numeros }) });
+export const getConfrontation =(token, params) => request(`/api/bordereaux/confrontation?${query(params)}`, token);
 
 // "2026-11" (month input) <-> "11/2026" (period stored with the bordereau)
 export const monthToPeriode = (month) => (/^\d{4}-\d{2}$/.test(month) ? `${month.slice(5)}/${month.slice(0, 4)}` : '');
-export const currentMonth = () => new Date().toISOString().slice(0, 7);
+export const currentMonth = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
 // The bordereau received is the one of the coming term: the month after the current one.
 export const nextMonth = () => {
   const now = new Date();

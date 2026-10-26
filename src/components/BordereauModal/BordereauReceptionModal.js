@@ -2,11 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
-import { deleteBordereau, getBordereau, listBordereaux, monthToPeriode, nextMonth, saveBordereau } from '../../services/bordereauApi';
+import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, monthToPeriode, nextMonth, saveBordereau } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
+// Terme: the head office's file for the coming due month. Comptant: the receipts issued in the month.
+const KINDS = {
+  T: { module: '530', title: 'Réception terme', label: 'Terme', importLabel: 'Importer Terme', month: nextMonth },
+  C: { module: '535', title: 'Réception comptant', label: 'Comptant', importLabel: 'Importer Comptant', month: currentMonth },
+};
 const today = () => new Date().toISOString().slice(0, 10);
+const cleanNumber = (value) => String(value ?? '').trim().replace(/\.0+$/, '');
 const emptyLine = () => ({ num_police: '', code_client: '', nom_client: '', echeance: '', num_quittance: '', prime_net: '', commission: '', prime_total: '' });
 const GRID = [
   ['num_police', 'N° Police (num_int)'], ['code_client', 'Code Clt'], ['nom_client', 'Nom Client'], ['echeance', 'Échéance', 'date'],
@@ -17,11 +23,14 @@ function fromApi(line) {
   return { ...line, echeance: line.echeance ? String(line.echeance).slice(0, 10) : null };
 }
 
-export default function BordereauReceptionModal({ onClose }) {
+export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
+  const kind = KINDS[tc] || KINDS.T;
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
   const [companies, setCompanies] = useState([]);
-  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: nextMonth(), date_reception: today() });
+  const [form, setForm] = useState({ code_compagnie: '', tc, month: kind.month(), date_reception: today() });
+  const [clients, setClients] = useState({}); // num_police -> { code_client, nom_client } from the agency's policies
+  const requestedClients = useRef(new Set());
   const [lines, setLines] = useState([]);
   const [savedId, setSavedId] = useState(null);
   const [fichier, setFichier] = useState('');
@@ -36,7 +45,25 @@ export default function BordereauReceptionModal({ onClose }) {
   const [notice, setNotice] = useState('');
   const periode = monthToPeriode(form.month);
   const companyName = companies.find((company) => String(company.code_compagnie) === String(form.code_compagnie))?.nom_compagnie || '';
+  // Lines with the client filled from the agency's policy when the file does not give it.
+  const shownLines = useMemo(() => lines.map((line) => {
+    const client = clients[cleanNumber(line.num_police)];
+    return client ? { ...line, code_client: line.code_client || client.code_client || '', nom_client: line.nom_client || client.nom_client || '' } : line;
+  }), [lines, clients]);
   const total = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0), 0), [lines]);
+  // Solde: what is due to the company, prime totale less the agency's commissions.
+  const solde = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0) - Number(line.commission || 0), 0), [lines]);
+
+  // Client code and name of the policies the lines name, asked once per policy number.
+  useEffect(() => {
+    const missing = [...new Set(lines.filter((line) => !(line.code_client && line.nom_client)).map((line) => cleanNumber(line.num_police)))]
+      .filter((number) => number && !requestedClients.current.has(number));
+    if (!missing.length) return;
+    missing.forEach((number) => requestedClients.current.add(number));
+    getBordereauClients(accessToken, missing)
+      .then((found) => setClients((current) => ({ ...current, ...found })))
+      .catch(() => missing.forEach((number) => requestedClients.current.delete(number)));
+  }, [accessToken, lines]);
 
   useEffect(() => {
     let active = true;
@@ -94,7 +121,7 @@ export default function BordereauReceptionModal({ onClose }) {
       const { meta } = info;
       const company = companies.find((item) => String(item.code_compagnie) === String(meta.code_compagnie));
       const nextMonth = /^\d{2}\/\d{4}$/.test(meta.periode || '') ? `${meta.periode.slice(3)}-${meta.periode.slice(0, 2)}` : form.month;
-      const nextForm = { ...form, code_compagnie: company ? String(company.code_compagnie) : form.code_compagnie, tc: 'T', month: nextMonth };
+      const nextForm = { ...form, code_compagnie: company ? String(company.code_compagnie) : form.code_compagnie, month: nextMonth };
       const raw = buildLines(info);
       const scale = looksLikeMillimes(raw);
       const parsedLines = makeLines(info, scale, nextMonth.slice(5));
@@ -143,7 +170,7 @@ export default function BordereauReceptionModal({ onClose }) {
     try {
       const payload = {
         code_compagnie: Number(form.code_compagnie), tc: form.tc, periode, date_reception: form.date_reception || null, fichier: fichier || null,
-        lignes: lines.map((line) => ({
+        lignes: shownLines.map((line) => ({
           num_police: String(line.num_police), code_client: line.code_client || null, nom_client: line.nom_client || null,
           echeance: line.echeance || null, num_quittance: line.num_quittance || null,
           prime_net: line.prime_net === '' ? null : line.prime_net ?? null, commission: line.commission === '' ? null : line.commission ?? null,
@@ -194,6 +221,11 @@ export default function BordereauReceptionModal({ onClose }) {
     setEditing(null);
   }
 
+  function editLine(index) {
+    const line = shownLines[index];
+    setEditing({ index, values: { ...emptyLine(), ...line, echeance: line.echeance || '', prime_net: line.prime_net ?? '', commission: line.commission ?? '', prime_total: line.prime_total ?? '' } });
+  }
+
   function removeLine() {
     if (selected < 0) return;
     setLines((current) => current.filter((_, index) => index !== selected));
@@ -203,12 +235,12 @@ export default function BordereauReceptionModal({ onClose }) {
 
   function preview() {
     printReport({
-      title: 'Réception de bordereau',
-      lines: [`Compagnie : ${companyName}    TC : ${form.tc === 'T' ? 'Terme' : 'Comptant'}    Période : ${periode}    Total : ${money(total)}`],
+      title: kind.title,
+      lines: [`Compagnie : ${companyName}    TC : ${kind.label}    Période : ${periode}    Total : ${money(total)}    Solde : ${money(solde)}`],
       sections: [{
         title: `${lines.length} ligne(s)`,
-        columns: [{ label: 'N°', value: (row) => lines.indexOf(row) + 1 }, ...GRID.map(([key, label, kind]) => ({ key, label, kind }))],
-        rows: lines,
+        columns: [{ label: 'N°', value: (row) => shownLines.indexOf(row) + 1 }, ...GRID.map(([key, label, type]) => ({ key, label, kind: type }))],
+        rows: shownLines,
       }],
     });
   }
@@ -217,18 +249,18 @@ export default function BordereauReceptionModal({ onClose }) {
     <div className="bd-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section className="bd-dialog" role="dialog" aria-modal="true" aria-labelledby="bd-reception-title">
         <header className="bd-header">
-          <div><span>COMPTABILITE · MODULE 530</span><h2 id="bd-reception-title">Réception bordereau mécanisé</h2></div>
+          <div><span>COMPTABILITE · MODULE {kind.module}</span><h2 id="bd-reception-title">{kind.title}</h2></div>
           <button type="button" onClick={onClose} aria-label="Fermer">×</button>
         </header>
 
         <div className="bd-toolbar">
           <button type="button" className="bd-tool" onClick={() => { setEditing({ index: -1, values: emptyLine() }); }}>Ajouter</button>
-          <button type="button" className="bd-tool" disabled={selected < 0} onClick={() => setEditing({ index: selected, values: { ...emptyLine(), ...lines[selected], echeance: lines[selected].echeance || '', prime_net: lines[selected].prime_net ?? '', commission: lines[selected].commission ?? '', prime_total: lines[selected].prime_total ?? '' } })}>Modifier</button>
+          <button type="button" className="bd-tool" disabled={selected < 0} onClick={() => editLine(selected)}>Modifier</button>
           <button type="button" className="bd-tool" disabled={selected < 0} onClick={removeLine}>Supprimer</button>
           <button type="button" className="bd-tool" disabled={!lines.length} onClick={preview}>Aperçu</button>
           <span className="bd-spacer" />
           <input ref={fileInput} type="file" accept=".xls,.xlsx,.csv,.txt" hidden onChange={chooseFile} />
-          <button type="button" className="bd-import" onClick={() => fileInput.current?.click()} disabled={busy}>Importer Terme</button>
+          <button type="button" className="bd-import" onClick={() => fileInput.current?.click()} disabled={busy}>{kind.importLabel}</button>
           <button type="button" className="bd-save" onClick={save} disabled={busy || !lines.length}>{busy ? 'Patientez…' : dirty ? 'Enregistrer le bordereau' : 'Enregistré'}</button>
         </div>
 
@@ -241,10 +273,11 @@ export default function BordereauReceptionModal({ onClose }) {
           </label>
           <label>Date réception<input type="date" value={form.date_reception} onChange={(event) => setForm((current) => ({ ...current, date_reception: event.target.value }))} /></label>
           <label>TC
-            <select value="T" disabled><option value="T">Terme</option></select>
+            <select value={form.tc} disabled><option value={form.tc}>{kind.label}</option></select>
           </label>
           <label>Période<input type="month" value={form.month} onChange={(event) => changeForm({ month: event.target.value })} /></label>
           <div className="bd-total"><span>Total</span><strong>{money(total)}</strong></div>
+          <div className="bd-total" title="Prime totale moins les commissions"><span>Solde</span><strong>{money(solde)}</strong></div>
           <div className="bd-total"><span>Lignes</span><strong>{lines.length}</strong></div>
         </div>
 
@@ -273,9 +306,9 @@ export default function BordereauReceptionModal({ onClose }) {
             <thead><tr><th>N°</th>{GRID.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead>
             <tbody>
               {lines.length === 0 ? (
-                <tr><td colSpan={GRID.length + 1} className="bd-empty">{form.code_compagnie ? 'Aucun bordereau pour cette période : cliquez sur « Importer Terme » et choisissez le fichier Excel reçu du siège.' : 'Choisissez la compagnie et la période, puis importez le fichier du siège.'}</td></tr>
-              ) : lines.map((line, index) => (
-                <tr key={`${line.id_ligne || 'new'}-${index}`} className={selected === index ? 'is-selected' : undefined} onClick={() => setSelected(index)} onDoubleClick={() => { setSelected(index); setEditing({ index, values: { ...emptyLine(), ...line, echeance: line.echeance || '', prime_net: line.prime_net ?? '', commission: line.commission ?? '', prime_total: line.prime_total ?? '' } }); }}>
+                <tr><td colSpan={GRID.length + 1} className="bd-empty">{form.code_compagnie ? `Aucun bordereau pour cette période : cliquez sur « ${kind.importLabel} » et choisissez le fichier Excel reçu du siège.` : 'Choisissez la compagnie et la période, puis importez le fichier du siège.'}</td></tr>
+              ) : shownLines.map((line, index) => (
+                <tr key={`${line.id_ligne || 'new'}-${index}`} className={selected === index ? 'is-selected' : undefined} onClick={() => setSelected(index)} onDoubleClick={() => { setSelected(index); editLine(index); }}>
                   <td>{index + 1}</td>
                   {GRID.map(([key, , kind]) => <td key={key} className={kind === 'money' ? 'is-number' : undefined}>{kind === 'money' ? money(line[key]) : kind === 'date' ? shortDate(line[key]) : line[key] ?? ''}</td>)}
                 </tr>

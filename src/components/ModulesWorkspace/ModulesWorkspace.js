@@ -65,7 +65,7 @@ export default function ModulesWorkspace() {
       setShowDocumentModal(true);
       return;
     }
-    if (module.form === 'bordereau-reception' || module.form === 'bordereau-confrontation' || module.form === 'bordereau-fusion') {
+    if (['bordereau-reception', 'bordereau-comptant', 'bordereau-confrontation', 'bordereau-fusion'].includes(module.form)) {
       setActiveModuleId(module.id);
       setBordereauModal(module.form);
       return;
@@ -149,7 +149,8 @@ export default function ModulesWorkspace() {
       {showBranchModal && <BranchManagementModal onClose={() => setShowBranchModal(false)} />}
       {showDocumentModal && <DocumentEntryModal onClose={() => setShowDocumentModal(false)} />}
       {showUnpaidModal && <AgencyUnpaidModal onClose={() => setShowUnpaidModal(false)} />}
-      {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal onClose={() => setBordereauModal(null)} />}
+      {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal tc="T" onClose={() => setBordereauModal(null)} />}
+      {bordereauModal === 'bordereau-comptant' && <BordereauReceptionModal tc="C" onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
