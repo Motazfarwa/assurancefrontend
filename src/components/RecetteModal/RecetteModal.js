@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientOverview, listBanks } from '../../services/chequeApi';
+import { scanRecette } from '../../services/recetteImport';
 import './RecetteModal.css';
 
 const TYPES = ['Traite', 'Chèque', 'Virement', 'Espèces', 'Carte bancaire', 'Fictif'];
@@ -8,6 +9,20 @@ const today = () => new Date().toISOString().slice(0, 10);
 const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
 const money = (value) => num(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const blankPiece = () => ({ typeReglement: 'Chèque', nump: '', acompte: '', montant: '', echeance: today(), code_banque: '', a_verser: true, en_instance: false });
+
+// Rows for the quittances named on an imported document, each paid up to what the amount still covers.
+function importedRows(list, { numbers, montant }) {
+  let room = num(montant);
+  const added = [];
+  numbers.forEach((number) => {
+    const row = list.find((item) => String(item.num_quittance) === String(number));
+    if (!row || room <= 0.0005) return;
+    const amount = Math.min(Number(row.solde), room);
+    room -= amount;
+    added.push({ num_quittance: row.num_quittance, montant: Number(row.solde), aRegler: amount });
+  });
+  return added;
+}
 
 export default function RecetteModal({ onClose }) {
   const { accessToken } = useAuth();
@@ -21,6 +36,10 @@ export default function RecetteModal({ onClose }) {
   const [toPay, setToPay] = useState('');
   const [selectedRow, setSelectedRow] = useState('');
   const [error, setError] = useState('');
+  const [scanning, setScanning] = useState(null); // null, or progress 0..1 while a document is read
+  const [notice, setNotice] = useState('');
+  const fileInput = useRef(null);
+  const pendingImport = useRef(null); // quittances read from a document, added once the client is loaded
 
   const fictif = piece.typeReglement === 'Fictif';
   const noPiece = fictif || piece.typeReglement === 'Espèces';
@@ -41,6 +60,7 @@ export default function RecetteModal({ onClose }) {
         const overview = await getClientOverview(accessToken, value);
         if (!active) return;
         setClient(overview.client); setQuittances(overview.quittances); setError('');
+        if (pendingImport.current) { setRows(importedRows(overview.quittances, pendingImport.current)); pendingImport.current = null; }
       } catch (requestError) {
         if (!active) return;
         setClient(null); setQuittances([]); setError(requestError.message);
@@ -97,6 +117,36 @@ export default function RecetteModal({ onClose }) {
 
   function selectRow(row) {
     setSelected(''); setSelectedRow(row.num_quittance); setToPay(row.aRegler.toFixed(3)); setError('');
+  }
+
+  async function importDocument(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type) && !/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      setError('Format non pris en charge : importez une image (JPG, PNG) ou un PDF.');
+      return;
+    }
+    setScanning(0); setError(''); setNotice('');
+    try {
+      const { values } = await scanRecette(file, banks, accessToken, (progress) => setScanning(progress));
+      const { code: importedCode, quittances: numbers, ...pieceValues } = values;
+      const filled = Object.keys(values).length;
+      if (!filled) { setError('Aucune information reconnue dans le document. Saisissez les champs manuellement.'); return; }
+      patch(pieceValues);
+      const montant = pieceValues.montant ?? piece.montant;
+      if (numbers?.length) {
+        // A new client code reloads the quittances: they are added once loaded.
+        if (importedCode && importedCode !== code.trim()) pendingImport.current = { numbers, montant };
+        else if (client) setRows(importedRows(quittances, { numbers, montant }));
+      }
+      if (importedCode) setCode(importedCode);
+      setNotice(`${filled} information(s) extraite(s) du document. Vérifiez les champs avant de valider.`);
+    } catch (scanError) {
+      setError(`Lecture du document impossible : ${scanError.message}`);
+    } finally {
+      setScanning(null);
+    }
   }
 
   function leave() {
@@ -199,9 +249,14 @@ export default function RecetteModal({ onClose }) {
           </fieldset>
 
           {error && <p className="rct-error" role="alert">{error}</p>}
+          {notice && !error && <p className="rct-notice" role="status">{notice}</p>}
         </div>
 
         <footer className="rct-footer">
+          <input ref={fileInput} type="file" accept="image/*,application/pdf,.pdf" onChange={importDocument} hidden />
+          <button type="button" className="rct-tool rct-import" onClick={() => fileInput.current?.click()} disabled={scanning !== null} title="Scanner une image ou un PDF pour remplir le formulaire">
+            {scanning === null ? 'Importer' : `Lecture… ${Math.round(scanning * 100)}%`}
+          </button>
           <button type="button" className="rct-tool" onClick={() => patch({ typeReglement: 'Fictif' })} disabled={fictif}>Règlement fictif</button>
           <button type="button" className="rct-tool" onClick={leave}>Quitter transaction</button>
         </footer>
