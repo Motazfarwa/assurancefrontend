@@ -32,7 +32,6 @@
 .rct-table .rct-empty { padding: 22px 10px; text-align: center; color: #7b8b95; }
 .rct-table tr.is-clickable { cursor: pointer; }
 .rct-table tr.is-clickable:hover, .rct-table tr.is-selected { background: #eaf5f2; }
-.rct-notice { margin: 0; padding: 7px 12px; border: 1px solid #cde6dc; border-radius: 7px; background: #f3fbf7; color: #2f6b55; }
 .rct-import { margin-right: auto; }
 .rct-error { margin: 0; padding: 7px 12px; border: 1px solid #f1cccc; border-radius: 7px; background: #fff7f7; color: #b34747; }
 .rct-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 20px; border-top: 1px solid #edf1f2; background: #f8fbfb; }

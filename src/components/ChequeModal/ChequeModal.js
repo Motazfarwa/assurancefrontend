@@ -1,14 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { createPiece, deletePiece, extractCheque, getClientOverview, getPiece, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
+import { createPiece, deletePiece, getClientOverview, getPiece, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
+import { scanPayment } from '../../services/paymentScan';
+import ScanSummary from '../ScanSummary/ScanSummary';
 import './ChequeModal.css';
 
 const TYPES = [['T', 'Traite'], ['C', 'Chèque'], ['V', 'Virement'], ['E', 'Espèce'], ['B', 'Carte bancaire']];
+const TYPE_CODES = { Traite: 'T', Chèque: 'C', Virement: 'V', Espèces: 'E', 'Carte bancaire': 'B' };
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
 const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: true, en_instance: true });
+
+// Amounts for the quittances named on an imported document, each up to what is left to pay on it.
+function importedAlloc(list, { numbers, montant }) {
+  let left = num(montant);
+  const next = {};
+  numbers.forEach((number) => {
+    const row = list.find((item) => String(item.num_quittance) === String(number));
+    if (!row || left <= 0.0005) return;
+    const part = Math.max(0, Math.min(left, Number(row.solde) - Number(row.instance)));
+    if (part > 0) next[row.num_quittance] = part.toFixed(3);
+    left -= part;
+  });
+  return next;
+}
 
 export default function ChequeModal({ onClose }) {
   const { accessToken } = useAuth();
@@ -26,6 +43,9 @@ export default function ChequeModal({ onClose }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [list, setList] = useState(null);
+  const [scanning, setScanning] = useState(null); // null, or progress 0..1 while a document is read
+  const [scan, setScan] = useState(null); // what the last imported document gave
+  const pendingImport = useRef(null); // quittances read from a document, spread once the client is loaded
 
   useEffect(() => {
     let active = true;
@@ -55,7 +75,8 @@ export default function ChequeModal({ onClose }) {
         setClient(overview.client);
         setQuittances(overview.quittances);
         setPieces(overview.pieces);
-        setAlloc({});
+        setAlloc(pendingImport.current ? importedAlloc(overview.quittances, pendingImport.current) : {});
+        pendingImport.current = null;
         setEditing(false);
       } catch (requestError) {
         if (!active) return;
@@ -192,28 +213,35 @@ export default function ChequeModal({ onClose }) {
     event.target.value = '';
     if (!file) return;
     setBusy(true);
+    setScanning(0);
     setError('');
-    setNotice('Lecture du chèque en cours…');
+    setNotice('');
+    setScan(null);
     try {
-      const { fields, source } = await extractCheque(accessToken, file);
-      const bank = banks.find((item) => fields.banque && (item.nom_banque.toLowerCase() === fields.banque.toLowerCase() || fields.banque.toLowerCase().includes(item.nom_banque.toLowerCase())));
-      const iso = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(fields.date_echeance || '');
+      const { values, found, text } = await scanPayment(file, { accessToken, banks, onProgress: setScanning });
+      if (!found.length) { setNotice('Aucune information lisible : renseignez les champs à la main.'); return; }
       setForm((current) => ({
         ...current,
-        typep: fields.type === 'traite' ? 'T' : 'C',
-        nump: fields.numero ? String(fields.numero).replace(/\s/g, '') : current.nump,
-        montant: fields.montant ? String(Number(String(fields.montant).replace(/\s/g, '').replace(',', '.')) || '') : current.montant,
-        datep: iso ? `${iso[3]}-${iso[2]}-${iso[1]}` : current.datep,
-        code_banque: bank ? bank.code_banque : current.code_banque,
+        typep: TYPE_CODES[values.typeReglement] || current.typep,
+        nump: values.nump || current.nump,
+        montant: values.montant ? String(Number(values.montant)) : current.montant,
+        datep: values.echeance || current.datep,
+        code_banque: values.code_banque || current.code_banque,
       }));
       setEditing(false);
-      const found = [fields.numero && `N° ${fields.numero}`, fields.montant && `montant ${fields.montant}`, fields.date_echeance && `échéance ${fields.date_echeance}`, fields.banque && `banque ${fields.banque}`, fields.tireur && `tireur ${fields.tireur}`].filter(Boolean);
-      setNotice(found.length ? `Chèque lu (${source === 'ai' ? 'IA' : 'OCR'}) : ${found.join(' · ')}. Vérifiez les champs avant d’ajouter.` : 'Aucune information lisible : renseignez les champs à la main.');
+      const montant = values.montant || form.montant;
+      if (values.quittances?.length) {
+        // A new client code reloads the quittances: the amounts are spread once they are loaded.
+        if (values.code && values.code !== code.trim()) pendingImport.current = { numbers: values.quittances, montant };
+        else if (client) setAlloc(importedAlloc(quittances, { numbers: values.quittances, montant }));
+      }
+      if (values.code) setCode(values.code);
+      setScan({ fileName: file.name, found, text });
     } catch (requestError) {
-      setNotice('');
-      setError(requestError.message);
+      setError(`Lecture du document impossible : ${requestError.message}`);
     } finally {
       setBusy(false);
+      setScanning(null);
     }
   }
 
@@ -232,7 +260,7 @@ export default function ChequeModal({ onClose }) {
           <button type="button" className="chq-tool" disabled={busy} onClick={openList}>Lister</button>
           <span className="chq-spacer" />
           <input ref={importInput} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={importFile} />
-          <button type="button" className="chq-import" disabled={busy} onClick={() => importInput.current?.click()}>Importer un chèque</button>
+          <button type="button" className="chq-import" disabled={busy} onClick={() => importInput.current?.click()} title="Scanner une image ou un PDF pour remplir le formulaire">{scanning === null ? 'Importer' : `Lecture… ${Math.round(scanning * 100)}%`}</button>
           <button type="button" className="chq-tool" onClick={onClose}>Fermer</button>
         </div>
 
@@ -286,6 +314,7 @@ export default function ChequeModal({ onClose }) {
 
           {error && <p className="chq-error" role="alert">{error}</p>}
           {notice && !error && <p className="chq-notice" role="status">{notice}</p>}
+          {scan && <ScanSummary {...scan} onClose={() => setScan(null)} />}
 
           <div className="chq-table-head"><strong>QUITTANCES</strong><button type="button" className="chq-tool" onClick={autoSpread} disabled={!client || num(form.montant) <= 0}>Répartir automatiquement</button></div>
           <div className="chq-table-wrap">

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientOverview, listBanks } from '../../services/chequeApi';
-import { scanRecette } from '../../services/recetteImport';
+import { scanPayment } from '../../services/paymentScan';
+import ScanSummary from '../ScanSummary/ScanSummary';
 import './RecetteModal.css';
 
 const TYPES = ['Traite', 'Chèque', 'Virement', 'Espèces', 'Carte bancaire', 'Fictif'];
@@ -37,7 +38,7 @@ export default function RecetteModal({ onClose }) {
   const [selectedRow, setSelectedRow] = useState('');
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(null); // null, or progress 0..1 while a document is read
-  const [notice, setNotice] = useState('');
+  const [scan, setScan] = useState(null); // what the last imported document gave
   const fileInput = useRef(null);
   const pendingImport = useRef(null); // quittances read from a document, added once the client is loaded
 
@@ -127,12 +128,12 @@ export default function RecetteModal({ onClose }) {
       setError('Format non pris en charge : importez une image (JPG, PNG) ou un PDF.');
       return;
     }
-    setScanning(0); setError(''); setNotice('');
+    setScanning(0); setError(''); setScan(null);
     try {
-      const { values } = await scanRecette(file, banks, accessToken, (progress) => setScanning(progress));
-      const { code: importedCode, quittances: numbers, ...pieceValues } = values;
-      const filled = Object.keys(values).length;
-      if (!filled) { setError('Aucune information reconnue dans le document. Saisissez les champs manuellement.'); return; }
+      const { values, found, text } = await scanPayment(file, { accessToken, banks, onProgress: (progress) => setScanning(progress) });
+      const { code: importedCode, quittances: numbers } = values;
+      if (!found.length) { setError('Aucune information reconnue dans le document. Saisissez les champs manuellement.'); return; }
+      const pieceValues = Object.fromEntries(['typeReglement', 'nump', 'montant', 'echeance', 'code_banque'].filter((key) => values[key]).map((key) => [key, values[key]]));
       patch(pieceValues);
       const montant = pieceValues.montant ?? piece.montant;
       if (numbers?.length) {
@@ -141,7 +142,7 @@ export default function RecetteModal({ onClose }) {
         else if (client) setRows(importedRows(quittances, { numbers, montant }));
       }
       if (importedCode) setCode(importedCode);
-      setNotice(`${filled} information(s) extraite(s) du document. Vérifiez les champs avant de valider.`);
+      setScan({ fileName: file.name, found, text });
     } catch (scanError) {
       setError(`Lecture du document impossible : ${scanError.message}`);
     } finally {
@@ -249,7 +250,7 @@ export default function RecetteModal({ onClose }) {
           </fieldset>
 
           {error && <p className="rct-error" role="alert">{error}</p>}
-          {notice && !error && <p className="rct-notice" role="status">{notice}</p>}
+          {scan && <ScanSummary {...scan} onClose={() => setScan(null)} />}
         </div>
 
         <footer className="rct-footer">

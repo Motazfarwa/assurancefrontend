@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { checkValue, scanFiche, scanFicheWithAI, scanFicheWithServerOcr } from '../../services/ficheOcr';
+import { checkValue, completeReading, isPdf, scanFiche, scanFicheWithAI, scanFicheWithServerOcr } from '../../services/ficheOcr';
 import './FicheImportModal.css';
 
 const GROUPS = [
@@ -48,13 +48,19 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
 
   useEffect(() => {
     let active = true;
+    const onProgress = (value) => { if (active) setProgress(value); };
     scanFicheWithAI(file, accessToken)
-      .catch((aiError) => {
+      .then(async (aiResult) => {
+        // Whole scan: what the AI missed is looked for in the full text of the document.
+        if (aiResult.fields.every((field) => field.value)) return aiResult;
+        const full = await (isPdf(file) ? scanFiche(file, onProgress) : scanFicheWithServerOcr(file, accessToken)).catch(() => null);
+        return full ? completeReading(aiResult, full) : aiResult;
+      }, (aiError) => {
         // No server AI configured is a normal setup: use the free server OCR, then the in-browser one.
         if (active && !/non configur|jeton/i.test(aiError.message)) setAiNotice(`Lecture IA indisponible (${aiError.message}).`);
         return scanFicheWithServerOcr(file, accessToken).catch((ocrError) => {
           if (active && !/jeton/i.test(ocrError.message)) setAiNotice((notice) => `${notice ? `${notice} ` : ''}OCR serveur indisponible (${ocrError.message}). Lecture locale utilisée.`);
-          return scanFiche(file, (value) => { if (active) setProgress(value); });
+          return scanFiche(file, onProgress);
         });
       })
       .then((result) => {
@@ -91,7 +97,9 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
 
         <div className="fiche-body">
           <aside className="fiche-preview">
-            {previewUrl && <img src={previewUrl} alt="Document importé" />}
+            {previewUrl && (isPdf(file)
+              ? <iframe src={previewUrl} title="Document importé" />
+              : <img src={previewUrl} alt="Document importé" />)}
             <small>{file?.name}</small>
           </aside>
 

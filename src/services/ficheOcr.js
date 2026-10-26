@@ -1,5 +1,6 @@
 // In-browser OCR of a client file (fiche client), French and Arabic, and extraction of the
 // client / policy / receipt fields. Everything is returned to the caller to be reviewed before use.
+import { pdfToText } from './pdfText';
 
 const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 
@@ -362,9 +363,9 @@ async function enhanceImage(file, targetSide = 2600) {
 }
 
 // Runs OCR on an image file (French first, then French + Arabic) and merges the readings.
-// Progress is reported as 0..1.
+// A PDF is read page by page (text layer, or OCR of scanned pages). Progress is reported as 0..1.
 export async function scanFiche(file, onProgress) {
-  if (isPdf(file)) throw new Error('Un PDF est lu par le serveur (OCR) : la lecture locale ne traite que les images (JPG, PNG). Réessayez, ou importez le document en JPG.');
+  if (isPdf(file)) return mergeReadings([await pdfToText(file, onProgress)], 'pdf');
   const { createWorker } = await import('tesseract.js');
   const passes = [
     { langs: ['fra'], pageMode: '4', enhanced: true },
@@ -408,6 +409,16 @@ function mergeReadings(texts, source) {
     return pool.find((candidate) => votes.get(candidate.value) === top);
   });
   return { text: texts.join('\n\n--- lecture suivante ---\n\n'), fields, source };
+}
+
+// Fields left empty by the first reading are taken from the second one (full text of the document).
+export function completeReading(primary, secondary) {
+  const fields = primary.fields.map((field) => {
+    if (field.value) return field;
+    const other = secondary.fields.find((candidate) => candidate.key === field.key);
+    return other?.value ? other : field;
+  });
+  return { ...primary, fields, text: `${primary.text}\n\n--- texte complet ---\n\n${secondary.text}` };
 }
 
 // Free server-side OCR (OCR.space): sturdier on phone photos than the in-browser engine, same parser.
