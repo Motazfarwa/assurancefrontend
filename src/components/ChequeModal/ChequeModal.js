@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { createPiece, deletePiece, getClientOverview, getPiece, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
-import { importNotes, NO_CLIENT_NOTE, spreadImported } from '../../services/importedPayment';
+import { spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
-import ScanSummary from '../ScanSummary/ScanSummary';
 import './ChequeModal.css';
 
 const TYPES = [['T', 'Traite'], ['C', 'Chèque'], ['V', 'Virement'], ['E', 'Espèce'], ['B', 'Carte bancaire']];
@@ -14,13 +13,10 @@ const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reve
 const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
 const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: true, en_instance: true });
 
-// Unpaid quittances paid by an imported document: amounts per quittance, and the summary lines.
-function applyImport(client, list, request) {
+// Unpaid quittances paid by an imported document: amount per quittance.
+function importedAlloc(list, request) {
   const parts = spreadImported(list, request, (row) => Number(row.solde) - Number(row.instance));
-  return {
-    alloc: Object.fromEntries(parts.map((part) => [part.row.num_quittance, part.amount.toFixed(3)])),
-    notes: importNotes(client, list, parts, request.nomClient),
-  };
+  return Object.fromEntries(parts.map((part) => [part.row.num_quittance, part.amount.toFixed(3)]));
 }
 
 export default function ChequeModal({ onClose }) {
@@ -40,7 +36,6 @@ export default function ChequeModal({ onClose }) {
   const [notice, setNotice] = useState('');
   const [list, setList] = useState(null);
   const [scanning, setScanning] = useState(null); // null, or progress 0..1 while a document is read
-  const [scan, setScan] = useState(null); // what the last imported document gave
   const pendingImport = useRef(null); // quittances read from a document, spread once the client is loaded
 
   useEffect(() => {
@@ -71,13 +66,7 @@ export default function ChequeModal({ onClose }) {
         setClient(overview.client);
         setQuittances(overview.quittances);
         setPieces(overview.pieces);
-        if (pendingImport.current) {
-          const { alloc: next, notes } = applyImport(overview.client, overview.quittances, pendingImport.current);
-          setAlloc(next);
-          setScan((current) => current && { ...current, found: [...current.found, ...notes] });
-        } else {
-          setAlloc({});
-        }
+        setAlloc(pendingImport.current ? importedAlloc(overview.quittances, pendingImport.current) : {});
         pendingImport.current = null;
         setEditing(false);
       } catch (requestError) {
@@ -219,9 +208,8 @@ export default function ChequeModal({ onClose }) {
     setScanning(0);
     setError('');
     setNotice('');
-    setScan(null);
     try {
-      const { values, found, text } = await scanPayment(file, { accessToken, banks, onProgress: setScanning });
+      const { values, found } = await scanPayment(file, { accessToken, banks, onProgress: setScanning });
       if (!found.length) { setNotice('Aucune information lisible : renseignez les champs à la main.'); return; }
       setForm((current) => ({
         ...current,
@@ -234,17 +222,11 @@ export default function ChequeModal({ onClose }) {
         en_instance: values.enInstance ?? current.en_instance,
       }));
       setEditing(false);
-      const request = { numbers: values.quittances, montant: values.montant || form.montant, nomClient: values.nomClient };
-      const extra = [];
+      const request = { numbers: values.quittances, montant: values.montant || form.montant };
       // A new client code reloads the client: its unpaid quittances are paid once they are loaded.
       if (values.code && values.code !== code.trim()) pendingImport.current = request;
-      else if (client) {
-        const { alloc: next, notes } = applyImport(client, quittances, request);
-        setAlloc(next);
-        extra.push(...notes);
-      } else extra.push(NO_CLIENT_NOTE);
+      else if (client) setAlloc(importedAlloc(quittances, request));
       if (values.code) setCode(values.code);
-      setScan({ fileName: file.name, found: [...found, ...extra], text });
     } catch (requestError) {
       setError(`Lecture du document impossible : ${requestError.message}`);
     } finally {
@@ -322,8 +304,6 @@ export default function ChequeModal({ onClose }) {
 
           {error && <p className="chq-error" role="alert">{error}</p>}
           {notice && !error && <p className="chq-notice" role="status">{notice}</p>}
-          {scan && <ScanSummary {...scan} onClose={() => setScan(null)} />}
-
           <div className="chq-table-head"><strong>QUITTANCES</strong><button type="button" className="chq-tool" onClick={autoSpread} disabled={!client || num(form.montant) <= 0}>Répartir automatiquement</button></div>
           <div className="chq-table-wrap">
             <table className="chq-table">
