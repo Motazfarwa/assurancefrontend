@@ -67,10 +67,8 @@ export default function RecetteModal({ onClose }) {
   const available = quittances.filter((row) => !rows.some((added) => added.num_quittance === row.num_quittance));
   const current = quittances.find((row) => row.num_quittance === selected);
   const editedRow = rows.find((row) => row.num_quittance === selectedRow);
-  // Solde règlement: what the client still owes on its unpaid quittances once this règlement is applied,
-  // including the quittance being picked or modified.
-  const pending = current ? num(toPay) : editedRow ? num(toPay) - editedRow.aRegler : 0;
-  const solde = unpaid - paid - pending;
+  // Solde règlement: total of the client's unpaid quittances, less what the quittances added to the table pay.
+  const solde = unpaid - paid;
   // What the amount typed in "Montant règlement" can still cover (no limit while it is empty).
   const room = num(piece.montant) > 0 ? num(piece.montant) - paid : Infinity;
   const bankName = banks.find((bank) => bank.code_banque === piece.code_banque)?.nom_banque || '';
