@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
+import { getClientByCode } from '../../services/clientApi';
 import {
   createSinistre, deleteSinistre, extractSinistre, findClaimPolicy, getSinistre, getSinistreLookups, listSinistres, nextSinistreNumber, updateSinistre,
 } from '../../services/sinistreApi';
@@ -9,55 +10,57 @@ const today = () => new Date().toISOString().slice(0, 10);
 const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 
-const DATES = ['Date_Saisie', 'Date_FTUSA', 'Date_Reglement', 'Date_CXP', 'Date_Cloture', 'Date_Prescription'];
-const FLAGS = ['IDA', 'FTUSA', 'Regle', 'CXP', 'Cloture', 'Prescription'];
+const DATES = ['Date_Saisie', 'Date_Reglement', 'Date_Cloture'];
+const FLAGS = ['IDA', 'Regle', 'Cloture'];
+// Only the main fields are on screen. The other columns of a stored claim are kept as loaded and saved back unchanged.
 const blank = () => ({
-  Num_Sinistre_Agence: '', Date_Saisie: today(), Date_Sinistre: '', Lieu_Sinistre: '', Agence: '', Num_Sinistre_Compagnie_Assure: '', reference: '',
+  Num_Sinistre_Agence: '', Date_Saisie: today(), Date_Sinistre: '', Lieu_Sinistre: '', Num_Sinistre_Compagnie_Assure: '',
   Num_Int: '', Num_Imat: '', Code_Client: '', nom_client: '', Code_Compagnie_Assure: '', Code_Type_Branche: '', code_branche: '', Risque: '',
-  code_assure: '', nom_assure: '', Type_Sinistre: '', Garantie: '', Type_Degats: '', Degats: '', Code_Responsabilite: '0', PC: 'N', classer: 'N',
-  Tiers1: '', Code_Compagnie_Advers1: '0', Num_Sinistre_Compagnie_Advers1: '', Num_Int1: '', Num_Imat1: '',
-  Tiers2: '', Code_Compagnie_Advers2: '0', Num_Sinistre_Compagnie_Advers2: '', Num_Int2: '', Num_Imat2: '',
-  Code_Expert1: '0', Code_Expert2: '0', Code_Expert3: '0', code_garage: '',
-  Montant_Devis: '', MTVA_Devis: '', Montant_Facture: '', MTVA_Facture: '', Montant_Rapport: '', MTVA_Rapport: '', Montant_Reglement: '', mont_cie: '', solde: '',
-  ...Object.fromEntries(FLAGS.map((flag) => [flag, false])), ...Object.fromEntries(DATES.slice(1).map((key) => [key, ''])),
+  Tiers1: '', Code_Compagnie_Advers1: '0', Num_Imat1: '', Num_Int1: '', Num_Sinistre_Compagnie_Advers1: '',
+  Type_Sinistre: '', Garantie: '', Type_Degats: '', Degats: '', Code_Responsabilite: '0', IDA: false,
+  Code_Expert1: '0', Montant_Devis: '', Montant_Reglement: '', Regle: false, Date_Reglement: '', Cloture: false, Date_Cloture: '',
   Observation: '',
 });
 
-// Stored record -> form values (dates for the inputs, empty strings instead of null).
 function toForm(record) {
-  const form = blank();
-  Object.keys(form).forEach((key) => {
-    const value = record[key];
+  const form = { ...blank() };
+  Object.entries(record).forEach(([key, value]) => {
     if (value == null) return;
     if (key === 'Date_Sinistre') form[key] = String(value).slice(0, 16);
     else if (DATES.includes(key)) form[key] = String(value).slice(0, 10);
     else if (FLAGS.includes(key)) form[key] = Boolean(value);
-    else form[key] = String(value).trim();
+    else if (key in form) form[key] = String(value).trim();
   });
   return form;
 }
 
+const STATUS_FILTERS = [['en_cours', 'En cours'], ['regle', 'Réglés'], ['cloture', 'Clôturés'], ['', 'Tous']];
+const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
+
 export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620' }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
-  const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], experts: [], garages: [], garanties: [], types_degats: [] });
+  const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], experts: [], garanties: [], types_degats: [] });
   const [form, setForm] = useState(blank);
   const [current, setCurrent] = useState(''); // number of the stored claim being edited ('' = new claim)
   const [proposed, setProposed] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [tried, setTried] = useState(false); // a save was attempted: required fields are highlighted
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [list, setList] = useState(mode === 'manage' ? { q: '', items: null, total: 0 } : null);
+  const [message, setMessage] = useState(null); // { kind: 'error' | 'info', text }
+  const [list, setList] = useState(mode === 'manage' ? { q: '', statut: 'en_cours', items: null, total: 0 } : null);
+
+  const info = (text) => setMessage(text ? { kind: 'info', text } : null);
+  const fail = (text) => setMessage({ kind: 'error', text });
 
   useEffect(() => {
     let active = true;
-    getSinistreLookups(accessToken).then((data) => { if (active) setLookups(data); }).catch((requestError) => { if (active) setError(requestError.message); });
+    getSinistreLookups(accessToken).then((data) => { if (active) setLookups(data); }).catch((requestError) => { if (active) fail(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);
 
-  // The number a new claim will get: year and month of the claim date, then the next sequence.
+  // Number a new claim will get: year and month of the claim date, then the next sequence of that month.
   useEffect(() => {
     if (current) { setProposed(''); return undefined; }
     let active = true;
@@ -69,47 +72,47 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return () => { active = false; clearTimeout(timer); };
   }, [accessToken, current, form.Date_Sinistre]);
 
-  // Claims list (search as you type).
-  const listQuery = list?.q;
+  // Claims list: search as you type, filtered by status.
+  const listKey = list ? `${list.statut}|${list.q}` : null;
   useEffect(() => {
-    if (listQuery === undefined) return undefined;
+    if (listKey === null) return undefined;
+    const [statut, q] = [listKey.split('|')[0], listKey.slice(listKey.indexOf('|') + 1)];
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q: listQuery, limit: 200 })
+      listSinistres(accessToken, { q, statut, limit: 300 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total }); })
-        .catch((requestError) => { if (active) setError(requestError.message); });
-    }, 300);
+        .catch((requestError) => { if (active) fail(requestError.message); });
+    }, 250);
     return () => { active = false; clearTimeout(timer); };
-  }, [accessToken, listQuery]);
+  }, [accessToken, listKey]);
 
   function change(patch) {
     setForm((value) => ({ ...value, ...patch }));
     setDirty(true);
-    setNotice('');
+    if (message?.kind === 'info') setMessage(null);
   }
 
   const confirmLeave = () => !dirty || window.confirm('Les modifications non enregistrées seront perdues. Continuer ?');
 
   function startNew() {
     if (!confirmLeave()) return;
-    setForm(blank()); setCurrent(''); setDirty(false); setError(''); setNotice('');
+    setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setMessage(null);
   }
 
   async function open(numero) {
     if (!confirmLeave()) return;
-    setBusy(true); setError('');
+    setBusy(true); setMessage(null);
     try {
       const record = await getSinistre(accessToken, numero);
-      setForm(toForm(record)); setCurrent(String(record.Num_Sinistre_Agence).trim()); setDirty(false); setList(null);
-      setNotice(`Dossier ${String(record.Num_Sinistre_Agence).trim()} ouvert.`);
+      setForm(toForm(record)); setCurrent(String(record.Num_Sinistre_Agence).trim()); setDirty(false); setTried(false); setList(null);
     } catch (requestError) {
-      setError(requestError.message);
+      fail(requestError.message);
     } finally {
       setBusy(false);
     }
   }
 
-  // N° police or immatriculation typed: the insured's policy fills the client, company, branch and risk.
+  // N° police or immatriculation: the insured's policy fills the client, company and branch.
   async function fillFromPolicy() {
     if (!form.Num_Int.trim() && !form.Num_Imat.trim()) return;
     try {
@@ -120,9 +123,21 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         code_branche: policy.code_branche || '', Code_Type_Branche: policy.code_type_branche != null ? String(policy.code_type_branche) : form.Code_Type_Branche,
         Risque: (policy.risque || form.Risque).slice(0, 50),
       });
-      setNotice(`Police ${policy.num_int} : client ${policy.code_client} ${policy.nom_client || ''}${policy.etat && policy.etat !== 'AN' ? ` (police ${policy.etat})` : ''}.`);
+      info(`Police ${policy.num_int} : ${policy.code_client} ${policy.nom_client || ''}${policy.etat && policy.etat !== 'AN' ? ` — police ${policy.etat}` : ''}`);
     } catch (requestError) {
-      setNotice(requestError.message);
+      info(requestError.message);
+    }
+  }
+
+  // Client code typed by hand: its name.
+  async function fillClientName() {
+    const code = form.Code_Client.trim();
+    if (!code || form.nom_client) return;
+    try {
+      const client = await getClientByCode(accessToken, code);
+      change({ nom_client: client.nom_client || [client.lastName, client.firstName].filter(Boolean).join(' ') });
+    } catch {
+      info(`Client ${code} introuvable.`);
     }
   }
 
@@ -130,28 +145,36 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    setScanning(true); setError(''); setNotice('');
+    setScanning(true); setMessage(null);
     try {
       const result = await extractSinistre(accessToken, file);
-      const values = result.sinistre || {};
-      const patch = Object.fromEntries(Object.entries(values).filter(([key]) => key in form && key !== 'Num_Sinistre_Agence').map(([key, value]) => [
+      const patch = Object.fromEntries(Object.entries(result.sinistre || {}).filter(([key]) => key !== 'Num_Sinistre_Agence').map(([key, value]) => [
         key, key === 'Date_Sinistre' ? String(value).slice(0, 16) : String(value),
       ]));
-      if (!Object.keys(patch).length) { setError('Aucune information lisible dans ce document : saisissez le dossier à la main.'); return; }
+      if (!Object.keys(patch).length) { fail('Aucune information lisible dans ce document : saisissez le dossier à la main.'); return; }
       change(patch);
       const kindLabel = result.fields?.type_document === 'constat' ? 'Constat' : result.fields?.type_document === 'declaration' ? 'Déclaration' : 'Document';
-      const insured = result.police ? ` Véhicule ${result.vehicule_assure} = votre assuré (police ${result.police.num_int}, client ${result.police.code_client}).` : ' Aucune police de l’agence reconnue : complétez N° police / client.';
-      setNotice(`${kindLabel} lu (${result.source === 'ai' ? 'IA' : 'OCR'}) : ${Object.keys(patch).length} champ(s) rempli(s).${insured} Vérifiez puis enregistrez.`);
+      info(`${kindLabel} lu (${result.source === 'ai' ? 'IA' : 'OCR'}) · ${result.police ? `véhicule ${result.vehicule_assure} = votre assuré (police ${result.police.num_int})` : 'aucune police de l’agence reconnue'} · vérifiez puis enregistrez.`);
     } catch (requestError) {
-      setError(`Lecture du document impossible : ${requestError.message}`);
+      fail(`Lecture du document impossible : ${requestError.message}`);
     } finally {
       setScanning(false);
     }
   }
 
-  async function save() {
-    if (!form.Date_Sinistre) { setError('La date du sinistre est obligatoire.'); return; }
-    setBusy(true); setError(''); setNotice('');
+  const problem = () => {
+    if (!form.Date_Sinistre) return 'La date du sinistre est obligatoire.';
+    if (form.Date_Sinistre.slice(0, 10) > today()) return 'La date du sinistre ne peut pas être dans le futur.';
+    if (!form.Code_Client.trim() && !form.Num_Int.trim()) return 'Indiquez la police ou le client assuré.';
+    if (form.Regle && !form.Montant_Reglement) return 'Renseignez le montant du règlement.';
+    return '';
+  };
+
+  const save = useCallback(async () => {
+    setTried(true);
+    const issue = problem();
+    if (issue) { fail(issue); return; }
+    setBusy(true); setMessage(null);
     try {
       const payload = { ...form };
       if (!current) delete payload.Num_Sinistre_Agence; // numbered by the server
@@ -159,24 +182,25 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         ? (await updateSinistre(accessToken, current, payload)).numero
         : (await createSinistre(accessToken, payload)).numero;
       const record = await getSinistre(accessToken, numero);
-      setForm(toForm(record)); setCurrent(numero); setDirty(false);
-      setNotice(current ? `Dossier ${numero} modifié.` : `Dossier ${numero} créé.`);
+      setForm(toForm(record)); setCurrent(numero); setDirty(false); setTried(false);
+      info(current ? `Dossier ${numero} enregistré.` : `Dossier ${numero} créé.`);
     } catch (requestError) {
-      setError(requestError.message);
+      fail(requestError.message);
     } finally {
       setBusy(false);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, current, form]);
 
   async function remove() {
     if (!current || !window.confirm(`Supprimer définitivement le dossier ${current} ?`)) return;
-    setBusy(true); setError('');
+    setBusy(true); setMessage(null);
     try {
       await deleteSinistre(accessToken, current);
       setForm(blank()); setCurrent(''); setDirty(false);
-      setNotice(`Dossier ${current} supprimé.`);
+      info(`Dossier ${current} supprimé.`);
     } catch (requestError) {
-      setError(requestError.message);
+      fail(requestError.message);
     } finally {
       setBusy(false);
     }
@@ -186,22 +210,33 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     if (confirmLeave()) onClose();
   }
 
+  // Ctrl+S saves, Échap closes the list.
+  useEffect(() => {
+    const onKey = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!busy && !scanning) save(); }
+      if (event.key === 'Escape' && list) setList(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, scanning, save, list]);
+
   // Field helpers -----------------------------------------------------------------------------
-  const input = (label, name, { type = 'text', wide = false, maxLength, readOnly = false, onBlur, placeholder } = {}) => (
-    <label className={wide ? 'snr-wide' : undefined}>
-      {label}
+  const missing = (name) => tried && ((name === 'Date_Sinistre' && !form.Date_Sinistre) || (['Num_Int', 'Code_Client'].includes(name) && !form.Code_Client.trim() && !form.Num_Int.trim()));
+  const input = (label, name, { type = 'text', span = 3, maxLength, onBlur, placeholder, required = false } = {}) => (
+    <label className={`snr-span-${span}${missing(name) ? ' is-missing' : ''}`}>
+      <span>{label}{required && <i> *</i>}</span>
       <input
-        type={type} value={form[name]} maxLength={maxLength} readOnly={readOnly} onBlur={onBlur} placeholder={placeholder}
-        step={type === 'number' ? 'any' : undefined} min={type === 'number' ? '0' : undefined}
+        type={type} value={form[name]} maxLength={maxLength} onBlur={onBlur} placeholder={placeholder}
+        step={type === 'number' ? 'any' : undefined} min={type === 'number' ? '0' : undefined} max={type === 'datetime-local' ? `${today()}T23:59` : undefined}
         onChange={(event) => change({ [name]: event.target.value })}
       />
     </label>
   );
-  const choose = (label, name, options, { none = '', noneLabel = 'Sélectionner', wide = false } = {}) => {
+  const choose = (label, name, options, { none = '', noneLabel = '—', span = 3 } = {}) => {
     const known = options.some((option) => String(option.id) === String(form[name])) || String(form[name]) === String(none);
     return (
-      <label className={wide ? 'snr-wide' : undefined}>
-        {label}
+      <label className={`snr-span-${span}`}>
+        <span>{label}</span>
         <select value={form[name]} onChange={(event) => change({ [name]: event.target.value })}>
           <option value={none}>{noneLabel}</option>
           {!known && form[name] !== '' && <option value={form[name]}>{form[name]}</option>}
@@ -211,26 +246,18 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     );
   };
   const asOptions = (values) => values.map((value) => ({ id: value, label: value }));
-  // A status flag and the date it was set.
   const flag = (label, name, dateName) => (
-    <div className="snr-flag">
+    <div className="snr-span-3 snr-flag">
       <label className="snr-check">
-        <input type="checkbox" checked={form[name]} onChange={(event) => change({ [name]: event.target.checked, ...(dateName && event.target.checked && !form[dateName] ? { [dateName]: today() } : {}) })} />
+        <input type="checkbox" checked={form[name]} onChange={(event) => change({ [name]: event.target.checked, ...(event.target.checked && !form[dateName] ? { [dateName]: today() } : {}) })} />
         {label}
       </label>
-      {dateName && form[name] && <input type="date" value={form[dateName]} onChange={(event) => change({ [dateName]: event.target.value })} aria-label={`Date ${label}`} />}
+      <input type="date" value={form[dateName]} disabled={!form[name]} onChange={(event) => change({ [dateName]: event.target.value })} aria-label={`Date ${label}`} />
     </div>
   );
-  const adverse = (index) => (
-    <fieldset className="snr-group">
-      <legend>Partie adverse {index}</legend>
-      {input('Tiers', `Tiers${index}`, { wide: true, maxLength: 50 })}
-      {choose('Compagnie', `Code_Compagnie_Advers${index}`, lookups.compagnies, { none: '0', noneLabel: '(Aucune)' })}
-      {input('N° sinistre compagnie', `Num_Sinistre_Compagnie_Advers${index}`, { maxLength: 20 })}
-      {input('N° police', `Num_Int${index}`, { maxLength: 15 })}
-      {input('Immatriculation', `Num_Imat${index}`, { maxLength: 12 })}
-    </fieldset>
-  );
+
+  const [statusLabel, statusClass] = statusOf(form);
+  const reste = form.Montant_Devis !== '' ? Number(form.Montant_Devis || 0) - Number(form.Montant_Reglement || 0) : null;
 
   return (
     <div className="snr-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !scanning) close(); }}>
@@ -248,97 +275,68 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
         <div className="snr-toolbar">
           <button type="button" className="snr-tool" onClick={startNew} disabled={busy}>Nouveau</button>
-          <button type="button" className="snr-tool snr-primary" onClick={save} disabled={busy || scanning || (!dirty && Boolean(current))}>{busy ? 'Patientez…' : current ? 'Enregistrer' : 'Créer le dossier'}</button>
+          <button type="button" className="snr-tool snr-primary" onClick={save} disabled={busy || scanning || (!dirty && Boolean(current))} title="Ctrl+S">{busy ? 'Patientez…' : current ? 'Enregistrer' : 'Créer le dossier'}</button>
           <button type="button" className="snr-tool" onClick={remove} disabled={busy || !current}>Supprimer</button>
-          <button type="button" className="snr-tool" onClick={() => setList({ q: '', items: null, total: 0 })} disabled={busy}>Lister</button>
+          <button type="button" className="snr-tool" onClick={() => setList({ q: '', statut: 'en_cours', items: null, total: 0 })} disabled={busy}>Lister</button>
+          {message && <p className={`snr-message is-${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'} title={message.text}>{message.text}</p>}
           <span className="snr-spacer" />
-          <span className={`snr-status${current ? '' : ' is-new'}`}>{current ? `Dossier n° ${current}${dirty ? ' · modifié' : ''}` : `Nouveau dossier${proposed ? ` · n° proposé ${proposed}` : ''}`}</span>
+          <span className="snr-number">{current ? `N° ${current}` : proposed ? `Nouveau · n° ${proposed}` : 'Nouveau dossier'}{dirty && <em> · modifié</em>}</span>
+          <span className={`snr-badge ${statusClass}`}>{statusLabel}</span>
         </div>
 
         <div className="snr-body">
-          {error && <p className="snr-error" role="alert">{error}</p>}
-          {notice && !error && <p className="snr-notice" role="status">{notice}</p>}
+          <fieldset className="snr-group">
+            <legend>Dossier</legend>
+            {input('Date et heure du sinistre', 'Date_Sinistre', { type: 'datetime-local', span: 4, required: true })}
+            {input('Date saisie', 'Date_Saisie', { type: 'date', span: 2 })}
+            {input('Lieu du sinistre', 'Lieu_Sinistre', { span: 6, maxLength: 50 })}
+            {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { span: 3, maxLength: 20 })}
+            {choose('Branche', 'Code_Type_Branche', lookups.branches)}
+          </fieldset>
 
-          <div className="snr-columns">
-            <fieldset className="snr-group">
-              <legend>Dossier</legend>
-              <label>N° sinistre agence<input value={current || proposed} readOnly placeholder="Automatique" /></label>
-              {input('Date saisie', 'Date_Saisie', { type: 'date' })}
-              {input('Date et heure du sinistre *', 'Date_Sinistre', { type: 'datetime-local' })}
-              {input('Lieu du sinistre', 'Lieu_Sinistre', { wide: true, maxLength: 50 })}
-              {input('Agence', 'Agence', { maxLength: 50 })}
-              {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { maxLength: 20 })}
-              {input('Référence', 'reference', { maxLength: 50 })}
-            </fieldset>
+          <fieldset className="snr-group">
+            <legend>Assuré et police</legend>
+            {input('N° police', 'Num_Int', { maxLength: 15, onBlur: fillFromPolicy, placeholder: 'Recherche auto', required: true })}
+            {input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => { if (!form.Code_Client) fillFromPolicy(); }, placeholder: '209 TU 2222' })}
+            {input('Code client', 'Code_Client', { span: 2, maxLength: 8, onBlur: fillClientName })}
+            {input('Nom client', 'nom_client', { span: 4, maxLength: 255 })}
+            {choose('Compagnie', 'Code_Compagnie_Assure', lookups.compagnies, { span: 6 })}
+          </fieldset>
 
-            <fieldset className="snr-group">
-              <legend>Assuré et police</legend>
-              {input('N° police', 'Num_Int', { maxLength: 15, onBlur: fillFromPolicy, placeholder: 'num_int' })}
-              {input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => { if (!form.Code_Client) fillFromPolicy(); }, placeholder: '209 TU 2222' })}
-              {input('Code client', 'Code_Client', { maxLength: 8 })}
-              {input('Nom client', 'nom_client', { wide: true, maxLength: 255 })}
-              {choose('Compagnie', 'Code_Compagnie_Assure', lookups.compagnies)}
-              {choose('Branche', 'Code_Type_Branche', lookups.branches)}
-              {input('Code branche', 'code_branche', { maxLength: 3 })}
-              {input('Risque', 'Risque', { wide: true, maxLength: 50 })}
-              {input('Code assuré', 'code_assure', { maxLength: 50 })}
-              {input('Nom assuré (si différent)', 'nom_assure', { wide: true, maxLength: 200 })}
-            </fieldset>
-          </div>
+          <fieldset className="snr-group">
+            <legend>Partie adverse</legend>
+            {input('Tiers', 'Tiers1', { span: 6, maxLength: 50 })}
+            {choose('Compagnie adverse', 'Code_Compagnie_Advers1', lookups.compagnies, { none: '0', noneLabel: '(Aucune)' })}
+            {input('Immatriculation', 'Num_Imat1', { maxLength: 12 })}
+            {input('N° police', 'Num_Int1', { maxLength: 15 })}
+            {input('N° sinistre adverse', 'Num_Sinistre_Compagnie_Advers1', { maxLength: 20 })}
+          </fieldset>
 
           <fieldset className="snr-group">
             <legend>Nature du sinistre</legend>
             {choose('Type sinistre', 'Type_Sinistre', lookups.types_sinistre)}
             {choose('Garantie', 'Garantie', asOptions(lookups.garanties))}
             {choose('Type dégâts', 'Type_Degats', asOptions(lookups.types_degats))}
-            {input('Dégâts', 'Degats', { wide: true, maxLength: 50 })}
             {choose('Responsabilité', 'Code_Responsabilite', lookups.responsabilites, { none: '0', noneLabel: 'Non définie' })}
-            <div className="snr-flags-inline">
-              {flag('IDA', 'IDA')}
-              <label className="snr-check"><input type="checkbox" checked={form.PC === 'O'} onChange={(event) => change({ PC: event.target.checked ? 'O' : 'N' })} />PC</label>
-            </div>
+            {input('Dégâts', 'Degats', { span: 4, maxLength: 50 })}
+            <div className="snr-span-2 snr-flag"><label className="snr-check"><input type="checkbox" checked={form.IDA} onChange={(event) => change({ IDA: event.target.checked })} />Convention IDA</label></div>
           </fieldset>
 
-          <div className="snr-columns">
-            {adverse(1)}
-            {adverse(2)}
-          </div>
+          <fieldset className="snr-group">
+            <legend>Expertise et règlement</legend>
+            {choose('Expert', 'Code_Expert1', lookups.experts, { none: '0', noneLabel: '(Aucun)', span: 6 })}
+            {input('Montant devis', 'Montant_Devis', { type: 'number', span: 2 })}
+            {input('Montant réglé', 'Montant_Reglement', { type: 'number', span: 2 })}
+            <label className="snr-span-2"><span>Reste</span><input value={reste == null ? '' : money(reste)} readOnly className={reste != null && reste < 0 ? 'is-negative' : undefined} /></label>
+            {flag('Réglé', 'Regle', 'Date_Reglement')}
+            {flag('Clôturé', 'Cloture', 'Date_Cloture')}
+          </fieldset>
 
-          <div className="snr-columns">
-            <fieldset className="snr-group">
-              <legend>Expertise et montants</legend>
-              {choose('Expert 1', 'Code_Expert1', lookups.experts, { none: '0', noneLabel: '(Aucun)' })}
-              {choose('Expert 2', 'Code_Expert2', lookups.experts, { none: '0', noneLabel: '(Aucun)' })}
-              {choose('Expert 3', 'Code_Expert3', lookups.experts, { none: '0', noneLabel: '(Aucun)' })}
-              {choose('Garage', 'code_garage', lookups.garages)}
-              <div className="snr-amounts">
-                <span /><b>Montant</b><b>TVA</b>
-                {[['Devis', 'Montant_Devis', 'MTVA_Devis'], ['Facture', 'Montant_Facture', 'MTVA_Facture'], ['Rapport', 'Montant_Rapport', 'MTVA_Rapport']].map(([label, amount, tva]) => (
-                  <div className="snr-amount-row" key={label}>
-                    <span>{label}</span>
-                    <input type="number" step="any" min="0" value={form[amount]} onChange={(event) => change({ [amount]: event.target.value })} aria-label={`Montant ${label}`} />
-                    <input type="number" step="any" min="0" value={form[tva]} onChange={(event) => change({ [tva]: event.target.value })} aria-label={`TVA ${label}`} />
-                  </div>
-                ))}
-              </div>
-              {input('Montant règlement', 'Montant_Reglement', { type: 'number' })}
-              {input('Montant compagnie', 'mont_cie', { type: 'number' })}
-              {input('Solde', 'solde', { type: 'number' })}
-            </fieldset>
-
-            <fieldset className="snr-group snr-follow">
-              <legend>Suivi du dossier</legend>
-              {flag('FTUSA', 'FTUSA', 'Date_FTUSA')}
-              {flag('Réglé', 'Regle', 'Date_Reglement')}
-              {flag('CXP', 'CXP', 'Date_CXP')}
-              {flag('Clôturé', 'Cloture', 'Date_Cloture')}
-              {flag('Prescription', 'Prescription', 'Date_Prescription')}
-              <label className="snr-check"><input type="checkbox" checked={form.classer === 'O' || form.classer === '1'} onChange={(event) => change({ classer: event.target.checked ? 'O' : 'N' })} />Classé</label>
-              <label className="snr-wide">Observation
-                <textarea value={form.Observation} maxLength={200} rows={4} onChange={(event) => change({ Observation: event.target.value })} />
-              </label>
-            </fieldset>
-          </div>
+          <fieldset className="snr-group snr-observation">
+            <legend>Observation</legend>
+            <textarea value={form.Observation} maxLength={200} onChange={(event) => change({ Observation: event.target.value })} placeholder="Circonstances, suivi, pièces attendues…" aria-label="Observation" />
+            <small>{form.Observation.length}/200</small>
+          </fieldset>
         </div>
       </section>
 
@@ -347,26 +345,35 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <section className="snr-list" role="dialog" aria-modal="true" aria-label="Dossiers sinistres">
             <header>
               <h3>Dossiers sinistres</h3>
+              <div className="snr-filters" role="radiogroup" aria-label="Statut">
+                {STATUS_FILTERS.map(([value, label]) => (
+                  <button key={value || 'all'} type="button" className={list.statut === value ? 'is-active' : undefined} onClick={() => setList((current) => ({ ...current, statut: value, items: null }))}>{label}</button>
+                ))}
+              </div>
               <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, client, police, immatriculation, tiers…" />
-              <button type="button" onClick={() => setList(null)} aria-label="Fermer">×</button>
+              <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
             </header>
             <div className="snr-table-wrap">
               <table className="snr-table">
-                <thead><tr><th>N° sinistre</th><th>Date sinistre</th><th>Client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Garantie</th><th>Tiers</th><th>Réglé</th><th>Clôturé</th></tr></thead>
+                <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Tiers</th><th className="is-number">Devis</th><th className="is-number">Réglé</th><th>Statut</th></tr></thead>
                 <tbody>
                   {list.items === null ? <tr><td colSpan={10} className="snr-empty">Chargement…</td></tr>
                     : list.items.length === 0 ? <tr><td colSpan={10} className="snr-empty">Aucun dossier trouvé.</td></tr>
-                    : list.items.map((row) => (
-                      <tr key={row.Num_Sinistre_Agence} className="is-clickable" onClick={() => open(row.Num_Sinistre_Agence)}>
-                        <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{[row.Code_Client, row.nom_client].filter(Boolean).join(' ')}</td>
-                        <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td>{row.Garantie}</td><td>{row.Tiers1}</td>
-                        <td>{row.Regle ? `Oui${row.Montant_Reglement ? ` (${money(row.Montant_Reglement)})` : ''}` : 'Non'}</td><td>{row.Cloture ? 'Oui' : 'Non'}</td>
-                      </tr>
-                    ))}
+                    : list.items.map((row) => {
+                      const [label, className] = statusOf(row);
+                      return (
+                        <tr key={row.Num_Sinistre_Agence} className="is-clickable" onClick={() => open(row.Num_Sinistre_Agence)}>
+                          <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{[row.Code_Client, row.nom_client].filter(Boolean).join(' ')}</td>
+                          <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td>{row.Tiers1}</td>
+                          <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
+                          <td><span className={`snr-badge ${className}`}>{label}</span></td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
-            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} — cliquez une ligne pour l’ouvrir</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}

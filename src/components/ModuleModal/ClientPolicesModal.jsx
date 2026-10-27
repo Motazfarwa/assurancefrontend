@@ -13,6 +13,12 @@ const STATUTS = [
   { value: "susp", label: "Susp. / Rés.", title: "Les polices suspendues ou résiliées" },
   { value: "expirees", label: "Expirées", title: "Les polices expirées" }
 ];
+// Revalorisation filter, combined with the status filter.
+const REVALORISATIONS = [
+  { value: "", label: "Toutes" },
+  { value: "oui", label: "Revalorisées" },
+  { value: "non", label: "Non revalorisées" }
+];
 
 function formatDate(value) {
   if (!value) return "";
@@ -34,6 +40,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
   const { accessToken } = useAuth();
   const [code, setCode] = useState(codeClient || "");
   const [statut, setStatut] = useState("vigueur");
+  const [revalorisation, setRevalorisation] = useState("");
   const [nomClient, setNomClient] = useState("");
   const [polices, setPolices] = useState([]);
   const [page, setPage] = useState(1);
@@ -100,6 +107,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
         // Without a client code the filter applies to every client's policies.
         const params = new URLSearchParams({ statut, page: String(page), page_size: String(PAGE_SIZE) });
         if (value) params.set("code_client", value);
+        if (revalorisation) params.set("revalorisation", revalorisation);
         const response = await fetch(`${API_URL}/api/polices/search?${params}`, {
           credentials: "include",
           signal: controller.signal
@@ -130,7 +138,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [code, statut, page]);
+  }, [code, statut, revalorisation, page]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -191,13 +199,14 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                     <th className="is-number">P. Total</th>
                     <th>Observation</th>
                     <th>Risque</th>
+                    <th>Revalorisation</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={8} className="empty-row">Recherche en cours...</td></tr>
+                    <tr><td colSpan={9} className="empty-row">Recherche en cours...</td></tr>
                   ) : searched && polices.length === 0 ? (
-                    <tr><td colSpan={8} className="empty-row">Aucune police pour ce filtre.</td></tr>
+                    <tr><td colSpan={9} className="empty-row">Aucune police pour ce filtre.</td></tr>
                   ) : (
                     polices.map((police) => (
                       <tr
@@ -214,6 +223,7 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                         <td className="is-number">{formatMoney(police.prime_total)}</td>
                         <td>{police.observation || ""}</td>
                         <td>{police.risque || ""}</td>
+                        <td title={police.date_envoi ? `Envoyée le ${formatDate(police.date_envoi)}` : undefined}>{formatDate(police.date_revalorisation)}</td>
                       </tr>
                     ))
                   )}
@@ -229,6 +239,18 @@ export default function ClientPolicesModal({ codeClient, onClose, onSelect }) {
                 key={item.value}
                 className={statut === item.value ? "is-active" : undefined}
                 onClick={() => { setStatut(item.value); setPage(1); }}
+              >
+                {item.label}
+              </button>
+            ))}
+            <span className="client-polices-filter-separator" aria-hidden="true" />
+            <span className="client-polices-filter-label">Revalorisation</span>
+            {REVALORISATIONS.map((item) => (
+              <button
+                type="button"
+                key={item.value || "toutes"}
+                className={revalorisation === item.value ? "is-active" : undefined}
+                onClick={() => { setRevalorisation(item.value); setPage(1); }}
               >
                 {item.label}
               </button>

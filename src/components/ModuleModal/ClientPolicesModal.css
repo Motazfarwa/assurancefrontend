@@ -341,7 +341,9 @@
 .client-polices-list .client-polices-table tbody tr.is-selected { background: #173247; }
 .client-polices-list .client-polices-table tbody tr.is-selected td { color: #fff; }
 
-.client-polices-statuts { display: flex; justify-content: center; gap: 10px; }
+.client-polices-statuts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
+.client-polices-filter-separator { width: 1px; height: 26px; margin: 0 6px; background: #d3dfe5; }
+.client-polices-filter-label { color: #587079; font-size: 11px; font-weight: 700; }
 .client-polices-statuts button { min-width: 108px; padding: 8px 14px; border: 1px solid #c4d3da; border-radius: 6px; background: #f6f9fa; color: #263d4f; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .client-polices-statuts button:hover { background: #e9f3f1; }
 .client-polices-statuts button.is-active { border-color: #187d78; background: #187d78; color: #fff; }
