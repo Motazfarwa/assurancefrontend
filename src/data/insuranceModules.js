@@ -38,9 +38,9 @@ export const INSURANCE_MODULES = [
   { id: '330', category: 'collections', title: 'Etat du recouvrement', description: 'Afficher les resultats par periode.', permission: P.REPORTS_VIEW, form: 'report' },
   { id: '340', category: 'collections', title: 'Etat des impayes Agence', description: 'Consulter et filtrer les quittances impayees de l’agence.', permission: P.REPORTS_VIEW, form: 'unpaid-agency' },
 
-  { id: '600', category: 'claims', title: 'Declarer un sinistre', description: 'Ouvrir un dossier de sinistre.', permission: P.CLAIMS_CREATE, form: 'claim' },
+  { id: '600', category: 'claims', title: 'Declarer un sinistre', description: 'Ouvrir un dossier de sinistre.', permission: P.CLAIMS_CREATE, form: 'sinistre-new' },
   { id: '610', category: 'claims', title: 'Mes dossiers sinistres', description: 'Rechercher et suivre vos dossiers.', permission: P.CLAIMS_VIEW_OWN, form: 'search' },
-  { id: '620', category: 'claims', title: 'Gestion des sinistres', description: 'Examiner les dossiers et leur statut.', permission: P.CLAIMS_VIEW_ALL, form: 'claim' },
+  { id: '620', category: 'claims', title: 'Gestion des sinistres', description: 'Saisir, scanner (constat, declaration) et suivre les dossiers sinistres.', permission: P.CLAIMS_VIEW_ALL, form: 'sinistre' },
   { id: '630', category: 'claims', title: 'Reglements et indemnisations', description: 'Traiter les reglements de sinistres.', permission: P.CLAIMS_REVIEW, form: 'accounting' },
   { id: '640', category: 'claims', title: 'Etat des sinistres', description: 'Consulter les sinistres par periode.', permission: P.CLAIMS_VIEW_ALL, form: 'report' },
 

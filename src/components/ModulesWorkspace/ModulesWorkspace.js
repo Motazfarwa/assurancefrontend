@@ -14,6 +14,7 @@ import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontatio
 import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
 import ChequeModal from '../ChequeModal/ChequeModal';
 import RecetteModal from '../RecetteModal/RecetteModal';
+import SinistreModal from '../SinistreModal/SinistreModal';
 import './ModulesWorkspace.css';
 
 export default function ModulesWorkspace() {
@@ -29,6 +30,7 @@ export default function ModulesWorkspace() {
   const [bordereauModal, setBordereauModal] = useState(null);
   const [showChequeModal, setShowChequeModal] = useState(false);
   const [showRecetteModal, setShowRecetteModal] = useState(false);
+  const [sinistreModule, setSinistreModule] = useState(null);
   const [activeModuleId, setActiveModuleId] = useState(null);
   const visibleModules = useMemo(
     () => user.role ? INSURANCE_MODULES.filter((module) => hasPermission(user, module.permission)) : INSURANCE_MODULES,
@@ -73,6 +75,11 @@ export default function ModulesWorkspace() {
     if (module.form === 'cheques') {
       setActiveModuleId(module.id);
       setShowChequeModal(true);
+      return;
+    }
+    if (module.form === 'sinistre' || module.form === 'sinistre-new') {
+      setActiveModuleId(module.id);
+      setSinistreModule(module);
       return;
     }
     if (module.form === 'recette') {
@@ -155,6 +162,7 @@ export default function ModulesWorkspace() {
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
       {showRecetteModal && <RecetteModal onClose={() => setShowRecetteModal(false)} />}
+      {sinistreModule && <SinistreModal moduleId={sinistreModule.id} mode={sinistreModule.form === 'sinistre-new' ? 'new' : 'manage'} onClose={() => setSinistreModule(null)} />}
     </main>
   );
 }
