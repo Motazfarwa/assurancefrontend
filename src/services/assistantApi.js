@@ -1,4 +1,4 @@
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://assurancebackend.onrender.com').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBase';
 
 // messages: [{ role: 'user' | 'assistant', content }], mode: 'ask' | 'agent'
 export async function askAssistant(accessToken, { messages, mode, clientCode }, signal) {

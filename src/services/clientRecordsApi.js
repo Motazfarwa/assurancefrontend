@@ -1,4 +1,4 @@
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://assurancebackend.onrender.com').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBase';
 
 export async function listClientRecords(accessToken, kind, clientCode, query = {}) {
   const resource = { policies: 'policies', receipts: 'receipts', claims: 'claims' }[kind];

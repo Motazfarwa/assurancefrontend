@@ -1,0 +1,21 @@
+.sync-status { position: relative; flex: none; }
+.sync-pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border: 1px solid #d3dfe5; border-radius: 999px; background: #fff; color: #233c4b; font: inherit; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.sync-pill.is-ok { border-color: #bfe3dc; background: #effaf7; color: #187d58; }
+.sync-pill.is-busy { border-color: #c7dcf0; background: #f1f7fd; color: #1d5f99; }
+.sync-pill.is-offline { border-color: #f0d9b5; background: #fff8ec; color: #a8640f; }
+.sync-pill.is-warn, .sync-pill.is-down { border-color: #f1cccc; background: #fff5f5; color: #b34747; }
+.sync-conflicts { padding: 1px 7px; border-radius: 999px; background: #b34747; color: #fff; font-size: 10.5px; }
+.sync-panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; width: min(420px, 92vw); padding: 12px 14px; border: 1px solid #dce5eb; border-radius: 10px; background: #fff; box-shadow: 0 14px 40px rgba(8, 24, 36, .18); color: #233c4b; font-size: 12.5px; line-height: 1.45; white-space: normal; }
+.sync-panel p { margin: 0 0 8px; }
+.sync-panel .sync-warn { color: #b34747; font-weight: 600; }
+.sync-panel .sync-help { color: #587079; font-size: 11.5px; }
+.sync-panel ul { max-height: 220px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.sync-panel li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid #edf1f2; font-size: 11.5px; }
+.sync-panel li button { flex: none; padding: 3px 10px; border: 1px solid #187d78; border-radius: 6px; background: #fff; color: #187d78; font: inherit; font-weight: 650; cursor: pointer; }
+
+/* Placed in the header's company block, whose div / span / strong rules must not apply here */
+.sync-status.sync-status, .sync-status .sync-panel { display: block; }
+.sync-status .sync-panel li { display: flex; }
+.sync-status span { color: inherit; font-size: inherit; letter-spacing: 0; }
+.sync-status strong { display: block; margin-bottom: 4px; color: #173247; font-size: 12.5px; font-style: normal; }

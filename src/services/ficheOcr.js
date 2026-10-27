@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './apiBase';
+import { TESSERACT_PATHS } from './ocrAssets';
 // In-browser OCR of a client file (fiche client), French and Arabic, and extraction of the
 // client / policy / receipt fields. Everything is returned to the caller to be reviewed before use.
 import { pdfReadings } from './pdfText';
@@ -378,6 +380,7 @@ export async function scanFiche(file, onProgress) {
   for (let index = 0; index < passes.length; index += 1) {
     const pass = passes[index];
     const worker = await createWorker(pass.langs, 1, {
+      ...TESSERACT_PATHS,
       logger: (message) => {
         if (message.status === 'recognizing text' && onProgress) onProgress((index + message.progress) / passes.length);
       },
@@ -447,7 +450,6 @@ export async function scanFicheWithServerOcr(file, accessToken) {
 // ---------------------------------------------------------------------------------------------
 // Preferred reading: the server's vision model (handles skewed photos, tables, Arabic + French).
 // ---------------------------------------------------------------------------------------------
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://assurancebackend.onrender.com').replace(/\/$/, '');
 
 // Server field -> form field key.
 const AI_MAP = {

@@ -1,6 +1,8 @@
 // Reads every page of a PDF in the browser: the text layer when the PDF has one, OCR of the rendered page
 // otherwise (scanned PDFs). Lines keep wide gaps as 3 spaces so table cells can still be told apart.
 
+import { TESSERACT_PATHS } from './ocrAssets';
+
 async function openPdf(file) {
   const pdfjs = await import('pdfjs-dist/build/pdf');
   pdfjs.GlobalWorkerOptions.workerSrc = (await import('./pdfWorker')).default;
@@ -79,6 +81,7 @@ export async function pdfReadings(file, onProgress) {
     const { createWorker } = await import('tesseract.js');
     let current = 0;
     const worker = await createWorker(['fra', 'ara'], 1, {
+      ...TESSERACT_PATHS,
       logger: (message) => {
         if (message.status === 'recognizing text' && onProgress) onProgress(0.2 + ((current + message.progress) / scanned.length) * 0.8);
       },

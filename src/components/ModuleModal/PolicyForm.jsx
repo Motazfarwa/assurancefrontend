@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "./PolicyForm.css";
 import ClientPolicesModal from "./ClientPolicesModal";
 import { useAuth } from "../../auth/AuthContext";
+import { API_BASE_URL as API_URL } from "../../services/apiBase";
 import { isOfferedCompany } from "../../services/companyApi";
 
 // A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
@@ -85,7 +86,6 @@ const initialValues = {
 // Companies not offered in the list (STAR, SALIM, EUROP ASSISTANCE, MAE, EL AMANA TAKAFUL), by company code.
 const HIDDEN_COMPANIES = new Set([1, 7, 8, 11, 13]);
 
-const API_URL = import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com";
 
 const POLICE_FIELDS = [
     "num_police", "code_compagnie", "code_client",
@@ -240,9 +240,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
         const loadCompagnies = async () => {
             try {
-                const API_URL =
-                    import.meta.env.VITE_API_URL ||
-                    "https://assurancebackend.onrender.com";
 
                 const response = await fetch(
                     `${API_URL}/api/polices/compagnies`,
@@ -293,9 +290,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             setLoadingBranche(true);
 
             try {
-                const API_URL =
-                    import.meta.env.VITE_API_URL ||
-                    "https://assurancebackend.onrender.com";
 
                 const params = new URLSearchParams({
                     code_compagnie: String(compagnie),

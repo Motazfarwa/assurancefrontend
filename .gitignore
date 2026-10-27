@@ -21,3 +21,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# agency (offline) build: OCR engine + language data copied by scripts/build-agency.js, and its output
+/public/tesseract
+/build-agency

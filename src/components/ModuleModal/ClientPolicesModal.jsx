@@ -3,8 +3,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../../auth/AuthContext";
 import "./ClientPolicesModal.css";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com";
+import { API_BASE_URL as API_URL } from "../../services/apiBase";
 
 // Same filters as the legacy "Liste des polices" window; "En vigueur" is the default.
 const STATUTS = [

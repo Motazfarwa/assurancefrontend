@@ -1,6 +1,5 @@
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "https://assurancebackend.onrender.com";
+import { API_BASE_URL as API_URL } from './apiBase';
 
 export async function createPolice(payload) {
   const response = await fetch(

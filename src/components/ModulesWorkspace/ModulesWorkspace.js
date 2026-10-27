@@ -15,6 +15,7 @@ import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
 import ChequeModal from '../ChequeModal/ChequeModal';
 import RecetteModal from '../RecetteModal/RecetteModal';
 import SinistreModal from '../SinistreModal/SinistreModal';
+import SyncStatus from '../SyncStatus/SyncStatus';
 import './ModulesWorkspace.css';
 
 export default function ModulesWorkspace() {
@@ -101,7 +102,7 @@ export default function ModulesWorkspace() {
       <section className="workspace-window" aria-label="Gestion Assurance">
         <header className="workspace-topbar">
           <a className="workspace-brand" href="/workspace"><span className="workspace-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>ESPACE PROFESSIONNEL</small></span></a>
-          <div className="workspace-company"><div><strong>Assurance Jemmali</strong></div></div>
+          <div className="workspace-company"><div><strong>Assurance Jemmali</strong></div><SyncStatus /></div>
           <div className="workspace-user"><span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span><span className="workspace-user-copy"><strong>{user.name}</strong><small>{user.role ? (user.role === ROLES.ADMIN ? 'Administrateur' : 'Membre') : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>{user.isAdmin && <button type="button" className="workspace-logout" onClick={() => navigate('/admin/users')}>Utilisateurs</button>}<button type="button" className="workspace-logout" onClick={logout}>Quitter <span aria-hidden="true">↗</span></button></div>
         </header>
 

@@ -1,6 +1,6 @@
 import { fileToBase64, isPdf, toJpegBase64 } from './ficheOcr';
 
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://assurancebackend.onrender.com').replace(/\/$/, '');
+import { API_BASE_URL } from './apiBase';
 
 async function request(path, accessToken, options = {}) {
   let response;

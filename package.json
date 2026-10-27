@@ -19,6 +19,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "build:agency": "node scripts/build-agency.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
