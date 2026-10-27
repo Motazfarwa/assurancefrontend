@@ -16,7 +16,7 @@ function ago(iso) {
   return hours < 48 ? `il y a ${hours} h` : `le ${new Date(time).toLocaleDateString('fr-FR')}`;
 }
 
-// Agency (offline) server only: is Render reachable, how many changes wait to be sent, what conflicted.
+// Agency (offline) server only: is the online database reachable, how many changes wait to be sent, what conflicted.
 export default function SyncStatus() {
   const { accessToken, user } = useAuth();
   const [status, setStatus] = useState(null); // null = not loaded yet, false = agency server unreachable
