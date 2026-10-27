@@ -327,8 +327,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   // Field helpers -----------------------------------------------------------------------------
   const missing = (name) => tried && ((name === 'Date_Sinistre' && !form.Date_Sinistre) || (['Num_Int', 'Code_Client'].includes(name) && !form.Code_Client.trim() && !form.Num_Int.trim()));
-  const input = (label, name, { type = 'text', span = 3, maxLength, onBlur, onType, list, placeholder, required = false } = {}) => (
-    <label className={`snr-span-${span}${missing(name) ? ' is-missing' : ''}`}>
+  const input = (label, name, { type = 'text', span = 3, maxLength, onBlur, onType, list, placeholder, required = false, search = false } = {}) => (
+    <label className={`snr-span-${span}${missing(name) ? ' is-missing' : ''}${search ? ' snr-search' : ''}`}>
       <span>{label}{required && <i> *</i>}</span>
       <input
         type={type} value={form[name]} maxLength={maxLength} onBlur={onBlur} placeholder={placeholder} list={list}
@@ -397,11 +397,12 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         <div className="snr-body">
           <fieldset className="snr-group">
             <legend>Dossier</legend>
-            {input('N° sinistre', 'Num_Sinistre_Agence', { span: 2, maxLength: 12, onBlur: () => openByNumber('Num_Sinistre_Agence'), onType: () => openByNumber('Num_Sinistre_Agence', { quiet: true }), placeholder: proposed || 'Ex : 202610003' })}
+            {/* Both claim numbers first: typing either one opens that claim with all its information. */}
+            {input('N° sinistre', 'Num_Sinistre_Agence', { span: 3, maxLength: 12, onBlur: () => openByNumber('Num_Sinistre_Agence'), onType: () => openByNumber('Num_Sinistre_Agence', { quiet: true }), placeholder: '🔍 Ex : 202610003', search: true })}
+            {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { span: 3, maxLength: 20, onBlur: () => openByNumber('Num_Sinistre_Compagnie_Assure'), onType: () => openByNumber('Num_Sinistre_Compagnie_Assure', { quiet: true }), placeholder: '🔍 Ex : 20260125954V', search: true })}
             {input('Date et heure du sinistre', 'Date_Sinistre', { type: 'datetime-local', span: 4, required: true })}
-            {input('Lieu du sinistre', 'Lieu_Sinistre', { span: 4, maxLength: 50 })}
             {input('Date saisie', 'Date_Saisie', { type: 'date', span: 2 })}
-            {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { span: 3, maxLength: 20, onBlur: () => openByNumber('Num_Sinistre_Compagnie_Assure'), onType: () => openByNumber('Num_Sinistre_Compagnie_Assure', { quiet: true }), placeholder: 'Recherche auto' })}
+            {input('Lieu du sinistre', 'Lieu_Sinistre', { span: 3, maxLength: 50, placeholder: 'Adresse, route…' })}
             {choose('Branche', 'Code_Type_Branche', lookups.branches)}
           </fieldset>
 
