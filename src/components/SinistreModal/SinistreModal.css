@@ -91,3 +91,6 @@
 /* Claim number fields: they search, so they look like search boxes */
 .snr-search input { border-color: #9fcfca; background: #f3faf9; }
 .snr-search input:focus { background: #fff; }
+
+/* Claims list: the risk (Observation column) on one line, in full on hover */
+.snr-table td.snr-risque { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
