@@ -20,6 +20,10 @@ async function request(path, accessToken, options = {}) {
   return body;
 }
 
+// Companies no longer offered in the company lists (policy entry, bordereaux), by name.
+const EXCLUDED_COMPANIES = new Set(['BIAT']);
+export const isOfferedCompany = (company) => !EXCLUDED_COMPANIES.has(String(company?.nom_compagnie || '').trim().toUpperCase());
+
 export function listCompanies(token) { return request('/api/compagnies', token); }
 export function updateCompany(token, code, values) {
   return request(`/api/compagnies/${encodeURIComponent(code)}`, token, { method: 'PUT', body: JSON.stringify(values) });

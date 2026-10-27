@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "./PolicyForm.css";
 import ClientPolicesModal from "./ClientPolicesModal";
 import { useAuth } from "../../auth/AuthContext";
+import { isOfferedCompany } from "../../services/companyApi";
 
 // A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
 // month only, "dd/mm" as the policy table stores it) on the same day.
@@ -664,7 +665,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
                             {compagnies
                                 // a hidden company stays visible when the loaded policy belongs to it
-                                .filter((compagnie) => !HIDDEN_COMPANIES.has(Number(compagnie.code_compagnie)) || String(compagnie.code_compagnie) === String(values.code_compagnie))
+                                .filter((compagnie) => (isOfferedCompany(compagnie) && !HIDDEN_COMPANIES.has(Number(compagnie.code_compagnie))) || String(compagnie.code_compagnie) === String(values.code_compagnie))
                                 .map((compagnie) => (
                                 <option
                                     key={compagnie.code_compagnie}

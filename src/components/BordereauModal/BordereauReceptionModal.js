@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { listCompanies } from '../../services/companyApi';
+import { isOfferedCompany, listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
 import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, monthToPeriode, nextMonth, saveBordereau } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
@@ -68,7 +68,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((result) => { if (active) setCompanies(Array.isArray(result) ? result : result.items || []); })
+      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(isOfferedCompany)); })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);

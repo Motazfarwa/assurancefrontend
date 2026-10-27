@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { listCompanies } from '../../services/companyApi';
+import { isOfferedCompany, listCompanies } from '../../services/companyApi';
 import { cancelFusion, fuseBordereau, getConfrontation, monthToPeriode, nextMonth } from '../../services/bordereauApi';
 import { money, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
@@ -18,7 +18,7 @@ export default function BordereauFusionModal({ onClose }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((rows) => { if (active) setCompanies(Array.isArray(rows) ? rows : rows.items || []); })
+      .then((rows) => { if (active) setCompanies((Array.isArray(rows) ? rows : rows.items || []).filter(isOfferedCompany)); })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);
