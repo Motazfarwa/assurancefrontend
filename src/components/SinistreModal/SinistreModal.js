@@ -38,7 +38,7 @@ function toForm(record) {
 
 // Claims list filters: not closed ("Cloture" false), claims up to a date.
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
-const newList = () => ({ q: '', nonCloture: true, dateMax: '', items: null, total: 0, counts: null });
+const newList = () => ({ q: '', nonCloture: true, dateMax: '', compagnie: '', items: null, total: 0, counts: null });
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
 export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620' }) {
@@ -82,13 +82,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   }, [accessToken, current, form.Date_Sinistre]);
 
   // Claims list: search as you type, filtered by status and date.
-  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax]) : null;
+  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.compagnie]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, nonCloture, dateMax] = JSON.parse(listKey);
+    const [q, nonCloture, dateMax, compagnie] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, limit: 300 })
+      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, code_compagnie: compagnie, limit: 300 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
@@ -467,6 +467,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </label>
                 ))}
               </div>
+              <label className="snr-date-filter">
+                <span>Compagnie</span>
+                <select value={list.compagnie} onChange={(event) => { const compagnie = event.target.value; setList((value) => ({ ...value, compagnie, items: null })); }} aria-label="Filtrer par compagnie">
+                  <option value="">Toutes</option>
+                  {lookups.compagnies.filter((option) => option.label.trim().toUpperCase() !== 'BIAT').map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </label>
               <label className="snr-date-filter">
                 <span>Jusqu’au</span>
                 <input type="date" value={list.dateMax} max={today()} onChange={(event) => { const dateMax = event.target.value; setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
