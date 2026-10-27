@@ -36,9 +36,9 @@ function toForm(record) {
   return form;
 }
 
-// Claims list filters: not closed / not settled (both ticked = the files still open), claims up to a date.
-const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés'], ['nonRegle', 'non_regle', 'Non réglés']];
-const newList = () => ({ q: '', nonCloture: true, nonRegle: true, dateMax: '', items: null, total: 0, counts: null });
+// Claims list filters: not closed ("Cloture" false), claims up to a date.
+const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
+const newList = () => ({ q: '', nonCloture: true, dateMax: '', items: null, total: 0, counts: null });
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
 export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620' }) {
@@ -82,13 +82,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   }, [accessToken, current, form.Date_Sinistre]);
 
   // Claims list: search as you type, filtered by status and date.
-  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.nonRegle, list.dateMax]) : null;
+  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, nonCloture, nonRegle, dateMax] = JSON.parse(listKey);
+    const [q, nonCloture, dateMax] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', non_regle: nonRegle || '', date_max: dateMax, limit: 300 })
+      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, limit: 300 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
