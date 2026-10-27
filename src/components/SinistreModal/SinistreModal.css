@@ -110,4 +110,3 @@
 .snr-claims th:nth-child(7) { width: 6.5%; }  /* Type */
                                                /* Observation: the remaining width */
 .snr-claims th:nth-child(9), .snr-claims th:nth-child(10) { width: 6.5%; } /* Devis, Réglé */
-.snr-claims th:nth-child(11) { width: 7.5%; } /* Statut */

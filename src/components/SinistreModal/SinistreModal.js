@@ -477,18 +477,16 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             </header>
             <div className="snr-table-wrap">
               <table className="snr-table snr-claims">
-                <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th><th>Statut</th></tr></thead>
+                <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
                 <tbody>
-                  {list.items === null ? <tr><td colSpan={11} className="snr-empty">Chargement…</td></tr>
-                    : list.items.length === 0 ? <tr><td colSpan={11} className="snr-empty">Aucun dossier trouvé.</td></tr>
+                  {list.items === null ? <tr><td colSpan={10} className="snr-empty">Chargement…</td></tr>
+                    : list.items.length === 0 ? <tr><td colSpan={10} className="snr-empty">Aucun dossier trouvé.</td></tr>
                     : list.items.map((row) => {
-                      const [label, className] = statusOf(row);
                       return (
                         <tr key={row.Num_Sinistre_Agence} className="is-clickable" onClick={() => open(row.Num_Sinistre_Agence)}>
                           <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
                           <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
                           <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
-                          <td><span className={`snr-badge ${className}`}>{label}</span></td>
                         </tr>
                       );
                     })}
