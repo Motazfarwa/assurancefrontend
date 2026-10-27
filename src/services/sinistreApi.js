@@ -31,7 +31,9 @@ export const listSinistres = (token, params = {}) => request(`/api/sinistres?${q
 export const getSinistre = (token, numero) => request(`/api/sinistres/${encodeURIComponent(numero)}`, token);
 export const nextSinistreNumber = (token, dateSinistre) => request(`/api/sinistres/next-number?${query({ date_sinistre: dateSinistre })}`, token);
 export const findClaimPolicy = (token, { numero = '', immat = '' }) => request(`/api/sinistres/police?${query({ numero, immat })}`, token);
-export const createSinistre = (token, payload) => request('/api/sinistres', token, { method: 'POST', body: JSON.stringify(payload) });
+// The client's policies, most recently created first.
+export const listClientPolicies = (token, codeClient) => request(`/api/polices/client/${encodeURIComponent(codeClient)}`, token);
+export const createSinistre =(token, payload) => request('/api/sinistres', token, { method: 'POST', body: JSON.stringify(payload) });
 export const updateSinistre = (token, numero, payload) => request(`/api/sinistres/${encodeURIComponent(numero)}`, token, { method: 'PUT', body: JSON.stringify(payload) });
 export const deleteSinistre = (token, numero) => request(`/api/sinistres/${encodeURIComponent(numero)}`, token, { method: 'DELETE' });
 
