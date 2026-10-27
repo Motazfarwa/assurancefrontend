@@ -468,8 +468,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 ))}
               </div>
               <label className="snr-date-filter">
-                <span>Compagnie</span>
-                <select value={list.compagnie} onChange={(event) => { const compagnie = event.target.value; setList((value) => ({ ...value, compagnie, items: null })); }} aria-label="Filtrer par compagnie">
+                <span>Compagnie adverse</span>
+                <select value={list.compagnie} onChange={(event) => { const compagnie = event.target.value; setList((value) => ({ ...value, compagnie, items: null })); }} aria-label="Filtrer par compagnie adverse">
                   <option value="">Toutes</option>
                   {lookups.compagnies.filter((option) => option.label.trim().toUpperCase() !== 'BIAT').map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
