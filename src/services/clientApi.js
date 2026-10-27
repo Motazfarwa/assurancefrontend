@@ -144,13 +144,31 @@ export async function saveClient(accessToken, client, isUpdate = false) {
 }
 
 // Live client search on a normalized record: digits look up the client code (from its start),
-// words must each begin a word of the nom, prénom or interlocutor ("walid" finds every Walid).
-export function matchesClientQuery(record, query) {
+// words must each begin a word of the nom or prénom ("walid" finds every Walid).
+// Rank: 0 = every word is a whole nom/prénom word (or the exact code), 1 = partial match, -1 = no match.
+export function clientQueryRank(record, query) {
   const text = String(query || '').trim().toLocaleLowerCase();
-  if (!text) return true;
-  if (/^\d+$/.test(text)) return String(record.clientCode || '').startsWith(text);
-  const words = `${record.firstName} ${record.lastName} ${record.relatedName}`.toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return text.split(/\s+/).every((part) => words.some((word) => word.startsWith(part)));
+  if (!text) return 0;
+  const code = String(record.clientCode || '');
+  if (/^\d+$/.test(text)) return code === text ? 0 : code.startsWith(text) ? 1 : -1;
+  const words = `${record.firstName} ${record.lastName}`.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const parts = text.split(/\s+/);
+  if (!parts.every((part) => words.some((word) => word.startsWith(part)))) return -1;
+  return parts.every((part) => words.includes(part)) ? 0 : 1;
+}
+
+export function matchesClientQuery(record, query) {
+  return clientQueryRank(record, query) >= 0;
+}
+
+// The clients matching a search, whole-name matches first, then by name.
+export function rankClients(records, query) {
+  const name = (record) => `${record.lastName} ${record.firstName}`.trim().toLocaleLowerCase();
+  return records
+    .map((record) => ({ record, rank: clientQueryRank(record, query) }))
+    .filter((item) => item.rank >= 0)
+    .sort((a, b) => a.rank - b.rank || name(a.record).localeCompare(name(b.record)))
+    .map((item) => item.record);
 }
 
 export function normalizeClientRecord(record) {

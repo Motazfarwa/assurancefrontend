@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { createPiece, deletePiece, getClientOverview, getPiece, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
-import { listClients, matchesClientQuery, normalizeClientRecord } from '../../services/clientApi';
+import { listClients, normalizeClientRecord, rankClients } from '../../services/clientApi';
 import { spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
 import './ChequeModal.css';
@@ -66,7 +66,7 @@ export default function ChequeModal({ onClose }) {
     setCode(String(record.clientCode));
   }
 
-  const nameMatches = nameQuery?.trim() && allClients ? allClients.filter((record) => record.clientCode && matchesClientQuery(record, nameQuery)).slice(0, 12) : [];
+  const nameMatches = nameQuery?.trim() && allClients ? rankClients(allClients.filter((record) => record.clientCode), nameQuery).slice(0, 12) : [];
 
   // The client typed in "Code client": name, unpaid receipts and recorded pieces.
   async function loadClient(clientCode, excludeNump = '') {

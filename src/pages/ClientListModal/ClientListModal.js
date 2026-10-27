@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { listClients, matchesClientQuery, normalizeClientRecord } from '../../services/clientApi';
+import { listClients, normalizeClientRecord, rankClients } from '../../services/clientApi';
 import '../ClientManagement/ClientManagementPage.css';
 
 export default function ClientListModal({ accessToken, localClients = [], onClose, onView }) {
@@ -8,7 +8,6 @@ export default function ClientListModal({ accessToken, localClients = [], onClos
   const [clientType, setClientType] = useState('');
   const [clientQuery, setClientQuery] = useState('');
   const [clients, setClients] = useState(null); // every client, loaded once when the list opens
-  const [showAll, setShowAll] = useState(false); // "Filtrer les clients" lists the results even without a search
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const localRef = useRef(localClients);
@@ -26,18 +25,15 @@ export default function ClientListModal({ accessToken, localClients = [], onClos
     return () => { active = false; };
   }, [accessToken]);
 
-  function filterClients(event) {
-    event.preventDefault();
-    setShowAll(true);
-  }
-
+  // Results follow the filters as they change: nothing is listed until one of them is filled in.
   // date_creation is returned by FastAPI as an ISO timestamp; its date portion is compared inclusively.
-  const results = clients && (showAll || clientQuery.trim()) ? clients.filter((record) => (
+  const filtering = Boolean(clientQuery.trim() || startDate || endDate || clientType);
+  const results = clients && filtering ? clients.filter((record) => (
     (!startDate || (record.creationDate && record.creationDate >= startDate))
     && (!endDate || (record.creationDate && record.creationDate <= endDate))
     && (!clientType || record.clientType === clientType)
   )) : null;
-  const visibleResults = results?.filter((record) => matchesClientQuery(record, clientQuery)) || [];
+  const visibleResults = results ? rankClients(results, clientQuery) : [];
 
   return (
     <div className="client-list-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -46,7 +42,7 @@ export default function ClientListModal({ accessToken, localClients = [], onClos
           <div><span className="client-profile-label">PRODUCTION · MODULE 100</span><h2 id="client-list-title">Liste des clients</h2></div>
           <button type="button" className="client-close-button" onClick={onClose} aria-label="Fermer">×</button>
         </header>
-        <form onSubmit={filterClients}>
+        <form onSubmit={(event) => event.preventDefault()}>
           <fieldset className="client-filter-group">
             <legend>Rechercher un client</legend>
             <label>Nom ou code client<input type="search" value={clientQuery} onChange={(event) => setClientQuery(event.target.value)} placeholder="Ex. 5060 ou Ben Ali" /></label>
@@ -62,11 +58,8 @@ export default function ClientListModal({ accessToken, localClients = [], onClos
             <label><input type="radio" name="filter-client-type" checked={clientType === 'Societe'} onChange={() => setClientType('Societe')} /> Société</label>
             <label><input type="radio" name="filter-client-type" checked={clientType === 'Particulier'} onChange={() => setClientType('Particulier')} /> Particulier</label>
           </fieldset>
-          <div className="client-list-actions">
-            <button type="button" className="client-secondary-button" onClick={onClose}>Fermer</button>
-            <button type="submit" className="client-primary-button" disabled={loading}>{loading ? 'Chargement…' : 'Filtrer les clients'}</button>
-          </div>
         </form>
+        {loading && <p className="client-list-loading">Chargement des clients…</p>}
         {error && <p className="client-list-error" role="alert">{error}</p>}
         {results && <div className="client-filter-results">
           <strong>{visibleResults.length} client{visibleResults.length > 1 ? 's' : ''} trouvé{visibleResults.length > 1 ? 's' : ''}</strong>
