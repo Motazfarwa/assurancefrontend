@@ -48,3 +48,11 @@
 @media (max-width: 760px) { .chq-row { grid-template-columns: 1fr; } }
 .chq-group input, .chq-group select { box-sizing: border-box; }
 .chq-wide { min-width: 0; }
+
+/* Nom client: typing a name proposes the matching clients */
+.chq-name { position: relative; }
+.chq-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; max-height: 220px; margin: 2px 0 0; padding: 4px; overflow-y: auto; list-style: none; border: 1px solid #d3dfe5; border-radius: 7px; background: #fff; box-shadow: 0 8px 20px rgba(23, 50, 71, .12); }
+.chq-suggest button { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 5px; background: none; color: #173247; font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+.chq-suggest button:hover, .chq-suggest button:focus { background: #eef6f5; }
+.chq-suggest small { color: #587079; font-weight: 500; }
+.chq-required { color: #b34747; }

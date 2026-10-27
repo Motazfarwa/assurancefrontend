@@ -143,6 +143,16 @@ export async function saveClient(accessToken, client, isUpdate = false) {
   return normalizeClientRecord(body);
 }
 
+// Live client search on a normalized record: digits look up the client code (from its start),
+// words must each begin a word of the nom, prénom or interlocutor ("walid" finds every Walid).
+export function matchesClientQuery(record, query) {
+  const text = String(query || '').trim().toLocaleLowerCase();
+  if (!text) return true;
+  if (/^\d+$/.test(text)) return String(record.clientCode || '').startsWith(text);
+  const words = `${record.firstName} ${record.lastName} ${record.relatedName}`.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  return text.split(/\s+/).every((part) => words.some((word) => word.startsWith(part)));
+}
+
 export function normalizeClientRecord(record) {
   const type = record.Type_Client;
   const homePhones = record.telephones_domicile || [{ value: record.tel || '', label: '' }, ...Array.from({ length: 3 }, () => ({ value: '', label: '' }))];

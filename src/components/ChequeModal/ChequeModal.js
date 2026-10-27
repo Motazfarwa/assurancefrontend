@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { createPiece, deletePiece, getClientOverview, getPiece, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
+import { listClients, matchesClientQuery, normalizeClientRecord } from '../../services/clientApi';
 import { spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
 import './ChequeModal.css';
@@ -11,7 +12,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
-const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: true, en_instance: true });
+const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: false, en_instance: false });
 
 // Unpaid quittances paid by an imported document: amount per quittance.
 function importedAlloc(list, request) {
@@ -37,12 +38,35 @@ export default function ChequeModal({ onClose }) {
   const [list, setList] = useState(null);
   const [scanning, setScanning] = useState(null); // null, or progress 0..1 while a document is read
   const pendingImport = useRef(null); // quittances read from a document, spread once the client is loaded
+  const [nameQuery, setNameQuery] = useState(null); // text typed in "Nom client", null while it shows the loaded client
+  const [allClients, setAllClients] = useState(null); // loaded the first time a name is typed
 
   useEffect(() => {
     let active = true;
     listBanks(accessToken).then((rows) => { if (active) setBanks(rows); }).catch(() => {});
     return () => { active = false; };
   }, [accessToken]);
+
+  function typeCode(value) {
+    setNameQuery(null);
+    setCode(value);
+  }
+
+  function typeName(value) {
+    setNameQuery(value);
+    if (allClients) return;
+    setAllClients([]);
+    listClients(accessToken)
+      .then((rows) => setAllClients(rows.map(normalizeClientRecord)))
+      .catch((requestError) => { setAllClients(null); setError(requestError.message); });
+  }
+
+  function pickClient(record) {
+    setNameQuery(null);
+    setCode(String(record.clientCode));
+  }
+
+  const nameMatches = nameQuery?.trim() && allClients ? allClients.filter((record) => record.clientCode && matchesClientQuery(record, nameQuery)).slice(0, 12) : [];
 
   // The client typed in "Code client": name, unpaid receipts and recorded pieces.
   async function loadClient(clientCode, excludeNump = '') {
@@ -140,8 +164,10 @@ export default function ChequeModal({ onClose }) {
   }
 
   function problem() {
-    if (!client) return 'Choisissez d’abord un client existant (code client).';
+    if (!code.trim()) return 'Le code client est obligatoire.';
+    if (!client || !client.nom_client) return 'Choisissez un client existant : code client et nom client sont obligatoires.';
     if (!form.nump.trim()) return 'Le numéro de pièce est obligatoire.';
+    if (!form.a_verser && !form.en_instance) return 'Le statut est obligatoire : cochez « À verser » et/ou « En instance ».';
     if (num(form.montant) <= 0) return 'Le montant doit être supérieur à zéro.';
     if (allocated > num(form.montant) + 0.001) return 'Le total réparti dépasse le montant de la pièce.';
     const tooMuch = quittances.find((row) => num(alloc[row.num_quittance]) > Number(row.solde) - Number(row.instance) + 0.001);
@@ -257,14 +283,39 @@ export default function ChequeModal({ onClose }) {
         <div className="chq-body">
           <fieldset className="chq-group">
             <legend>Donnée client</legend>
-            <label>Code client<input value={code} onChange={(event) => setCode(event.target.value)} maxLength={8} placeholder="Ex : 2973" /></label>
-            <label className="chq-wide">Nom client<input value={client?.nom_client || ''} readOnly placeholder="Détecté automatiquement" /></label>
+            <label>Code client <span className="chq-required">*</span><input value={code} onChange={(event) => typeCode(event.target.value)} maxLength={8} placeholder="Ex : 2973" required /></label>
+            <div className="chq-wide chq-name">
+              <label>Nom client <span className="chq-required">*</span>
+                <input
+                  value={nameQuery ?? (client?.nom_client || '')}
+                  onChange={(event) => typeName(event.target.value)}
+                  onBlur={() => setTimeout(() => setNameQuery(null), 150)}
+                  placeholder="Saisir un nom ou un prénom"
+                  autoComplete="off"
+                  required
+                />
+              </label>
+              {nameQuery?.trim() && (
+                <ul className="chq-suggest" role="listbox">
+                  {!allClients?.length ? <li><small>Chargement…</small></li>
+                    : nameMatches.length === 0 ? <li><small>Aucun client trouvé.</small></li>
+                    : nameMatches.map((record) => (
+                      <li key={record.clientCode}>
+                        <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => pickClient(record)}>
+                          <span>{[record.firstName, record.lastName].filter(Boolean).join(' ') || record.relatedName || 'Client sans nom'}</span>
+                          <small>Code {record.clientCode}</small>
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
           </fieldset>
 
           <fieldset className="chq-group">
             <legend>Donnée pièce</legend>
-            <label>N° pièce
-              <input list="chq-pieces" value={form.nump} onChange={(event) => changePiece(event.target.value)} maxLength={20} placeholder="Saisir ou choisir" disabled={!client} />
+            <label>N° pièce <span className="chq-required">*</span>
+              <input required list="chq-pieces" value={form.nump} onChange={(event) => changePiece(event.target.value)} maxLength={20} placeholder="Saisir ou choisir" disabled={!client} />
               <datalist id="chq-pieces">{pieces.map((piece) => <option key={piece.nump} value={piece.nump} />)}</datalist>
             </label>
             <label>Date échéance<input type="date" value={form.datep} onChange={(event) => change({ datep: event.target.value })} /></label>
@@ -295,7 +346,7 @@ export default function ChequeModal({ onClose }) {
               </label>
             </fieldset>
             <fieldset className="chq-group chq-flags">
-              <legend>Statut</legend>
+              <legend>Statut <span className="chq-required">*</span></legend>
               <label className="chq-check"><input type="checkbox" checked={form.a_verser} onChange={(event) => change({ a_verser: event.target.checked })} />À verser</label>
               <label className="chq-check"><input type="checkbox" checked={form.en_instance} onChange={(event) => change({ en_instance: event.target.checked })} />En instance</label>
               {bankName && <small>{bankName}</small>}

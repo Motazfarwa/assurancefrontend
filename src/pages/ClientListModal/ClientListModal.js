@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { listClients, normalizeClientRecord } from '../../services/clientApi';
+import { useEffect, useRef, useState } from 'react';
+import { listClients, matchesClientQuery, normalizeClientRecord } from '../../services/clientApi';
 import '../ClientManagement/ClientManagementPage.css';
 
 export default function ClientListModal({ accessToken, localClients = [], onClose, onView }) {
@@ -7,39 +7,37 @@ export default function ClientListModal({ accessToken, localClients = [], onClos
   const [endDate, setEndDate] = useState('');
   const [clientType, setClientType] = useState('');
   const [clientQuery, setClientQuery] = useState('');
-  const [results, setResults] = useState(null);
+  const [clients, setClients] = useState(null); // every client, loaded once when the list opens
+  const [showAll, setShowAll] = useState(false); // "Filtrer les clients" lists the results even without a search
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const localRef = useRef(localClients);
 
-  async function filterClients(event) {
-    event.preventDefault();
+  useEffect(() => {
+    let active = true;
     setLoading(true);
-    setError('');
-    setResults(null);
-    try {
-      const apiClients = await listClients(accessToken);
-      const combined = [...apiClients, ...localClients.filter((local) => !apiClients.some((api) => String(api.code_client) === String(local.clientCode)))];
-      const filtered = combined.filter((record) => {
-        // date_creation is returned by FastAPI as an ISO timestamp; compare its date portion inclusively.
-        const creationDate = String(record.date_creation || record.createdAt || '').slice(0, 10);
-        const normalized = normalizeClientRecord(record);
-        return (!startDate || (creationDate && creationDate >= startDate))
-          && (!endDate || (creationDate && creationDate <= endDate))
-          && (!clientType || normalized.clientType === clientType);
-      }).map(normalizeClientRecord);
-      setResults(filtered);
-    } catch (requestError) {
-      setError(requestError.message || 'Impossible de charger la liste des clients.');
-    } finally {
-      setLoading(false);
-    }
+    listClients(accessToken).then((apiClients) => {
+      if (!active) return;
+      const locals = localRef.current.filter((local) => !apiClients.some((api) => String(api.code_client) === String(local.clientCode)));
+      setClients([...apiClients, ...locals].map((record) => ({ ...normalizeClientRecord(record), creationDate: String(record.date_creation || record.createdAt || '').slice(0, 10) })));
+    }).catch((requestError) => {
+      if (active) setError(requestError.message || 'Impossible de charger la liste des clients.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [accessToken]);
+
+  function filterClients(event) {
+    event.preventDefault();
+    setShowAll(true);
   }
 
-  const visibleResults = results?.filter((record) => {
-    const query = clientQuery.trim().toLocaleLowerCase();
-    if (!query) return true;
-    return `${record.clientCode} ${record.firstName} ${record.lastName} ${record.relatedName}`.toLocaleLowerCase().includes(query);
-  }) || [];
+  // date_creation is returned by FastAPI as an ISO timestamp; its date portion is compared inclusively.
+  const results = clients && (showAll || clientQuery.trim()) ? clients.filter((record) => (
+    (!startDate || (record.creationDate && record.creationDate >= startDate))
+    && (!endDate || (record.creationDate && record.creationDate <= endDate))
+    && (!clientType || record.clientType === clientType)
+  )) : null;
+  const visibleResults = results?.filter((record) => matchesClientQuery(record, clientQuery)) || [];
 
   return (
     <div className="client-list-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>

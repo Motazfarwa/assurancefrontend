@@ -542,7 +542,11 @@
 
 /* Dommages cumulés: one line per guarantee, its amount appears once ticked */
 .policy-modal-expanded .pf-dc-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; width: 100%; padding-top: 6px; border-top: 1px dashed #dce5eb; }
-.policy-modal-expanded .pf-dc-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: clamp(26px, 4.4vh, 32px); }
-.policy-modal-expanded .pf-dc-item .pf-check { min-width: 0; }
-.policy-modal-expanded .pf-dc-item .pf-franchise input { width: 96px; }
+.policy-modal-expanded .pf-dc-item { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
+.policy-modal-expanded .pf-dc-item .pf-check { min-width: 0; white-space: normal; line-height: 1.25; }
+.policy-modal-expanded .pf-dc-item .pf-franchise { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding-left: 22px; font-size: 10px; }
+.policy-modal-expanded .pf-dc-item .pf-franchise input { width: 100%; text-align: left; }
+
+/* Creation: Information Police fields start right under the title */
+.policy-modal-expanded .is-create .pf-policy-info { justify-content: flex-start; gap: clamp(4px, 1vh, 9px); }
 @media (max-width: 760px) { .policy-modal-expanded .pf-dc-list { grid-template-columns: 1fr; } }
