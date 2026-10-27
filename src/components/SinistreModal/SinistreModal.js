@@ -26,7 +26,7 @@ function toForm(record) {
   const form = { ...blank() };
   Object.entries(record).forEach(([key, value]) => {
     if (value == null) return;
-    if (key === 'Date_Sinistre') form[key] = String(value).slice(0, 16);
+    if (key === 'Date_Sinistre') form[key] = String(value).length <= 10 ? `${String(value).slice(0, 10)}T00:00` : String(value).slice(0, 16);
     else if (DATES.includes(key)) form[key] = String(value).slice(0, 10);
     else if (FLAGS.includes(key)) form[key] = Boolean(value);
     else if (key in form) form[key] = String(value).trim();
@@ -99,16 +99,61 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setMessage(null);
   }
 
-  async function open(numero) {
-    if (!confirmLeave()) return;
+  // A stored claim may lack the client name, company or branch: they are taken from its client and policy.
+  async function completed(loaded) {
+    const next = { ...loaded };
+    if (next.Num_Int && (!next.Code_Client || !next.nom_client || !next.Code_Compagnie_Assure || !next.Code_Type_Branche)) {
+      try {
+        const policy = await findClaimPolicy(accessToken, { numero: next.Num_Int });
+        next.Code_Client = next.Code_Client || policy.code_client || '';
+        next.nom_client = next.nom_client || policy.nom_client || '';
+        next.Num_Imat = next.Num_Imat || policy.num_imat || '';
+        if (!next.Code_Compagnie_Assure && policy.code_compagnie != null) next.Code_Compagnie_Assure = String(policy.code_compagnie);
+        if (!next.Code_Type_Branche && policy.code_type_branche != null) next.Code_Type_Branche = String(policy.code_type_branche);
+        next.code_branche = next.code_branche || policy.code_branche || '';
+        next.Risque = next.Risque || (policy.risque || '').slice(0, 50);
+      } catch { /* policy no longer in the portfolio: the claim is shown as stored */ }
+    }
+    if (next.Code_Client && !next.nom_client) {
+      try {
+        const client = await getClientByCode(accessToken, next.Code_Client);
+        next.nom_client = client.nom_client || [client.lastName, client.firstName].filter(Boolean).join(' ');
+      } catch { /* unknown client: name left empty */ }
+    }
+    return next;
+  }
+
+  async function open(numero, { ask = true } = {}) {
+    if (ask && !confirmLeave()) return false;
     setBusy(true); setMessage(null);
     try {
       const record = await getSinistre(accessToken, numero);
-      setForm(toForm(record)); setCurrent(String(record.Num_Sinistre_Agence).trim()); setDirty(false); setTried(false); setList(null);
+      setForm(await completed(toForm(record))); setCurrent(String(record.Num_Sinistre_Agence).trim()); setDirty(false); setTried(false); setList(null);
+      return true;
     } catch (requestError) {
       fail(requestError.message);
+      return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  // N° sinistre compagnie typed: the stored claim with that number is opened with all its information.
+  async function openByCompanyNumber() {
+    const numero = form.Num_Sinistre_Compagnie_Assure.trim();
+    if (!numero) return;
+    try {
+      const result = await listSinistres(accessToken, { q: numero, limit: 50 });
+      const same = (value) => String(value || '').trim().toLowerCase() === numero.toLowerCase();
+      const found = result.items.find((row) => same(row.Num_Sinistre_Compagnie_Assure)) || result.items.find((row) => same(row.Num_Sinistre_Agence));
+      if (!found) { if (!current) info(`Aucun dossier avec le n° sinistre ${numero} : nouveau dossier.`); return; }
+      const foundNumber = String(found.Num_Sinistre_Agence).trim();
+      if (foundNumber === current) return;
+      // Only the number was typed in a new file: nothing to lose, no confirmation.
+      const typedOnlyNumber = !current && Object.entries(blank()).every(([key, value]) => key === 'Num_Sinistre_Compagnie_Assure' || String(form[key]) === String(value));
+      if (await open(foundNumber, { ask: !typedOnlyNumber })) info(`Dossier ${foundNumber} chargé (n° sinistre compagnie ${numero}).`);
+    } catch (requestError) {
+      fail(requestError.message);
     }
   }
 
@@ -182,7 +227,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         ? (await updateSinistre(accessToken, current, payload)).numero
         : (await createSinistre(accessToken, payload)).numero;
       const record = await getSinistre(accessToken, numero);
-      setForm(toForm(record)); setCurrent(numero); setDirty(false); setTried(false);
+      setForm(await completed(toForm(record))); setCurrent(numero); setDirty(false); setTried(false);
       info(current ? `Dossier ${numero} enregistré.` : `Dossier ${numero} créé.`);
     } catch (requestError) {
       fail(requestError.message);
@@ -227,6 +272,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       <span>{label}{required && <i> *</i>}</span>
       <input
         type={type} value={form[name]} maxLength={maxLength} onBlur={onBlur} placeholder={placeholder}
+        onKeyDown={onBlur ? (event) => { if (event.key === 'Enter') { event.preventDefault(); onBlur(); } } : undefined}
         step={type === 'number' ? 'any' : undefined} min={type === 'number' ? '0' : undefined} max={type === 'datetime-local' ? `${today()}T23:59` : undefined}
         onChange={(event) => change({ [name]: event.target.value })}
       />
@@ -290,7 +336,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {input('Date et heure du sinistre', 'Date_Sinistre', { type: 'datetime-local', span: 4, required: true })}
             {input('Date saisie', 'Date_Saisie', { type: 'date', span: 2 })}
             {input('Lieu du sinistre', 'Lieu_Sinistre', { span: 6, maxLength: 50 })}
-            {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { span: 3, maxLength: 20 })}
+            {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { span: 3, maxLength: 20, onBlur: openByCompanyNumber, placeholder: 'Recherche auto' })}
             {choose('Branche', 'Code_Type_Branche', lookups.branches)}
           </fieldset>
 
