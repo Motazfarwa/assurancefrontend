@@ -27,6 +27,8 @@ async function request(path, accessToken, options = {}) {
 const query = (params) => new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null)).toString();
 
 export const listBanks = (token) => request('/api/cheques/banques', token);
+// Agency bank accounts (TBanque) a piece "à verser" is paid into.
+export const listAccounts = (token) => request('/api/cheques/comptes', token);
 export const getClientOverview = (token, code, excludeNump = '') => request(`/api/cheques/client/${encodeURIComponent(code)}?${query({ exclude_nump: excludeNump })}`, token);
 export const getPiece = (token, code, nump) => request(`/api/cheques/piece?${query({ code_client: code, nump })}`, token);
 export const listPieces = (token, params) => request(`/api/cheques?${query(params)}`, token);

@@ -1,0 +1,10 @@
+/* Règlement client: built on the Recette Technique styles (rct-*) */
+.rct-dialog.rgc-dialog { width: min(1180px, 100%); }
+.rct-group input.rgc-search { border-color: #9fcfca; background: #f3faf9; }
+.rct-group input.rgc-search:focus { background: #fff; }
+.rct-group input.rgc-number { text-align: right; font-variant-numeric: tabular-nums; }
+.rgc-row { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 8px; }
+.rgc-row .rct-group { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+.rgc-row .rct-table-wrap { max-height: clamp(160px, 40vh, 380px); }
+.rgc-list .rct-table td:nth-child(4) { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 860px) { .rgc-row { grid-template-columns: 1fr; } }

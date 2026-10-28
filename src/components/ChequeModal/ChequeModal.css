@@ -56,3 +56,5 @@
 .chq-suggest button:hover, .chq-suggest button:focus { background: #eef6f5; }
 .chq-suggest small { color: #587079; font-weight: 500; }
 .chq-required { color: #b34747; }
+.chq-flags .chq-account { width: 100%; }
+.chq-flags .chq-account select { width: 100%; min-width: 0; }

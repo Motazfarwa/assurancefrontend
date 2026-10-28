@@ -31,12 +31,14 @@ export const INSURANCE_MODULES = [
   { id: '550', category: 'accounting', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
   { id: '560', category: 'accounting', title: 'Gestion des cheques', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
   { id: '570', category: 'accounting', title: 'Recette Technique', description: 'Saisir un reglement et l’affecter aux quittances impayees.', permission: P.REPORTS_VIEW, form: 'recette' },
+  { id: '575', category: 'accounting', title: 'Reglement client', description: 'Consulter les reglements d’un client et les quittances qu’ils ont payees.', permission: P.REPORTS_VIEW, form: 'reglement-client' },
 
   { id: '300', category: 'collections', title: 'Suivi du recouvrement', description: 'Consulter les paiements en attente.', permission: P.REPORTS_VIEW, form: 'search' },
   { id: '310', category: 'collections', title: 'Dossiers en retard', description: 'Identifier les echeances impayees.', permission: P.REPORTS_VIEW, form: 'report' },
   { id: '320', category: 'collections', title: 'Relances clients', description: 'Rechercher et preparer les relances.', permission: P.REPORTS_VIEW, form: 'search' },
   { id: '330', category: 'collections', title: 'Etat du recouvrement', description: 'Afficher les resultats par periode.', permission: P.REPORTS_VIEW, form: 'report' },
   { id: '340', category: 'collections', title: 'Etat des impayes Agence', description: 'Consulter et filtrer les quittances impayees de l’agence.', permission: P.REPORTS_VIEW, form: 'unpaid-agency' },
+  { id: '350', category: 'collections', title: 'Etat des acomptes', description: 'Quittances partiellement reglees : montant regle et reste a payer par client.', permission: P.REPORTS_VIEW, form: 'acompte' },
 
   { id: '600', category: 'claims', title: 'Declarer un sinistre', description: 'Ouvrir un dossier de sinistre.', permission: P.CLAIMS_CREATE, form: 'sinistre-new' },
   { id: '610', category: 'claims', title: 'Mes dossiers sinistres', description: 'Rechercher et suivre vos dossiers.', permission: P.CLAIMS_VIEW_OWN, form: 'search' },

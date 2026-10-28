@@ -37,6 +37,16 @@ export const createSinistre =(token, payload) => request('/api/sinistres', token
 export const updateSinistre = (token, numero, payload) => request(`/api/sinistres/${encodeURIComponent(numero)}`, token, { method: 'PUT', body: JSON.stringify(payload) });
 export const deleteSinistre = (token, numero) => request(`/api/sinistres/${encodeURIComponent(numero)}`, token, { method: 'DELETE' });
 
+// Suivi of a claim: its steps (TEtape_Siniste) and the calls / letters sent or received, each row keyed by its "Cmp".
+export const getSinistreSuivi = (token, numero) => request(`/api/sinistres/${encodeURIComponent(numero)}/suivi`, token);
+const followUp = (kind) => ({
+  add: (token, numero, payload) => request(`/api/sinistres/${encodeURIComponent(numero)}/${kind}`, token, { method: 'POST', body: JSON.stringify(payload) }),
+  update: (token, numero, cmp, payload) => request(`/api/sinistres/${encodeURIComponent(numero)}/${kind}/${cmp}`, token, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (token, numero, cmp) => request(`/api/sinistres/${encodeURIComponent(numero)}/${kind}/${cmp}`, token, { method: 'DELETE' }),
+});
+export const sinistreEtapes = followUp('etapes');
+export const sinistreAppels = followUp('appels');
+
 // Sends a scanned constat amiable / déclaration (JPG, PNG or PDF) to be read.
 export async function extractSinistre(token, file) {
   const pdf = isPdf(file);

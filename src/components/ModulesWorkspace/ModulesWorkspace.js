@@ -9,11 +9,13 @@ import CompanyManagementModal from '../CompanyManagementModal/CompanyManagementM
 import BranchManagementModal from '../BranchManagementModal/BranchManagementModal';
 import DocumentEntryModal from '../DocumentEntryModal/DocumentEntryModal';
 import AgencyUnpaidModal from '../AgencyUnpaidModal/AgencyUnpaidModal';
+import AcompteModal from '../AcompteModal/AcompteModal';
 import BordereauReceptionModal from '../BordereauModal/BordereauReceptionModal';
 import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontationModal';
 import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
 import ChequeModal from '../ChequeModal/ChequeModal';
 import RecetteModal from '../RecetteModal/RecetteModal';
+import ReglementClientModal from '../ReglementClientModal/ReglementClientModal';
 import SinistreModal from '../SinistreModal/SinistreModal';
 import SyncStatus from '../SyncStatus/SyncStatus';
 import './ModulesWorkspace.css';
@@ -28,9 +30,11 @@ export default function ModulesWorkspace() {
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
+  const [acompteModule, setAcompteModule] = useState(null);
   const [bordereauModal, setBordereauModal] = useState(null);
   const [showChequeModal, setShowChequeModal] = useState(false);
   const [showRecetteModal, setShowRecetteModal] = useState(false);
+  const [reglementClientModule, setReglementClientModule] = useState(null);
   const [sinistreModule, setSinistreModule] = useState(null);
   const [activeModuleId, setActiveModuleId] = useState(null);
   const visibleModules = useMemo(
@@ -88,9 +92,19 @@ export default function ModulesWorkspace() {
       setShowRecetteModal(true);
       return;
     }
+    if (module.form === 'reglement-client') {
+      setActiveModuleId(module.id);
+      setReglementClientModule(module);
+      return;
+    }
     if (module.form === 'unpaid-agency') {
       setActiveModuleId(module.id);
       setShowUnpaidModal(true);
+      return;
+    }
+    if (module.form === 'acompte') {
+      setActiveModuleId(module.id);
+      setAcompteModule(module);
       return;
     }
     setActiveModuleId(module.id);
@@ -157,12 +171,14 @@ export default function ModulesWorkspace() {
       {showBranchModal && <BranchManagementModal onClose={() => setShowBranchModal(false)} />}
       {showDocumentModal && <DocumentEntryModal onClose={() => setShowDocumentModal(false)} />}
       {showUnpaidModal && <AgencyUnpaidModal onClose={() => setShowUnpaidModal(false)} />}
+      {acompteModule && <AcompteModal moduleId={acompteModule.id} onClose={() => setAcompteModule(null)} />}
       {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal tc="T" onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-comptant' && <BordereauReceptionModal tc="C" onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
       {showRecetteModal && <RecetteModal onClose={() => setShowRecetteModal(false)} />}
+      {reglementClientModule && <ReglementClientModal moduleId={reglementClientModule.id} onClose={() => setReglementClientModule(null)} />}
       {sinistreModule && <SinistreModal moduleId={sinistreModule.id} mode={sinistreModule.form === 'sinistre-new' ? 'new' : 'manage'} onClose={() => setSinistreModule(null)} />}
     </main>
   );

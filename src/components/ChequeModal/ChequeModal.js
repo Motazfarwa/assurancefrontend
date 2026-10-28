@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { createPiece, deletePiece, getClientOverview, getPiece, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
+import { createPiece, deletePiece, getClientOverview, getPiece, listAccounts, listBanks, listPieces, updatePiece } from '../../services/chequeApi';
 import { listClients, normalizeClientRecord, rankClients } from '../../services/clientApi';
 import { spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
@@ -12,7 +12,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
-const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: false, en_instance: false });
+const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: false, en_instance: false, compte_versement: '' });
+// A piece stored in TPiece is "en instance" until settled; ticking "À verser" then pays it in (it becomes a règlement in TRegCli).
+const storedStatus = (piece) => ({ a_verser: false, en_instance: piece.regle !== 'O', compte_versement: '' });
 
 // Unpaid quittances paid by an imported document: amount per quittance.
 function importedAlloc(list, request) {
@@ -25,6 +27,7 @@ export default function ChequeModal({ onClose }) {
   const importInput = useRef(null);
   const skipCode = useRef(''); // a client opened from the list is loaded there, not by the typing effect
   const [banks, setBanks] = useState([]);
+  const [accounts, setAccounts] = useState([]); // agency accounts a piece "à verser" is paid into
   const [code, setCode] = useState('');
   const [client, setClient] = useState(null);
   const [quittances, setQuittances] = useState([]);
@@ -44,6 +47,7 @@ export default function ChequeModal({ onClose }) {
   useEffect(() => {
     let active = true;
     listBanks(accessToken).then((rows) => { if (active) setBanks(rows); }).catch(() => {});
+    listAccounts(accessToken).then((rows) => { if (active) setAccounts(rows); }).catch(() => {});
     return () => { active = false; };
   }, [accessToken]);
 
@@ -125,7 +129,7 @@ export default function ChequeModal({ onClose }) {
       const piece = result.piece;
       setForm({
         nump: piece.nump, typep: piece.typep || 'C', datep: String(piece.datep || today()).slice(0, 10), montant: String(piece.montant ?? ''),
-        code_banque: piece.code_banque || '', a_verser: piece.verser === 'N', en_instance: piece.regle !== 'O',
+        ...storedStatus(piece),
       });
       await loadClient(client.code_client, piece.nump);
       setAlloc(Object.fromEntries(result.allocations.map((item) => [item.num_quittance, String(item.montant)])));
@@ -158,7 +162,7 @@ export default function ChequeModal({ onClose }) {
   function payload() {
     return {
       code_client: client.code_client, nump: form.nump.trim(), typep: form.typep, datep: form.datep || null, montant: num(form.montant),
-      code_banque: form.code_banque || null, a_verser: form.a_verser, en_instance: form.en_instance,
+      code_banque: form.code_banque || null, a_verser: form.a_verser, en_instance: form.en_instance, compte_versement: form.a_verser ? form.compte_versement : null,
       allocations: Object.entries(alloc).filter(([, value]) => num(value) > 0).map(([num_quittance, value]) => ({ num_quittance, montant: num(value) })),
     };
   }
@@ -167,7 +171,8 @@ export default function ChequeModal({ onClose }) {
     if (!code.trim()) return 'Le code client est obligatoire.';
     if (!client || !client.nom_client) return 'Choisissez un client existant : code client et nom client sont obligatoires.';
     if (!form.nump.trim()) return 'Le numéro de pièce est obligatoire.';
-    if (!form.a_verser && !form.en_instance) return 'Le statut est obligatoire : cochez « À verser » et/ou « En instance ».';
+    if (!form.a_verser && !form.en_instance) return 'Le statut est obligatoire : cochez « À verser » ou « En instance ».';
+    if (form.a_verser && !form.compte_versement) return 'Choisissez le compte de versement de l’agence.';
     if (num(form.montant) <= 0) return 'Le montant doit être supérieur à zéro.';
     if (allocated > num(form.montant) + 0.001) return 'Le total réparti dépasse le montant de la pièce.';
     const tooMuch = quittances.find((row) => num(alloc[row.num_quittance]) > Number(row.solde) - Number(row.instance) + 0.001);
@@ -180,14 +185,16 @@ export default function ChequeModal({ onClose }) {
     setBusy(true);
     setError('');
     try {
-      if (action === 'create') await createPiece(accessToken, payload());
-      if (action === 'update') await updatePiece(accessToken, form.nump.trim(), payload());
+      let result = null;
+      if (action === 'create') result = await createPiece(accessToken, payload());
+      if (action === 'update') result = await updatePiece(accessToken, form.nump.trim(), payload());
       if (action === 'delete') await deletePiece(accessToken, form.nump.trim(), client.code_client);
       setForm(blankForm());
       setAlloc({});
       setEditing(false);
       await loadClient(client.code_client);
-      setNotice(doneMessage);
+      // "À verser": the piece was recorded as a client règlement (TRegCli) and the quittances it pays are settled.
+      setNotice(result?.num_reg_cli ? `Pièce versée : règlement n° ${result.num_reg_cli} enregistré, quittances réglées.` : doneMessage);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -216,7 +223,7 @@ export default function ChequeModal({ onClose }) {
     try {
       const result = await getPiece(accessToken, row.code_client, row.nump);
       const piece = result.piece;
-      setForm({ nump: piece.nump, typep: piece.typep || 'C', datep: String(piece.datep || today()).slice(0, 10), montant: String(piece.montant ?? ''), code_banque: piece.code_banque || '', a_verser: piece.verser === 'N', en_instance: piece.regle !== 'O' });
+      setForm({ nump: piece.nump, typep: piece.typep || 'C', datep: String(piece.datep || today()).slice(0, 10), montant: String(piece.montant ?? ''), code_banque: piece.code_banque || '', ...storedStatus(piece) });
       await loadClient(row.code_client, piece.nump);
       setAlloc(Object.fromEntries(result.allocations.map((item) => [item.num_quittance, String(item.montant)])));
       setEditing(true);
@@ -347,8 +354,21 @@ export default function ChequeModal({ onClose }) {
             </fieldset>
             <fieldset className="chq-group chq-flags">
               <legend>Statut <span className="chq-required">*</span></legend>
-              <label className="chq-check"><input type="checkbox" checked={form.a_verser} onChange={(event) => change({ a_verser: event.target.checked })} />À verser</label>
-              <label className="chq-check"><input type="checkbox" checked={form.en_instance} onChange={(event) => change({ en_instance: event.target.checked })} />En instance</label>
+              {/* One status only: "À verser" records a règlement (TRegCli), "En instance" keeps the piece in TPiece. */}
+              <label className="chq-check" title="Enregistrer la pièce comme règlement du client : les quittances choisies sont réglées">
+                <input type="checkbox" checked={form.a_verser} onChange={(event) => change({ a_verser: event.target.checked, ...(event.target.checked ? { en_instance: false } : {}) })} />À verser
+              </label>
+              <label className="chq-check" title="Garder la pièce en instance : les montants sont seulement réservés sur les quittances">
+                <input type="checkbox" checked={form.en_instance} onChange={(event) => change({ en_instance: event.target.checked, ...(event.target.checked ? { a_verser: false } : {}) })} />En instance
+              </label>
+              {form.a_verser && (
+                <label className="chq-account">Compte de versement <span className="chq-required">*</span>
+                  <select value={form.compte_versement} onChange={(event) => change({ compte_versement: event.target.value })}>
+                    <option value="">—</option>
+                    {accounts.map((account) => <option key={account.code_banque} value={account.code_banque}>{account.code_banque} · {account.nom_banque}</option>)}
+                  </select>
+                </label>
+              )}
               {bankName && <small>{bankName}</small>}
             </fieldset>
           </div>

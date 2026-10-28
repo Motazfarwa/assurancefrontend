@@ -1,0 +1,14 @@
+/* Etat des acomptes: built on the Etat des impayés styles (unpaid-*) */
+.acompte-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.acompte-field { display: grid; gap: 6px; flex: 1 1 150px; min-width: 0; color: #566d78; font-size: 9px; font-weight: 700; }
+.acompte-field input { box-sizing: border-box; width: 100%; height: 35px; padding: 0 9px; border: 1px solid #d9e2e5; border-radius: 6px; background: white; color: #294553; font: inherit; font-size: 11px; font-weight: 500; }
+.acompte-field input:focus { border-color: #63b9a9; outline: 2px solid rgba(99, 185, 169, .16); }
+.acompte-filters .unpaid-filter-set { flex: 0 0 auto; }
+.acompte-filters .expert-cancel { min-height: 35px; padding: 0 14px; font: inherit; font-size: 10px; font-weight: 650; }
+.acompte-totals { display: flex; gap: 8px; }
+.unpaid-table td.acompte-number { text-align: right; font-variant-numeric: tabular-nums; }
+.acompte-mark { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 8.5px; font-weight: 700; }
+.acompte-mark.is-acompte { background: #fff4e5; color: #a8640f; }
+.acompte-mark.is-solde { background: #e9f6f1; color: #187d58; }
+.acompte-limit { margin: 8px 0 0; color: #a8640f; font-size: 10px; }
+@media (max-width: 640px) { .unpaid-results-heading { flex-direction: column; align-items: flex-start; } }

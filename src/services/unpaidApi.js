@@ -64,3 +64,22 @@ export async function listAgencyUnpaidCompanies(accessToken) {
   if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Impossible de charger les compagnies des impayés.');
   return body.items || [];
 }
+
+// Etat des acomptes: quittances partly paid (0,01 < solde < montant quittance).
+export async function listPartialPayments(accessToken, filters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== '' && value != null) params.set(key, String(value));
+  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/impayes-agence/acomptes?${params.toString()}`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new Error(`Impossible de joindre l'API (${API_BASE_URL}). Vérifiez que FastAPI est démarré.`);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Impossible de charger les acomptes.');
+  return body;
+}

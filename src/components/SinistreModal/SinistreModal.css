@@ -115,3 +115,31 @@
 /* Claims list: one table per opposing company, each under its name and count */
 .snr-claims-group + .snr-claims-group { border-top: 6px solid #f4f8f9; }
 .snr-claims-group h4 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 8px 5px; color: #187d78; font-size: 12px; font-weight: 700; }
+
+/* Tabs: the claim itself, then its follow-up (steps, calls and letters) */
+.snr-tabs { display: flex; gap: 4px; padding: 6px 18px 0; border-bottom: 1px solid #dce5eb; }
+.snr-tabs button { min-width: 120px; padding: 6px 16px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; background: transparent; color: #587079; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.snr-tabs button:hover:not(:disabled) { color: #187d78; }
+.snr-tabs button.is-active { margin-bottom: -1px; border-color: #dce5eb; background: #fff; color: #187d78; }
+
+/* Suivi tab */
+.snr-body.snr-body-suivi { display: block; }
+.snr-suivi { display: flex; flex-direction: column; gap: 8px; }
+.snr-suivi > .snr-message { align-self: flex-start; max-width: 100%; margin: 0; white-space: normal; }
+.snr-suivi-group { display: flex; flex-direction: column; gap: 8px; }
+.snr-suivi-group:disabled { opacity: .7; }
+.snr-suivi-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 10px; }
+.snr-suivi-form > label { flex: 0 0 160px; }
+.snr-suivi-form > label.snr-suivi-etape { flex: 0 1 300px; }
+.snr-suivi-form > label.snr-suivi-text { flex: 1 1 260px; }
+.snr-suivi-actions { display: flex; gap: 6px; }
+.snr-table-wrap.snr-suivi-table { max-height: clamp(130px, 28vh, 260px); margin: 0; }
+.snr-suivi-table .snr-table { table-layout: fixed; }
+.snr-suivi-table .snr-table td { overflow: hidden; text-overflow: ellipsis; }
+.snr-suivi-group:first-of-type .snr-table th:nth-child(1) { width: 34%; }
+.snr-suivi-group:first-of-type .snr-table th:nth-child(2) { width: 110px; }
+.snr-suivi-group:last-of-type .snr-table th:nth-child(1) { width: 140px; }
+.snr-suivi-group:last-of-type .snr-table th:nth-child(3) { width: 120px; }
+.snr-table tr.is-selected, .snr-table tr.is-selected:hover { background: #e3f3ef; }
+.snr-urgence { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #eef3f5; color: #587079; font-size: 11px; font-weight: 650; }
+.snr-urgence.is-urgent { background: #fdecec; color: #b34747; }

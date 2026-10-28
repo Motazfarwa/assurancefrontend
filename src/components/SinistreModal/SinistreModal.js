@@ -4,6 +4,7 @@ import { getClientByCode } from '../../services/clientApi';
 import {
   createSinistre, deleteSinistre, extractSinistre, findClaimPolicy, getSinistre, getSinistreLookups, listClientPolicies, listSinistres, nextSinistreNumber, updateSinistre,
 } from '../../services/sinistreApi';
+import SinistreSuivi from './SinistreSuivi';
 import './SinistreModal.css';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -55,7 +56,7 @@ const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle 
 export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620' }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
-  const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], experts: [], garanties: [], types_degats: [] });
+  const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
   const [form, setForm] = useState(blank);
   const [current, setCurrent] = useState(''); // number of the stored claim being edited ('' = new claim)
   const [proposed, setProposed] = useState('');
@@ -66,6 +67,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [message, setMessage] = useState(null); // { kind: 'error' | 'info', text }
   const [list, setList] = useState(mode === 'manage' ? newList : null);
   const [clientPolicies, setClientPolicies] = useState([]); // the typed client's policies, proposed in "N° police"
+  const [tab, setTab] = useState('sinistre'); // 'sinistre' | 'suivi' (steps, calls and letters of a stored claim)
   const formRef = useRef(form); // the latest values, for the lookups that run once typing pauses
   formRef.current = form;
   const typingTimers = useRef({});
@@ -116,7 +118,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   function startNew() {
     if (!confirmLeave()) return;
-    setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setMessage(null); setClientPolicies([]);
+    setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setMessage(null); setClientPolicies([]); setTab('sinistre');
   }
 
   // A stored claim may lack the client name, company or branch: they are taken from its client and policy.
@@ -313,7 +315,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     setBusy(true); setMessage(null);
     try {
       await deleteSinistre(accessToken, current);
-      setForm(blank()); setCurrent(''); setDirty(false);
+      setForm(blank()); setCurrent(''); setDirty(false); setTab('sinistre');
       info(`Dossier ${current} supprimé.`);
     } catch (requestError) {
       fail(requestError.message);
@@ -405,6 +407,16 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <span className={`snr-badge ${statusClass}`}>{statusLabel}</span>
         </div>
 
+        <div className="snr-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'sinistre'} className={tab === 'sinistre' ? 'is-active' : ''} onClick={() => setTab('sinistre')}>Sinistre</button>
+          <button type="button" role="tab" aria-selected={tab === 'suivi'} className={tab === 'suivi' ? 'is-active' : ''} onClick={() => setTab('suivi')} disabled={!current} title={current ? 'Étapes, appels et courriers du dossier' : 'Enregistrez le dossier pour saisir son suivi'}>Suivi</button>
+        </div>
+
+        {tab === 'suivi' && current ? (
+          <div className="snr-body snr-body-suivi">
+            <SinistreSuivi accessToken={accessToken} numero={current} etapes={lookups.etapes} urgences={lookups.urgences} />
+          </div>
+        ) : (
         <div className="snr-body">
           <fieldset className="snr-group">
             <legend>Dossier</legend>
@@ -462,6 +474,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             <small>{form.Observation.length}/200</small>
           </fieldset>
         </div>
+        )}
       </section>
 
       {list && (
