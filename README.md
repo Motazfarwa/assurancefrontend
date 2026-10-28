@@ -2,7 +2,7 @@
 
 ## FastAPI authentication
 
-The frontend calls FastAPI directly at `https://assurancebackend.onrender.com` by default. Set `REACT_APP_API_URL` in `.env` or the build environment to change the API origin (see `.env.example`). Because the browser sends cross-origin requests from the React origin, configure FastAPI CORS to allow that frontend origin.
+The frontend calls FastAPI directly at `https://assurancebackend-1.onrender.com` by default. Set `REACT_APP_API_URL` in `.env` or the build environment to change the API origin (see `.env.example`). Because the browser sends cross-origin requests from the React origin, configure FastAPI CORS to allow that frontend origin.
 
 The login form sends `username` and `password` to `POST /api/auth/login`. The access token is kept in session storage by default, or local storage when **Se souvenir de moi** is selected. Protected workspace routes restore and validate the session with `GET /api/auth/me` and send the token as a bearer token.
 
