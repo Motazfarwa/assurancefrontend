@@ -456,8 +456,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             remarquage: values.g_remarquage ? 1 : 0
         };
         const carte_verte = values.carte_verte ? { du: values.cv_du || null, au: values.cv_au || null } : null;
-        // Ticked "Dommages cumulés" guarantees with their amounts.
-        const dommages_cumules = values.dommages_cumules
+        // Ticked guarantees with their amounts (shown under Tous risques and Dommages cumulés).
+        const dommages_cumules = values.tous_risque || values.dommages_cumules
             ? Object.fromEntries(DC_GUARANTEES.filter(([key]) => values[`dc_${key}`]).map(([key]) => [key, amount(values[`dc_${key}_montant`])]))
             : null;
         const revalorisation = values.revalorisation
@@ -558,7 +558,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             const dc = data.dommages_cumules || null;
             const reval = data.revalorisation || null;
             const extras = {
-                dommages_cumules: Boolean(dc),
+                // A Tous risques policy also stores its guarantees here: keep the two boxes exclusive.
+                dommages_cumules: Boolean(dc) && !loaded.tous_risque,
                 ...Object.fromEntries(DC_GUARANTEES.flatMap(([key]) => [[`dc_${key}`, Boolean(dc && key in dc)], [`dc_${key}_montant`, asText(dc?.[key])]])),
                 revalorisation: Boolean(reval),
                 date_revalorisation: asDate(reval?.date_revalorisation),
@@ -884,7 +885,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         </label>
                     </>
                 )}
-                {values.dommages_cumules && (
+                {(values.tous_risque || values.dommages_cumules) && (
                     <div className="pf-dc-list">
                         {DC_GUARANTEES.map(([key, label]) => (
                             <div className="pf-dc-item" key={key}>

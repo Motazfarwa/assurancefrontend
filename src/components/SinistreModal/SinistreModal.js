@@ -38,6 +38,8 @@ function toForm(record) {
 
 // Claims list filters: not closed ("Cloture" false), claims up to a date.
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
+// Companies not offered in the "Compagnie adverse" filter of the claims list.
+const HIDDEN_ADVERSE = new Set(['BIAT', 'STAR', 'SALIM', 'MAE', 'EL AMANA TAKAFUL', 'BH ASSURANCES']);
 const newList = () => ({ q: '', nonCloture: true, dateMax: '', compagnie: '', items: null, total: 0, counts: null });
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
@@ -471,7 +473,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 <span>Compagnie adverse</span>
                 <select value={list.compagnie} onChange={(event) => { const compagnie = event.target.value; setList((value) => ({ ...value, compagnie, items: null })); }} aria-label="Filtrer par compagnie adverse">
                   <option value="">Toutes</option>
-                  {lookups.compagnies.filter((option) => option.label.trim().toUpperCase() !== 'BIAT').map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                  {lookups.compagnies.filter((option) => !HIDDEN_ADVERSE.has(option.label.trim().toUpperCase())).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
               </label>
               <label className="snr-date-filter">
