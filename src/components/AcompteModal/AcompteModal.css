@@ -7,9 +7,6 @@
 .acompte-filters .expert-cancel { min-height: 35px; padding: 0 14px; font: inherit; font-size: 10px; font-weight: 650; }
 .acompte-totals { display: flex; gap: 8px; }
 .unpaid-table td.acompte-number { text-align: right; font-variant-numeric: tabular-nums; }
-.acompte-mark { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 8.5px; font-weight: 700; }
-.acompte-mark.is-acompte { background: #fff4e5; color: #a8640f; }
-.acompte-mark.is-solde { background: #e9f6f1; color: #187d58; }
 .acompte-limit { margin: 8px 0 0; color: #a8640f; font-size: 10px; }
 @media (max-width: 640px) { .unpaid-results-heading { flex-direction: column; align-items: flex-start; } }
 
