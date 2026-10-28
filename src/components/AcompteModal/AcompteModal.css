@@ -12,3 +12,15 @@
 .acompte-mark.is-solde { background: #e9f6f1; color: #187d58; }
 .acompte-limit { margin: 8px 0 0; color: #a8640f; font-size: 10px; }
 @media (max-width: 640px) { .unpaid-results-heading { flex-direction: column; align-items: flex-start; } }
+
+/* One table per compagnie, each under its name, count and totals */
+.acompte-field select { box-sizing: border-box; width: 100%; height: 35px; padding: 0 8px; border: 1px solid #d9e2e5; border-radius: 6px; background: white; color: #294553; font: inherit; font-size: 11px; font-weight: 500; }
+.acompte-companies { display: flex; flex-direction: column; gap: 16px; }
+.acompte-company > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 7px; padding: 0 2px; }
+.acompte-company h4 { margin: 0; color: #19394d; font-size: 13px; }
+.acompte-company > header > span { color: #71838d; font-size: 10px; }
+.acompte-company > header .acompte-company-totals { margin-left: auto; color: #4a6574; }
+.acompte-company > header b { color: #1d7d71; }
+.acompte-company > header b.unpaid-balance { color: #b34e41; }
+.acompte-company .unpaid-table-scroll { max-height: none; }
+.unpaid-table tfoot .acompte-subtotal td { border-top: 1px solid #dce6e9; border-bottom: 0; background: #f8fbfa; color: #19394d; font-weight: 750; }
