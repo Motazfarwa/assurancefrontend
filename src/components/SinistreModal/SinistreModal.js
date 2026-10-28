@@ -490,7 +490,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 <input type="date" value={list.dateMax} max={today()} onChange={(event) => { const dateMax = event.target.value; setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
                 {list.dateMax && <button type="button" onClick={() => setList((value) => ({ ...value, dateMax: '', items: null }))} aria-label="Effacer la date">×</button>}
               </label>
-              <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, client, police, immatriculation, tiers…" />
+              <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, code ou nom client, police, immatriculation, tiers…" />
               <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
             </header>
             <div className="snr-table-wrap">
