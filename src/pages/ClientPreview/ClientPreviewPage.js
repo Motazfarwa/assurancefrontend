@@ -116,7 +116,7 @@ export default function ClientPreviewPage() {
   const [editing, setEditing] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
-  const fullName = [client.firstName, client.lastName].filter(Boolean).join(' ') || 'Nouveau client';
+  const fullName = [client.lastName, client.firstName].filter(Boolean).join(' ') || 'Nouveau client';
 
   // Policies matching the filters (the client's own code is pre-filled; clear it to search every client).
   async function loadPolicies(filters = policyFilters) {

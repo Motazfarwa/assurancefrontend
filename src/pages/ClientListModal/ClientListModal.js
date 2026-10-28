@@ -64,7 +64,7 @@ export default function ClientListModal({ accessToken, localClients = [], onClos
         {results && <div className="client-filter-results">
           <strong>{visibleResults.length} client{visibleResults.length > 1 ? 's' : ''} trouvé{visibleResults.length > 1 ? 's' : ''}</strong>
           {visibleResults.length ? <div className="client-result-list">{visibleResults.map((record, index) => <button type="button" key={`${record.clientCode || record.lastName}-${index}`} onClick={() => onView(record)}>
-            <span><strong>{[record.firstName, record.lastName].filter(Boolean).join(' ') || 'Client sans nom'}</strong><small>Code {record.clientCode || '—'} · {record.clientType || 'Type non défini'} · {record.date_creation ? `Créé le ${String(record.date_creation).slice(0, 10)}` : 'Date de création non disponible'}</small></span><span aria-hidden="true">›</span>
+            <span><strong>{[record.lastName, record.firstName].filter(Boolean).join(' ') || 'Client sans nom'}</strong><small>Code {record.clientCode || '—'} · {record.clientType || 'Type non défini'} · {record.date_creation ? `Créé le ${String(record.date_creation).slice(0, 10)}` : 'Date de création non disponible'}</small></span><span aria-hidden="true">›</span>
           </button>)}</div> : <p>Aucun client ne correspond à ces filtres. Vérifiez la période de création et le type de client.</p>}
         </div>}
       </section>

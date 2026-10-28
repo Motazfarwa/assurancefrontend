@@ -302,7 +302,7 @@ export default function ChequeModal({ onClose }) {
                     : nameMatches.map((record) => (
                       <li key={record.clientCode}>
                         <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => pickClient(record)}>
-                          <span>{[record.firstName, record.lastName].filter(Boolean).join(' ') || record.relatedName || 'Client sans nom'}</span>
+                          <span>{[record.lastName, record.firstName].filter(Boolean).join(' ') || record.relatedName || 'Client sans nom'}</span>
                           <small>Code {record.clientCode}</small>
                         </button>
                       </li>
