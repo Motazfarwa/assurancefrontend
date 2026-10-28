@@ -11,7 +11,7 @@ const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').rev
 const initialFilters = { code_client: '', nom_client: '', date_debut: '', date_fin: '' };
 const MARKS = { A: 'Acompte', S: 'Solde' };
 
-// Etat des acomptes: quittances partly paid (0,01 < solde quittance < montant quittance), per quittance or per client.
+// Etat des acomptes: quittances of type P partly paid (0,01 < solde quittance < montant quittance), per quittance or per client.
 export default function AcompteModal({ onClose, moduleId = '350' }) {
   const { accessToken } = useAuth();
   const [filters, setFilters] = useState(initialFilters);
@@ -69,7 +69,7 @@ export default function AcompteModal({ onClose, moduleId = '350' }) {
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>QUITTANCES EN ACOMPTE · SOLDE ENTRE 0,01 ET LE MONTANT DE LA QUITTANCE</span><h3>{state.loading ? 'Chargement…' : `${state.items.length} quittance${state.items.length > 1 ? 's' : ''}${view === 'global' ? ` · ${clients.length} client${clients.length > 1 ? 's' : ''}` : ''}`}</h3></div>
+            <div><span>QUITTANCES TYPE P EN ACOMPTE · SOLDE ENTRE 0,01 ET LE MONTANT DE LA QUITTANCE</span><h3>{state.loading ? 'Chargement…' : `${state.items.length} quittance${state.items.length > 1 ? 's' : ''}${view === 'global' ? ` · ${clients.length} client${clients.length > 1 ? 's' : ''}` : ''}`}</h3></div>
             <div className="acompte-totals">
               <div className="unpaid-total"><small>Total réglé</small><strong>{money.format(totals.regle)} TND</strong></div>
               <div className="unpaid-total"><small>Reste à payer</small><strong className="unpaid-balance">{money.format(totals.solde)} TND</strong></div>
