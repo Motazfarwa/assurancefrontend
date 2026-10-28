@@ -111,3 +111,7 @@
                                                /* Observation: the remaining width */
 .snr-claims th:nth-child(9), .snr-claims th:nth-child(10) { width: 6.5%; } /* Devis, Réglé */
 .snr-date-filter select { height: 30px; max-width: 170px; padding: 3px 8px; border: 1px solid #d3dfe5; border-radius: 7px; background: #fff; font: inherit; font-size: 12px; color: #173247; }
+
+/* Claims list: one table per opposing company, each under its name and count */
+.snr-claims-group + .snr-claims-group { border-top: 6px solid #f4f8f9; }
+.snr-claims-group h4 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 8px 5px; color: #187d78; font-size: 12px; font-weight: 700; }

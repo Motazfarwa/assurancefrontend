@@ -38,9 +38,18 @@ function toForm(record) {
 
 // Claims list filters: not closed ("Cloture" false), claims up to a date.
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
-// Companies not offered in the "Compagnie adverse" filter of the claims list.
-const HIDDEN_ADVERSE = new Set(['BIAT', 'STAR', 'SALIM', 'MAE', 'EL AMANA TAKAFUL', 'BH ASSURANCES']);
-const newList = () => ({ q: '', nonCloture: true, dateMax: '', compagnie: '', items: null, total: 0, counts: null });
+const newList = () => ({ q: '', nonCloture: true, dateMax: '', typeSinistre: '', items: null, total: 0, counts: null });
+// Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
+function byAdverseCompany(items, compagnies) {
+  const names = new Map(compagnies.map((option) => [String(option.id), option.label]));
+  const groups = new Map();
+  items.forEach((row) => {
+    const code = row.Code_Compagnie_Advers1 && String(row.Code_Compagnie_Advers1) !== '0' ? String(row.Code_Compagnie_Advers1) : '';
+    if (!groups.has(code)) groups.set(code, { code, label: code ? names.get(code) || `Compagnie ${code}` : 'Sans compagnie adverse', rows: [] });
+    groups.get(code).rows.push(row);
+  });
+  return [...groups.values()].sort((a, b) => (!a.code ? -1 : !b.code ? 1 : a.label.localeCompare(b.label, 'fr')));
+}
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
 export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620' }) {
@@ -83,14 +92,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return () => { active = false; clearTimeout(timer); };
   }, [accessToken, current, form.Date_Sinistre]);
 
-  // Claims list: search as you type, filtered by status and date.
-  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.compagnie]) : null;
+  // Claims list: search as you type, filtered by status, type and date.
+  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.typeSinistre]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, nonCloture, dateMax, compagnie] = JSON.parse(listKey);
+    const [q, nonCloture, dateMax, typeSinistre] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, code_compagnie: compagnie, limit: 300 })
+      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, type_sinistre: typeSinistre, limit: 300 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
@@ -470,10 +479,10 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 ))}
               </div>
               <label className="snr-date-filter">
-                <span>Compagnie adverse</span>
-                <select value={list.compagnie} onChange={(event) => { const compagnie = event.target.value; setList((value) => ({ ...value, compagnie, items: null })); }} aria-label="Filtrer par compagnie adverse">
-                  <option value="">Toutes</option>
-                  {lookups.compagnies.filter((option) => !HIDDEN_ADVERSE.has(option.label.trim().toUpperCase())).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                <span>Type</span>
+                <select value={list.typeSinistre} onChange={(event) => { const typeSinistre = event.target.value; setList((value) => ({ ...value, typeSinistre, items: null })); }} aria-label="Filtrer par type de sinistre">
+                  <option value="">Tous</option>
+                  {lookups.types_sinistre.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
               </label>
               <label className="snr-date-filter">
@@ -485,22 +494,25 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
               <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
             </header>
             <div className="snr-table-wrap">
-              <table className="snr-table snr-claims">
-                <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
-                <tbody>
-                  {list.items === null ? <tr><td colSpan={10} className="snr-empty">Chargement…</td></tr>
-                    : list.items.length === 0 ? <tr><td colSpan={10} className="snr-empty">Aucun dossier trouvé.</td></tr>
-                    : list.items.map((row) => {
-                      return (
-                        <tr key={row.Num_Sinistre_Agence} className="is-clickable" onClick={() => open(row.Num_Sinistre_Agence)}>
-                          <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
-                          <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
-                          <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
+              {list.items === null ? <p className="snr-empty">Chargement…</p>
+                : list.items.length === 0 ? <p className="snr-empty">Aucun dossier trouvé.</p>
+                : byAdverseCompany(list.items, lookups.compagnies).map((group) => (
+                  <section key={group.code || 'none'} className="snr-claims-group">
+                    <h4>{group.label} <b className="snr-count">{group.rows.length}</b></h4>
+                    <table className="snr-table snr-claims">
+                      <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
+                      <tbody>
+                        {group.rows.map((row) => (
+                          <tr key={row.Num_Sinistre_Agence} className="is-clickable" onClick={() => open(row.Num_Sinistre_Agence)}>
+                            <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
+                            <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
+                            <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                ))}
             </div>
             <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
