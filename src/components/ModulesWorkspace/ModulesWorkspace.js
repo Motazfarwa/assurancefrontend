@@ -41,7 +41,9 @@ export default function ModulesWorkspace() {
     () => user.role ? INSURANCE_MODULES.filter((module) => hasPermission(user, module.permission)) : INSURANCE_MODULES,
     [user],
   );
-  const categories = MODULE_CATEGORIES.filter((category) => visibleModules.some((module) => module.category === category.id));
+  // A category without any module yet (e.g. Comptabilite) stays listed; otherwise it needs a module the user may open.
+  const categories = MODULE_CATEGORIES.filter((category) => visibleModules.some((module) => module.category === category.id)
+    || !INSURANCE_MODULES.some((module) => module.category === category.id));
   const filteredModules = visibleModules.filter((module) => {
     const matchesCategory = activeCategory === 'all' || module.category === activeCategory;
     const query = search.trim().toLocaleLowerCase();

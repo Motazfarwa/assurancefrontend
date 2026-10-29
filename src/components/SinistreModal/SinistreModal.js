@@ -37,9 +37,10 @@ function toForm(record) {
   return form;
 }
 
-// Claims list filters: not closed ("Cloture" false), claims up to a date.
+// Claims list filters: not closed ("Cloture" false), claims up to a date, by expert; only the claims of the last LIST_MONTHS months.
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
-const newList = () => ({ q: '', nonCloture: true, dateMax: '', typeSinistre: '', items: null, total: 0, counts: null });
+const LIST_MONTHS = 25;
+const newList = () => ({ q: '', nonCloture: true, dateMax: '', typeSinistre: '', expert: '', items: null, total: 0, counts: null });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
   const names = new Map(compagnies.map((option) => [String(option.id), option.label]));
@@ -94,14 +95,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return () => { active = false; clearTimeout(timer); };
   }, [accessToken, current, form.Date_Sinistre]);
 
-  // Claims list: search as you type, filtered by status, type and date.
-  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.typeSinistre]) : null;
+  // Claims list: search as you type, filtered by status, type, expert and date.
+  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.typeSinistre, list.expert]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, nonCloture, dateMax, typeSinistre] = JSON.parse(listKey);
+    const [q, nonCloture, dateMax, typeSinistre, expert] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, type_sinistre: typeSinistre, limit: 300 })
+      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, type_sinistre: typeSinistre, code_expert: expert, mois: LIST_MONTHS, limit: 300 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
@@ -499,6 +500,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 </select>
               </label>
               <label className="snr-date-filter">
+                <span>Expert</span>
+                <select value={list.expert} onChange={(event) => { const expert = event.target.value; setList((value) => ({ ...value, expert, items: null })); }} aria-label="Filtrer par expert">
+                  <option value="">Tous</option>
+                  <option value="0">(Aucun)</option>
+                  {lookups.experts.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </label>
+              <label className="snr-date-filter">
                 <span>Jusqu’au</span>
                 <input type="date" value={list.dateMax} max={today()} onChange={(event) => { const dateMax = event.target.value; setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
                 {list.dateMax && <button type="button" onClick={() => setList((value) => ({ ...value, dateMax: '', items: null }))} aria-label="Effacer la date">×</button>}
@@ -513,12 +522,12 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   <section key={group.code || 'none'} className="snr-claims-group">
                     <h4>{group.label} <b className="snr-count">{group.rows.length}</b></h4>
                     <table className="snr-table snr-claims">
-                      <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
+                      <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Expert</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
                       <tbody>
                         {group.rows.map((row) => (
                           <tr key={row.Num_Sinistre_Agence} className="is-clickable" onClick={() => open(row.Num_Sinistre_Agence)}>
                             <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
-                            <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
+                            <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td title={row.nom_expert || ''}>{row.nom_expert || ''}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
                             <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
                           </tr>
                         ))}
@@ -527,7 +536,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </section>
                 ))}
             </div>
-            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · sinistres des ${LIST_MONTHS} derniers mois · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}
