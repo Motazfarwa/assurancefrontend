@@ -37,10 +37,11 @@ function toForm(record) {
   return form;
 }
 
-// Claims list filters: not closed ("Cloture" false), claims between two dates: from LIST_START, up to LIST_MONTHS months
-// after "Du" (both editable; changing "Du" moves "Jusqu'au").
+// Claims list filters: not closed ("Cloture" false), claims between two dates, at first LIST_START to LIST_END
+// (both editable; changing "Du" moves "Jusqu'au" LIST_MONTHS months later).
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
 const LIST_START = '2020-01-01';
+const LIST_END = '2024-09-30';
 const LIST_MONTHS = 25;
 // The day some months after an ISO date, kept on the last day of a shorter month.
 function monthsAfter(iso, months) {
@@ -50,7 +51,7 @@ function monthsAfter(iso, months) {
   target.setUTCDate(Math.min(day, lastDay));
   return target.toISOString().slice(0, 10);
 }
-const newList = () => ({ q: '', nonCloture: true, dateMin: LIST_START, dateMax: monthsAfter(LIST_START, LIST_MONTHS), typeSinistre: '', items: null, total: 0, counts: null });
+const newList = () => ({ q: '', nonCloture: false, dateMin: LIST_START, dateMax: LIST_END, typeSinistre: '', items: null, total: 0, counts: null });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
   const names = new Map(compagnies.map((option) => [String(option.id), option.label]));
@@ -112,7 +113,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     const [q, nonCloture, dateMin, dateMax, typeSinistre] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_min: dateMin, date_max: dateMax, type_sinistre: typeSinistre, limit: 300 })
+      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_min: dateMin, date_max: dateMax, type_sinistre: typeSinistre, limit: 2000 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
@@ -542,7 +543,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </section>
                 ))}
             </div>
-            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · sinistres du ${shortDate(list.dateMin)} au ${shortDate(list.dateMax)} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · sinistres du {shortDate(list.dateMin)} au {shortDate(list.dateMax)} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}

@@ -167,3 +167,72 @@
 .module-row-info strong { font-size: 14px; }
 .module-row-info small, .module-row-info span { font-size: 11px; }
 .workspace-footer { font-size: 9px; }
+
+/* ===== Responsive: last, so it wins over the size blocks above ===== */
+.nature-options { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+.workspace-workbench { grid-template-columns: minmax(280px, .8fr) minmax(0, 1.2fr); }
+.workspace-user { flex-wrap: wrap; row-gap: 6px; }
+@media (max-width: 1100px) {
+  .workspace-topbar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; padding: 8px 16px; }
+  .workspace-workbench { grid-template-columns: minmax(240px, .75fr) minmax(0, 1.25fr); }
+  .workspace-intro-copy h1 { font-size: clamp(28px, 3.6vw, 38px); }
+}
+@media (max-width: 900px) {
+  /* stacked: the page scrolls instead of squeezing everything into the screen height */
+  .workspace-window { max-height: none; overflow: visible; }
+  .workspace-window > * { flex-shrink: 0; }
+  .workspace-topbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .workspace-company { grid-row: 2; grid-column: 1 / -1; justify-content: center; }
+  .workspace-user { grid-row: 1; grid-column: 2; }
+  .nature-selector { padding: 8px 16px 10px; }
+  .workspace-workbench { grid-template-columns: 1fr; gap: 12px; padding: 12px; }
+  .workspace-intro { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 18px 20px 12px; }
+  .workspace-intro-copy { flex: 1 1 260px; }
+  .workspace-intro-copy p { max-width: none; }
+  .workspace-illustration { flex: 0 0 170px; min-height: 0; height: 140px; margin: 0; transform: none; }
+  .workspace-intro-footer { flex-basis: 100%; }
+  .module-list { min-height: 0; max-height: none; }
+}
+@media (max-width: 760px) {
+  .workspace-shell { display: block; padding: 0; }
+  .workspace-window { width: 100%; min-height: 100vh; min-height: 100dvh; max-height: none; overflow: visible; border: 0; border-radius: 0; box-shadow: none; }
+  .workspace-topbar { padding: 8px 12px; gap: 8px; }
+  .workspace-intro-copy h1 { margin: 6px 0; font-size: 26px; }
+  .workspace-intro-copy h1 br { display: none; }
+  .workspace-intro-copy h1 em { margin-left: 6px; }
+  .workspace-illustration { display: none; }
+  .module-browser { padding: 14px 12px 10px; }
+  .module-browser-heading h2 { font-size: 19px; }
+  .workspace-search input { font-size: 16px; } /* no zoom on focus on phones */
+  .workspace-footer { flex-direction: column; gap: 4px; padding: 10px 12px 70px; text-align: center; } /* room for the assistant button */
+  .workspace-footer span:last-child { text-align: center; }
+}
+@media (max-width: 560px) {
+  .workspace-user-copy { display: none; }
+  .workspace-brand small { display: none; }
+  .workspace-logout { margin-left: 0; padding: 7px 9px; font-size: 11px; }
+  .nature-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .nature-option { min-height: 42px; padding: 0 9px; font-size: 12px; }
+  .nature-option > span:nth-of-type(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nature-option.nature-all { grid-column: 1 / -1; }
+  .workspace-intro { padding: 14px 14px 10px; }
+  .workspace-intro-copy p { font-size: 12px; }
+  .workspace-role-tag { display: none; }
+  .module-browser-heading { align-items: flex-start; }
+  .workspace-count { min-width: 0; padding: 6px 8px; }
+  .module-table-head, .module-row { grid-template-columns: 58px minmax(0, 1fr) 20px; padding-right: 8px; padding-left: 8px; }
+  .module-row { min-height: 58px; }
+  .module-row-code { padding: 5px 6px; font-size: 11px; }
+  .module-row-info { padding-left: 8px; }
+  .module-row-info strong { white-space: normal; }
+  .module-browser-footer span:first-child { display: none; }
+  .module-browser-footer { justify-content: flex-end; }
+}
+@media (max-width: 360px) {
+  .workspace-brand-mark { width: 30px; height: 30px; font-size: 15px; }
+  .workspace-brand strong { font-size: 12px; }
+  .workspace-avatar { display: none; }
+  .nature-option { font-size: 11px; gap: 5px; padding: 0 6px; }
+  .nature-option-icon { width: 20px; height: 20px; }
+}
+@media (max-height: 620px) and (min-width: 901px) { .workspace-window { max-height: none; } .workspace-window > * { flex-shrink: 0; } .module-list { min-height: 220px; } }
