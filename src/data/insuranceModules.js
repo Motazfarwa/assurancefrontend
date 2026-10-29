@@ -13,8 +13,8 @@ export const INSURANCE_MODULES = [
 
   { id: '530', category: 'production', title: 'Reception terme', description: 'Importer le bordereau terme (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-reception' },
   { id: '535', category: 'production', title: 'Reception comptant', description: 'Importer le bordereau comptant (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-comptant' },
-  { id: '540', category: 'collections', title: 'Confrontation bordereau', description: 'Comparer le bordereau du siege avec vos polices et quittances.', permission: P.REPORTS_VIEW, form: 'bordereau-confrontation' },
-  { id: '550', category: 'collections', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
+  { id: '540', category: 'production', title: 'Confrontation bordereau', description: 'Comparer le bordereau du siege avec vos polices et quittances.', permission: P.REPORTS_VIEW, form: 'bordereau-confrontation' },
+  { id: '550', category: 'production', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
   { id: '560', category: 'collections', title: 'Gestion des cheques', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
   { id: '570', category: 'collections', title: 'Recette Technique', description: 'Saisir un reglement et l’affecter aux quittances impayees.', permission: P.REPORTS_VIEW, form: 'recette' },
   { id: '575', category: 'collections', title: 'Reglement client', description: 'Consulter les reglements d’un client et les quittances qu’ils ont payees.', permission: P.REPORTS_VIEW, form: 'reglement-client' },

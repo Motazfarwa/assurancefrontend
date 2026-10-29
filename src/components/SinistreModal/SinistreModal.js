@@ -37,18 +37,20 @@ function toForm(record) {
   return form;
 }
 
-// Claims list filters: not closed ("Cloture" false), claims of the LIST_MONTHS months up to a date (today by default).
+// Claims list filters: not closed ("Cloture" false), claims between two dates: from LIST_START, up to LIST_MONTHS months
+// after "Du" (both editable; changing "Du" moves "Jusqu'au").
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
+const LIST_START = '2020-01-01';
 const LIST_MONTHS = 25;
-// The day LIST_MONTHS months before an ISO date, kept on the last day of a shorter month (as PostgreSQL does).
-function monthsBefore(iso, months) {
+// The day some months after an ISO date, kept on the last day of a shorter month.
+function monthsAfter(iso, months) {
   const [year, month, day] = iso.split('-').map(Number);
-  const target = new Date(Date.UTC(year, month - 1 - months, 1));
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
   const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
   target.setUTCDate(Math.min(day, lastDay));
   return target.toISOString().slice(0, 10);
 }
-const newList = () => ({ q: '', nonCloture: true, dateMax: today(), typeSinistre: '', items: null, total: 0, counts: null });
+const newList = () => ({ q: '', nonCloture: true, dateMin: LIST_START, dateMax: monthsAfter(LIST_START, LIST_MONTHS), typeSinistre: '', items: null, total: 0, counts: null });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
   const names = new Map(compagnies.map((option) => [String(option.id), option.label]));
@@ -104,13 +106,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   }, [accessToken, current, form.Date_Sinistre]);
 
   // Claims list: search as you type (the expert's name too), filtered by status, type and date.
-  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.typeSinistre]) : null;
+  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMin, list.dateMax, list.typeSinistre]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, nonCloture, dateMax, typeSinistre] = JSON.parse(listKey);
+    const [q, nonCloture, dateMin, dateMax, typeSinistre] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, type_sinistre: typeSinistre, mois: LIST_MONTHS, limit: 300 })
+      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_min: dateMin, date_max: dateMax, type_sinistre: typeSinistre, limit: 300 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
@@ -512,10 +514,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
               </label>
               <label className="snr-date-filter">
                 <span>Du</span>
-                <b className="snr-date-from" title={`${LIST_MONTHS} mois avant la date « Jusqu’au »`}>{shortDate(monthsBefore(list.dateMax || today(), LIST_MONTHS))}</b>
+                <input type="date" value={list.dateMin} onChange={(event) => { const dateMin = event.target.value || LIST_START; setList((value) => ({ ...value, dateMin, dateMax: monthsAfter(dateMin, LIST_MONTHS), items: null })); }} aria-label="Sinistres survenus à partir du" />
                 <span>Jusqu’au</span>
-                <input type="date" value={list.dateMax} max={today()} onChange={(event) => { const dateMax = event.target.value || today(); setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
-                {list.dateMax !== today() && <button type="button" onClick={() => setList((value) => ({ ...value, dateMax: today(), items: null }))} aria-label="Revenir à aujourd’hui">×</button>}
+                <input type="date" value={list.dateMax} min={list.dateMin} onChange={(event) => { const dateMax = event.target.value || monthsAfter(list.dateMin, LIST_MONTHS); setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
               </label>
               <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, code ou nom client, police, immatriculation, tiers, expert…" />
               <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
@@ -541,7 +542,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </section>
                 ))}
             </div>
-            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · sinistres des ${LIST_MONTHS} mois précédant la date « Jusqu’au » · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · sinistres du ${shortDate(list.dateMin)} au ${shortDate(list.dateMax)} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}
