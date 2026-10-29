@@ -13,18 +13,15 @@ export const INSURANCE_MODULES = [
 
   { id: '530', category: 'accounting', title: 'Reception terme', description: 'Importer le bordereau terme (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-reception' },
   { id: '535', category: 'accounting', title: 'Reception comptant', description: 'Importer le bordereau comptant (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-comptant' },
-  { id: '540', category: 'accounting', title: 'Confrontation bordereau', description: 'Comparer le bordereau du siege avec vos polices et quittances.', permission: P.REPORTS_VIEW, form: 'bordereau-confrontation' },
-  { id: '550', category: 'accounting', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
-  { id: '560', category: 'accounting', title: 'Gestion des cheques', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
-  { id: '570', category: 'accounting', title: 'Recette Technique', description: 'Saisir un reglement et l’affecter aux quittances impayees.', permission: P.REPORTS_VIEW, form: 'recette' },
-  { id: '575', category: 'accounting', title: 'Reglement client', description: 'Consulter les reglements d’un client et les quittances qu’ils ont payees.', permission: P.REPORTS_VIEW, form: 'reglement-client' },
+  { id: '540', category: 'collections', title: 'Confrontation bordereau', description: 'Comparer le bordereau du siege avec vos polices et quittances.', permission: P.REPORTS_VIEW, form: 'bordereau-confrontation' },
+  { id: '550', category: 'collections', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
+  { id: '560', category: 'collections', title: 'Gestion des cheques', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
+  { id: '570', category: 'collections', title: 'Recette Technique', description: 'Saisir un reglement et l’affecter aux quittances impayees.', permission: P.REPORTS_VIEW, form: 'recette' },
+  { id: '575', category: 'collections', title: 'Reglement client', description: 'Consulter les reglements d’un client et les quittances qu’ils ont payees.', permission: P.REPORTS_VIEW, form: 'reglement-client' },
 
-  { id: '300', category: 'collections', title: 'Suivi du recouvrement', description: 'Consulter les paiements en attente.', permission: P.REPORTS_VIEW, form: 'search' },
-  { id: '320', category: 'collections', title: 'Relances clients', description: 'Rechercher et preparer les relances.', permission: P.REPORTS_VIEW, form: 'search' },
   { id: '350', category: 'collections', title: 'Etat des acomptes', description: 'Quittances partiellement reglees : montant regle et reste a payer par client.', permission: P.REPORTS_VIEW, form: 'acompte' },
 
   { id: '600', category: 'claims', title: 'Declarer un sinistre', description: 'Ouvrir un dossier de sinistre.', permission: P.CLAIMS_CREATE, form: 'sinistre-new' },
   { id: '610', category: 'claims', title: 'Mes dossiers sinistres', description: 'Rechercher et suivre vos dossiers.', permission: P.CLAIMS_VIEW_OWN, form: 'search' },
   { id: '620', category: 'claims', title: 'Gestion des sinistres', description: 'Saisir, scanner (constat, declaration) et suivre les dossiers sinistres.', permission: P.CLAIMS_VIEW_ALL, form: 'sinistre' },
-  { id: '640', category: 'claims', title: 'Etat des sinistres', description: 'Consulter les sinistres par periode.', permission: P.CLAIMS_VIEW_ALL, form: 'report' },
 ];
