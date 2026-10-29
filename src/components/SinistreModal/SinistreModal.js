@@ -37,10 +37,10 @@ function toForm(record) {
   return form;
 }
 
-// Claims list filters: not closed ("Cloture" false), claims up to a date, by expert; only the claims of the last LIST_MONTHS months.
+// Claims list filters: not closed ("Cloture" false), claims up to a date; only the claims of the last LIST_MONTHS months.
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
 const LIST_MONTHS = 25;
-const newList = () => ({ q: '', nonCloture: true, dateMax: '', typeSinistre: '', expert: '', items: null, total: 0, counts: null });
+const newList = () => ({ q: '', nonCloture: true, dateMax: '', typeSinistre: '', items: null, total: 0, counts: null });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
   const names = new Map(compagnies.map((option) => [String(option.id), option.label]));
@@ -95,14 +95,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return () => { active = false; clearTimeout(timer); };
   }, [accessToken, current, form.Date_Sinistre]);
 
-  // Claims list: search as you type, filtered by status, type, expert and date.
-  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.typeSinistre, list.expert]) : null;
+  // Claims list: search as you type (the expert's name too), filtered by status, type and date.
+  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.dateMax, list.typeSinistre]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, nonCloture, dateMax, typeSinistre, expert] = JSON.parse(listKey);
+    const [q, nonCloture, dateMax, typeSinistre] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, type_sinistre: typeSinistre, code_expert: expert, mois: LIST_MONTHS, limit: 300 })
+      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_max: dateMax, type_sinistre: typeSinistre, mois: LIST_MONTHS, limit: 300 })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
@@ -500,19 +500,11 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 </select>
               </label>
               <label className="snr-date-filter">
-                <span>Expert</span>
-                <select value={list.expert} onChange={(event) => { const expert = event.target.value; setList((value) => ({ ...value, expert, items: null })); }} aria-label="Filtrer par expert">
-                  <option value="">Tous</option>
-                  <option value="0">(Aucun)</option>
-                  {lookups.experts.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                </select>
-              </label>
-              <label className="snr-date-filter">
                 <span>Jusqu’au</span>
                 <input type="date" value={list.dateMax} max={today()} onChange={(event) => { const dateMax = event.target.value; setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
                 {list.dateMax && <button type="button" onClick={() => setList((value) => ({ ...value, dateMax: '', items: null }))} aria-label="Effacer la date">×</button>}
               </label>
-              <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, code ou nom client, police, immatriculation, tiers…" />
+              <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, code ou nom client, police, immatriculation, tiers, expert…" />
               <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
             </header>
             <div className="snr-table-wrap">
