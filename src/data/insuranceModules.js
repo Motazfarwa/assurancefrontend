@@ -19,6 +19,7 @@ export const INSURANCE_MODULES = [
   { id: '570', category: 'collections', title: 'Recette Technique', description: 'Saisir un reglement et l’affecter aux quittances impayees.', permission: P.REPORTS_VIEW, form: 'recette' },
   { id: '575', category: 'collections', title: 'Reglement client', description: 'Consulter les reglements d’un client et les quittances qu’ils ont payees.', permission: P.REPORTS_VIEW, form: 'reglement-client' },
 
+  { id: '340', category: 'collections', title: 'Etat des impayes', description: 'Quittances impayees avec ou sans piece en instance, global par client ou memoire de reglement.', permission: P.REPORTS_VIEW, form: 'etat-impaye' },
   { id: '350', category: 'collections', title: 'Etat des acomptes', description: 'Quittances partiellement reglees : montant regle et reste a payer par client.', permission: P.REPORTS_VIEW, form: 'acompte' },
 
   { id: '600', category: 'claims', title: 'Declarer un sinistre', description: 'Ouvrir un dossier de sinistre.', permission: P.CLAIMS_CREATE, form: 'sinistre-new' },

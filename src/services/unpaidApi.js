@@ -83,3 +83,22 @@ export async function listPartialPayments(accessToken, filters) {
   if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Impossible de charger les acomptes.');
   return body;
 }
+
+// Etat des impayés computed live: quittances avec / sans pièce en instance, with the client and the compagnie.
+async function getJson(path, accessToken, filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== '' && value != null && value !== false) params.set(key, String(value));
+  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}?${params.toString()}`, { headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` } });
+  } catch {
+    throw new Error(`Impossible de joindre l'API (${API_BASE_URL}). Vérifiez que FastAPI est démarré.`);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Impossible de charger l’état des impayés.');
+  return body;
+}
+export const getUnpaidStatement = (accessToken, filters) => getJson('/api/impayes-agence/etat', accessToken, filters);
+export const listStatementCompanies = (accessToken) => getJson('/api/impayes-agence/etat/compagnies', accessToken);

@@ -10,6 +10,7 @@ import BranchManagementModal from '../BranchManagementModal/BranchManagementModa
 import DocumentEntryModal from '../DocumentEntryModal/DocumentEntryModal';
 import AgencyUnpaidModal from '../AgencyUnpaidModal/AgencyUnpaidModal';
 import AcompteModal from '../AcompteModal/AcompteModal';
+import EtatImpayeModal from '../EtatImpayeModal/EtatImpayeModal';
 import BordereauReceptionModal from '../BordereauModal/BordereauReceptionModal';
 import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontationModal';
 import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
@@ -31,6 +32,7 @@ export default function ModulesWorkspace() {
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
   const [acompteModule, setAcompteModule] = useState(null);
+  const [etatImpayeModule, setEtatImpayeModule] = useState(null);
   const [bordereauModal, setBordereauModal] = useState(null);
   const [showChequeModal, setShowChequeModal] = useState(false);
   const [showRecetteModal, setShowRecetteModal] = useState(false);
@@ -109,6 +111,11 @@ export default function ModulesWorkspace() {
       setAcompteModule(module);
       return;
     }
+    if (module.form === 'etat-impaye') {
+      setActiveModuleId(module.id);
+      setEtatImpayeModule(module);
+      return;
+    }
     setActiveModuleId(module.id);
     setSelectedModule(module);
   }
@@ -174,6 +181,7 @@ export default function ModulesWorkspace() {
       {showDocumentModal && <DocumentEntryModal onClose={() => setShowDocumentModal(false)} />}
       {showUnpaidModal && <AgencyUnpaidModal onClose={() => setShowUnpaidModal(false)} />}
       {acompteModule && <AcompteModal moduleId={acompteModule.id} onClose={() => setAcompteModule(null)} />}
+      {etatImpayeModule && <EtatImpayeModal moduleId={etatImpayeModule.id} onClose={() => setEtatImpayeModule(null)} />}
       {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal tc="T" onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-comptant' && <BordereauReceptionModal tc="C" onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
