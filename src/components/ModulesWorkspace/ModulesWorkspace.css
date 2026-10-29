@@ -236,3 +236,27 @@
   .nature-option-icon { width: 20px; height: 20px; }
 }
 @media (max-height: 620px) and (min-width: 901px) { .workspace-window { max-height: none; } .workspace-window > * { flex-shrink: 0; } .module-list { min-height: 220px; } }
+/* Very narrow screens (small phones, or large text / zoom): everything shrinks, nothing is cut off */
+@media (max-width: 420px) {
+  .workspace-brand { min-width: 0; }
+  .workspace-brand > span:last-child { min-width: 0; }
+  .workspace-user { gap: 6px; }
+  .module-browser-heading { flex-wrap: wrap; }
+  .module-browser-heading > div:first-child { min-width: 0; }
+  .workspace-search { min-width: 0; }
+  .workspace-search input { min-width: 0; }
+}
+@media (max-width: 340px) {
+  .workspace-topbar { grid-template-columns: minmax(0, 1fr); }
+  .workspace-user { grid-row: auto; grid-column: 1; justify-content: flex-start; }
+  .workspace-company { grid-row: auto; }
+  .workspace-logout { padding: 6px 8px; font-size: 10px; }
+  .nature-selector { padding: 8px 10px; }
+  .nature-option { padding: 0 6px; }
+  .nature-option-icon { display: none; }
+  .workspace-workbench { padding: 8px; }
+  .module-browser { padding: 12px 8px 8px; }
+  .module-table-head, .module-row { grid-template-columns: 48px minmax(0, 1fr) 16px; padding-right: 6px; padding-left: 6px; }
+  .module-row-code { min-width: 0; padding: 4px; font-size: 10px; }
+  .workspace-count { display: none; }
+}
