@@ -37,10 +37,18 @@ function toForm(record) {
   return form;
 }
 
-// Claims list filters: not closed ("Cloture" false), claims up to a date; only the claims of the last LIST_MONTHS months.
+// Claims list filters: not closed ("Cloture" false), claims of the LIST_MONTHS months up to a date (today by default).
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
 const LIST_MONTHS = 25;
-const newList = () => ({ q: '', nonCloture: true, dateMax: '', typeSinistre: '', items: null, total: 0, counts: null });
+// The day LIST_MONTHS months before an ISO date, kept on the last day of a shorter month (as PostgreSQL does).
+function monthsBefore(iso, months) {
+  const [year, month, day] = iso.split('-').map(Number);
+  const target = new Date(Date.UTC(year, month - 1 - months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, lastDay));
+  return target.toISOString().slice(0, 10);
+}
+const newList = () => ({ q: '', nonCloture: true, dateMax: today(), typeSinistre: '', items: null, total: 0, counts: null });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
   const names = new Map(compagnies.map((option) => [String(option.id), option.label]));
@@ -370,18 +378,22 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     );
   };
   const asOptions = (values) => values.map((value) => ({ id: value, label: value }));
-  const flag = (label, name, dateName) => (
+  // `follow(patch)` adds to the change the fields that go with it (a settled claim is closed on the same day).
+  const flag = (label, name, dateName, follow = () => ({})) => (
     <div className="snr-span-3 snr-flag">
       <label className="snr-check">
-        <input type="checkbox" checked={form[name]} onChange={(event) => change({ [name]: event.target.checked, ...(event.target.checked && !form[dateName] ? { [dateName]: today() } : {}) })} />
+        <input type="checkbox" checked={form[name]} onChange={(event) => {
+          const patch = { [name]: event.target.checked, ...(event.target.checked && !form[dateName] ? { [dateName]: today() } : {}) };
+          change({ ...patch, ...follow({ [dateName]: form[dateName], ...patch }) });
+        }} />
         {label}
       </label>
-      <input type="date" value={form[dateName]} disabled={!form[name]} onChange={(event) => change({ [dateName]: event.target.value })} aria-label={`Date ${label}`} />
+      <input type="date" value={form[dateName]} disabled={!form[name]} onChange={(event) => { const patch = { [dateName]: event.target.value }; change({ ...patch, ...follow({ [name]: form[name], ...patch }) }); }} aria-label={`Date ${label}`} />
     </div>
   );
+  const closeWhenSettled = (values) => (values.Regle ? { Cloture: true, Date_Cloture: values.Date_Reglement } : {});
 
   const [statusLabel, statusClass] = statusOf(form);
-  const reste = form.Montant_Devis !== '' ? Number(form.Montant_Devis || 0) - Number(form.Montant_Reglement || 0) : null;
 
   return (
     <div className="snr-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy && !scanning) close(); }}>
@@ -462,10 +474,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <fieldset className="snr-group">
             <legend>Expertise et règlement</legend>
             {choose('Expert', 'Code_Expert1', lookups.experts, { none: '0', noneLabel: '(Aucun)', span: 6 })}
-            {input('Montant devis', 'Montant_Devis', { type: 'number', span: 2 })}
-            {input('Montant réglé', 'Montant_Reglement', { type: 'number', span: 2 })}
-            <label className="snr-span-2"><span>Reste</span><input value={reste == null ? '' : money(reste)} readOnly className={reste != null && reste < 0 ? 'is-negative' : undefined} /></label>
-            {flag('Réglé', 'Regle', 'Date_Reglement')}
+            {input('Montant devis', 'Montant_Devis', { type: 'number', span: 3 })}
+            {input('Montant réglé', 'Montant_Reglement', { type: 'number', span: 3 })}
+            {flag('Réglé', 'Regle', 'Date_Reglement', closeWhenSettled)}
             {flag('Clôturé', 'Cloture', 'Date_Cloture')}
           </fieldset>
 
@@ -500,9 +511,11 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 </select>
               </label>
               <label className="snr-date-filter">
+                <span>Du</span>
+                <b className="snr-date-from" title={`${LIST_MONTHS} mois avant la date « Jusqu’au »`}>{shortDate(monthsBefore(list.dateMax || today(), LIST_MONTHS))}</b>
                 <span>Jusqu’au</span>
-                <input type="date" value={list.dateMax} max={today()} onChange={(event) => { const dateMax = event.target.value; setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
-                {list.dateMax && <button type="button" onClick={() => setList((value) => ({ ...value, dateMax: '', items: null }))} aria-label="Effacer la date">×</button>}
+                <input type="date" value={list.dateMax} max={today()} onChange={(event) => { const dateMax = event.target.value || today(); setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
+                {list.dateMax !== today() && <button type="button" onClick={() => setList((value) => ({ ...value, dateMax: today(), items: null }))} aria-label="Revenir à aujourd’hui">×</button>}
               </label>
               <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, code ou nom client, police, immatriculation, tiers, expert…" />
               <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
@@ -528,7 +541,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </section>
                 ))}
             </div>
-            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · sinistres des ${LIST_MONTHS} derniers mois · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · sinistres des ${LIST_MONTHS} mois précédant la date « Jusqu’au » · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}
