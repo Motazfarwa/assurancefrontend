@@ -42,16 +42,10 @@ function toForm(record) {
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
 const LIST_START = '2020-01-01';
 const LIST_MONTHS = 23;
-// The day some months after an ISO date, kept on the last day of a shorter month.
-function monthsAfter(iso, months) {
-  const [year, month, day] = iso.split('-').map(Number);
-  const target = new Date(Date.UTC(year, month - 1 + months, 1));
-  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  target.setUTCDate(Math.min(day, lastDay));
-  return target.toISOString().slice(0, 10);
-}
+// The last day of the LIST_MONTHS full months: January 2020 to November 2021, i.e. up to 30/11/2021.
+const LIST_END = new Date(Date.UTC(2020, LIST_MONTHS, 0)).toISOString().slice(0, 10);
 const newList = () => ({
-  q: '', nonCloture: true, byDate: false, dateMin: LIST_START, dateMax: monthsAfter(LIST_START, LIST_MONTHS), typeSinistre: '', items: null, total: 0, counts: null,
+  q: '', nonCloture: true, byDate: false, dateMin: LIST_START, dateMax: LIST_END, typeSinistre: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
