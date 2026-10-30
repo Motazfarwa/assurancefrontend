@@ -1,5 +1,5 @@
 .chq-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; overflow-y: auto; padding: 14px; background: rgba(15, 35, 47, .56); backdrop-filter: blur(5px); }
-.chq-dialog { display: flex; flex-direction: column; width: min(980px, 100%); max-height: min(96vh, 900px); overflow: hidden; border-radius: 14px; background: #fff; box-shadow: 0 28px 90px rgba(8, 24, 36, .28); color: #233c4b; font-size: 12px; }
+.chq-dialog { display: flex; flex-direction: column; width: min(1120px, 100%); height: 96vh; overflow: hidden; border-radius: 14px; background: #fff; box-shadow: 0 28px 90px rgba(8, 24, 36, .28); color: #233c4b; font-size: 12px; }
 .chq-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #e5ecef; }
 .chq-header span { color: #187d78; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
 .chq-header h2 { margin: 3px 0 0; color: #173247; font-size: 16px; }
@@ -27,7 +27,9 @@
 .chq-error { border: 1px solid #f1cccc; background: #fff7f7; color: #b34747; }
 .chq-notice { border: 1px solid #cfe6df; background: #f3faf8; color: #1d6b62; }
 .chq-table-head { display: flex; align-items: center; justify-content: space-between; color: #1d4f7a; font-size: 13px; }
-.chq-table-wrap { max-height: clamp(120px, 28vh, 260px); overflow: auto; border: 1px solid #cfdde3; border-radius: 8px; }
+/* The quittances take all the height the form leaves, never less than about 8 rows */
+.chq-body > * { flex-shrink: 0; }
+.chq-table-wrap { flex: 1 0 300px; min-height: 300px; overflow: auto; border: 1px solid #cfdde3; border-radius: 8px; }
 .chq-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
 .chq-table th { position: sticky; top: 0; z-index: 1; padding: 6px 10px; background: #eef4f6; color: #1d4f7a; text-align: left; font-weight: 700; border-bottom: 1px solid #cfdde3; }
 .chq-table td { padding: 5px 10px; border-top: 1px solid #edf1f2; }

@@ -322,8 +322,7 @@ export default function ChequeModal({ onClose }) {
           <fieldset className="chq-group">
             <legend>Donnée pièce</legend>
             <label>N° pièce <span className="chq-required">*</span>
-              <input required list="chq-pieces" value={form.nump} onChange={(event) => changePiece(event.target.value)} maxLength={20} placeholder="Saisir ou choisir" disabled={!client} />
-              <datalist id="chq-pieces">{pieces.map((piece) => <option key={piece.nump} value={piece.nump} />)}</datalist>
+              <input required value={form.nump} onChange={(event) => changePiece(event.target.value)} maxLength={20} placeholder="Nouveau n° de pièce" autoComplete="off" disabled={!client} />
             </label>
             <label>Date échéance<input type="date" value={form.datep} onChange={(event) => change({ datep: event.target.value })} /></label>
             <label>Date saisie<input value={shortDate(today())} readOnly /></label>
