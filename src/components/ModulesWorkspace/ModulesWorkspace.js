@@ -15,6 +15,7 @@ import BordereauReceptionModal from '../BordereauModal/BordereauReceptionModal';
 import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontationModal';
 import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
 import ChequeModal from '../ChequeModal/ChequeModal';
+import ChequeInstanceModal from '../ChequeInstanceModal/ChequeInstanceModal';
 import RecetteModal from '../RecetteModal/RecetteModal';
 import ReglementClientModal from '../ReglementClientModal/ReglementClientModal';
 import SinistreModal from '../SinistreModal/SinistreModal';
@@ -35,6 +36,7 @@ export default function ModulesWorkspace() {
   const [etatImpayeModule, setEtatImpayeModule] = useState(null);
   const [bordereauModal, setBordereauModal] = useState(null);
   const [showChequeModal, setShowChequeModal] = useState(false);
+  const [chequeInstanceModule, setChequeInstanceModule] = useState(null);
   const [showRecetteModal, setShowRecetteModal] = useState(false);
   const [reglementClientModule, setReglementClientModule] = useState(null);
   const [sinistreModule, setSinistreModule] = useState(null);
@@ -84,6 +86,11 @@ export default function ModulesWorkspace() {
     if (module.form === 'cheques') {
       setActiveModuleId(module.id);
       setShowChequeModal(true);
+      return;
+    }
+    if (module.form === 'cheques-instance') {
+      setActiveModuleId(module.id);
+      setChequeInstanceModule(module);
       return;
     }
     if (module.form === 'sinistre' || module.form === 'sinistre-new') {
@@ -187,6 +194,7 @@ export default function ModulesWorkspace() {
       {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
+      {chequeInstanceModule && <ChequeInstanceModal moduleId={chequeInstanceModule.id} onClose={() => setChequeInstanceModule(null)} />}
       {showRecetteModal && <RecetteModal onClose={() => setShowRecetteModal(false)} />}
       {reglementClientModule && <ReglementClientModal moduleId={reglementClientModule.id} onClose={() => setReglementClientModule(null)} />}
       {sinistreModule && <SinistreModal moduleId={sinistreModule.id} mode={sinistreModule.form === 'sinistre-new' ? 'new' : 'manage'} onClose={() => setSinistreModule(null)} />}

@@ -34,7 +34,10 @@ export const getPiece = (token, code, nump) => request(`/api/cheques/piece?${que
 export const listPieces = (token, params) => request(`/api/cheques?${query(params)}`, token);
 export const createPiece = (token, payload) => request('/api/cheques', token, { method: 'POST', body: JSON.stringify(payload) });
 export const updatePiece = (token, nump, payload) => request(`/api/cheques/${encodeURIComponent(nump)}`, token, { method: 'PUT', body: JSON.stringify(payload) });
-export const deletePiece = (token, nump, code) => request(`/api/cheques/${encodeURIComponent(nump)}?${query({ code_client: code })}`, token, { method: 'DELETE' });
+// Chèques et traites en instance (not paid into the bank yet), and paying one into an agency account.
+export const listPiecesToPayIn = (token) => request('/api/cheques/instance', token);
+export const payInPiece = (token, payload) => request('/api/cheques/verser', token, { method: 'POST', body: JSON.stringify(payload) });
+export const deletePiece =(token, nump, code) => request(`/api/cheques/${encodeURIComponent(nump)}?${query({ code_client: code })}`, token, { method: 'DELETE' });
 
 // Sends a photographed / scanned cheque (JPG, PNG or PDF) to be read.
 export async function extractCheque(token, file) {

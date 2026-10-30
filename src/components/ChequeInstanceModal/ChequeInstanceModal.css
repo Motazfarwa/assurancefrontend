@@ -1,0 +1,24 @@
+/* Chèques et traites en instance: built on the Etat des impayés / acomptes styles (unpaid-*, acompte-*) */
+.cqi-table td small { display: block; color: #7a8d97; font-size: 9.5px; }
+.unpaid-table td.cqi-number, .unpaid-table th.cqi-number { text-align: right; font-variant-numeric: tabular-nums; }
+.unpaid-table td.cqi-verser, .unpaid-table th.cqi-verser { width: 60px; text-align: center; }
+.cqi-verser input { width: 17px; height: 17px; margin: 0; accent-color: #187d78; cursor: pointer; }
+.cqi-table tr.is-due td:first-child { color: #b34e41; font-weight: 700; }
+/* Phones: the columns keep their width, the table scrolls sideways */
+.cqi-scroll { overflow-x: auto; }
+@media (max-width: 760px) { .cqi-table { min-width: 720px; } }
+
+.cqi-notice { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 12px; border: 1px solid #bfe3d9; border-radius: 8px; background: #effaf6; color: #17675f; font-size: 11px; font-weight: 600; }
+.cqi-notice button { margin-left: auto; border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; cursor: pointer; }
+
+/* The account choice, over the list */
+.cqi-popup-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 16px; background: rgba(8, 24, 36, .45); }
+.cqi-popup { display: grid; gap: 14px; width: min(440px, 100%); padding: 20px 22px; border-radius: 14px; background: #fff; box-shadow: 0 24px 70px rgba(8, 24, 36, .35); color: #233c4b; }
+.cqi-popup h3 { margin: 0; color: #173247; font-size: 16px; }
+.cqi-popup dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 12px; }
+.cqi-popup dt { color: #71838d; }
+.cqi-popup dd { margin: 0; }
+.cqi-popup .acompte-field { font-size: 10px; }
+.cqi-popup .expert-error { margin: 0; }
+.cqi-popup footer { display: flex; justify-content: flex-end; gap: 8px; }
+.cqi-popup footer button { min-height: 36px; padding: 0 16px; }
