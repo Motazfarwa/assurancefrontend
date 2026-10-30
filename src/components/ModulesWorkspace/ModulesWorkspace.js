@@ -16,6 +16,8 @@ import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontatio
 import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
 import ChequeModal from '../ChequeModal/ChequeModal';
 import ChequeInstanceModal from '../ChequeInstanceModal/ChequeInstanceModal';
+import JournalModal from '../JournalModal/JournalModal';
+import FeuilleCaisseModal from '../JournalModal/FeuilleCaisse';
 import RecetteModal from '../RecetteModal/RecetteModal';
 import ReglementClientModal from '../ReglementClientModal/ReglementClientModal';
 import SinistreModal from '../SinistreModal/SinistreModal';
@@ -37,6 +39,8 @@ export default function ModulesWorkspace() {
   const [bordereauModal, setBordereauModal] = useState(null);
   const [showChequeModal, setShowChequeModal] = useState(false);
   const [chequeInstanceModule, setChequeInstanceModule] = useState(null);
+  const [journalModule, setJournalModule] = useState(null);
+  const [feuilleCaisseModule, setFeuilleCaisseModule] = useState(null);
   const [showRecetteModal, setShowRecetteModal] = useState(false);
   const [reglementClientModule, setReglementClientModule] = useState(null);
   const [sinistreModule, setSinistreModule] = useState(null);
@@ -86,6 +90,16 @@ export default function ModulesWorkspace() {
     if (module.form === 'cheques') {
       setActiveModuleId(module.id);
       setShowChequeModal(true);
+      return;
+    }
+    if (module.form === 'feuille-caisse') {
+      setActiveModuleId(module.id);
+      setFeuilleCaisseModule(module);
+      return;
+    }
+    if (module.form === 'journal-encaissement' || module.form === 'journal-depense') {
+      setActiveModuleId(module.id);
+      setJournalModule(module);
       return;
     }
     if (module.form === 'cheques-instance') {
@@ -194,6 +208,8 @@ export default function ModulesWorkspace() {
       {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
+      {feuilleCaisseModule && <FeuilleCaisseModal moduleId={feuilleCaisseModule.id} onClose={() => setFeuilleCaisseModule(null)} />}
+      {journalModule && <JournalModal key={journalModule.id} kind={journalModule.form === 'journal-depense' ? 'depense' : 'encaissement'} moduleId={journalModule.id} onClose={() => setJournalModule(null)} />}
       {chequeInstanceModule && <ChequeInstanceModal moduleId={chequeInstanceModule.id} onClose={() => setChequeInstanceModule(null)} />}
       {showRecetteModal && <RecetteModal onClose={() => setShowRecetteModal(false)} />}
       {reglementClientModule && <ReglementClientModal moduleId={reglementClientModule.id} onClose={() => setReglementClientModule(null)} />}
