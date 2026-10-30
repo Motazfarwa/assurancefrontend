@@ -772,7 +772,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             checked={!values.renouvelable}
                             onChange={e => update("renouvelable", !e.target.checked)}
                         />
-                        Fermé
+                        Ferme
                     </label>
                     <label className="pf-field">
                         <span>Durée</span>
@@ -826,7 +826,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                                 <input type="date" value={values.date_revalorisation} onChange={e => update("date_revalorisation", e.target.value)} />
                             </label>
                             <label className="pf-franchise pf-inline-date">
-                                <span>Date d'envoi</span>
+                                <span>Date d'envoi de décharge</span>
                                 <input type="date" value={values.date_envoi} onChange={e => update("date_envoi", e.target.value)} />
                             </label>
                         </>

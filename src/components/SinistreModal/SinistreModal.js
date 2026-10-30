@@ -81,7 +81,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null); // { kind: 'error' | 'info', text }
-  const [list, setList] = useState(() => (mode === 'manage' ? newList(clientCode) : null));
+  // Module 620 opens on a new claim ("Lister" shows the list); from a client file it opens on that client's claims.
+  const [list, setList] = useState(() => (mode === 'manage' && clientCode ? newList(clientCode) : null));
   const [clientPolicies, setClientPolicies] = useState([]); // the typed client's policies, proposed in "N° police"
   const [tab, setTab] = useState('sinistre'); // 'sinistre' | 'suivi' (steps, calls and letters of a stored claim)
   const formRef = useRef(form); // the latest values, for the lookups that run once typing pauses
@@ -94,7 +95,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   useEffect(() => {
     let active = true;
-    getSinistreLookups(accessToken).then((data) => { if (active) setLookups(data); }).catch((requestError) => { if (active) fail(requestError.message); });
+    getSinistreLookups(accessToken).then((data) => { if (active) setLookups((current) => ({ ...current, ...data })); }).catch((requestError) => { if (active) fail(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);
 
