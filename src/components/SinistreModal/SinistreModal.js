@@ -38,10 +38,11 @@ function toForm(record) {
 }
 
 // Claims list filters: not closed ("Cloture" false, ticked at first) and, once "Entre deux dates" is ticked, the claims
-// between two dates, at first the LIST_MONTHS months up to today (both editable, each on its own).
+// between two dates, at first the LIST_MONTHS months from LIST_START (both editable, each on its own).
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
+const LIST_START = '2020-01-01';
 const LIST_MONTHS = 23;
-// The day some months after (or, negative, before) an ISO date, kept on the last day of a shorter month.
+// The day some months after an ISO date, kept on the last day of a shorter month.
 function monthsAfter(iso, months) {
   const [year, month, day] = iso.split('-').map(Number);
   const target = new Date(Date.UTC(year, month - 1 + months, 1));
@@ -50,7 +51,7 @@ function monthsAfter(iso, months) {
   return target.toISOString().slice(0, 10);
 }
 const newList = () => ({
-  q: '', nonCloture: true, byDate: false, dateMin: monthsAfter(today(), -LIST_MONTHS), dateMax: today(), typeSinistre: '', items: null, total: 0, counts: null,
+  q: '', nonCloture: true, byDate: false, dateMin: LIST_START, dateMax: monthsAfter(LIST_START, LIST_MONTHS), typeSinistre: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
