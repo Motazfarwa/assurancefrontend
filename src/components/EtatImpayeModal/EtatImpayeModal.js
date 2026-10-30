@@ -24,7 +24,7 @@ const letterhead = (title) => <div className="eti-letterhead">
   <span className="eti-date">Date : <b>{formatDate(today())}</b></span>
   <h3>{title}</h3>
 </div>;
-// Rows (already sorted by client, compagnie, échéance) grouped by client, then, for the mémoire, by compagnie.
+// Rows (already sorted by code client, compagnie, échéance) grouped by client, then, for the mémoire, by compagnie.
 function byClient(rows) {
   const groups = [];
   rows.forEach((row) => {
