@@ -15,9 +15,8 @@ export const INSURANCE_MODULES = [
   { id: '535', category: 'production', title: 'Reception comptant', description: 'Importer le bordereau comptant (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-comptant' },
   { id: '540', category: 'production', title: 'Confrontation bordereau', description: 'Comparer le bordereau du siege avec vos polices et quittances.', permission: P.REPORTS_VIEW, form: 'bordereau-confrontation' },
   { id: '550', category: 'production', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
-  { id: '560', category: 'collections', title: 'Gestion des cheques', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
+  { id: '560', category: 'collections', title: 'Saisir cheques et traites', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
   { id: '565', category: 'collections', title: 'Cheques et traites en instance', description: 'Consulter les pieces en instance et les verser sur un compte de l’agence.', permission: P.REPORTS_VIEW, form: 'cheques-instance' },
-  { id: '570', category: 'collections', title: 'Recette Technique', description: 'Saisir un reglement et l’affecter aux quittances impayees.', permission: P.REPORTS_VIEW, form: 'recette' },
   { id: '575', category: 'collections', title: 'Reglement client', description: 'Consulter les reglements d’un client et les quittances qu’ils ont payees.', permission: P.REPORTS_VIEW, form: 'reglement-client' },
 
   { id: '340', category: 'collections', title: 'Etat des impayes', description: 'Quittances impayees avec ou sans piece en instance, global par client ou memoire de reglement.', permission: P.REPORTS_VIEW, form: 'etat-impaye' },

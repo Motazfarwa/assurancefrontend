@@ -272,7 +272,7 @@ export default function ChequeModal({ onClose }) {
     <div className="chq-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <section className="chq-dialog" role="dialog" aria-modal="true" aria-labelledby="chq-title">
         <header className="chq-header">
-          <div><span>COMPTABILITE · MODULE 560</span><h2 id="chq-title">Gestion des chèques et traites en instance</h2></div>
+          <div><span>COMPTABILITE · MODULE 560</span><h2 id="chq-title">Saisir chèques et traites</h2></div>
           <button type="button" onClick={onClose} aria-label="Fermer">×</button>
         </header>
 
