@@ -71,7 +71,7 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
     <section className="unpaid-modal" role="dialog" aria-modal="true" aria-labelledby="cheque-instance-title">
-      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>RECOUVREMENT · MODULE {moduleId}</span><h2 id="cheque-instance-title">Chèques et traites en instance</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
+      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>RECOUVREMENT · MODULE {moduleId}</span><h2 id="cheque-instance-title">Recette Technique</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
         <div className="unpaid-filter-form acompte-filters">
           <fieldset className="unpaid-filter-set unpaid-choice"><legend>Échéance</legend>
