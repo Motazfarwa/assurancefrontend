@@ -65,6 +65,9 @@
 .snr-table .is-number { text-align: right; font-variant-numeric: tabular-nums; }
 .snr-table tr.is-clickable { cursor: pointer; }
 .snr-table tr.is-clickable:hover { background: #f4faf8; }
+/* Not closed more than 23 months after the claim */
+.snr-table tr.is-overdue { background: #fde3e1; color: #8f2a20; }
+.snr-table tr.is-overdue:hover { background: #fbd2ce; }
 .snr-empty { padding: 22px 10px !important; text-align: center; color: #7b8b95; }
 .snr-list footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px 12px; color: #778b97; font-size: 11px; }
 

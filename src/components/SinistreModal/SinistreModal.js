@@ -44,6 +44,13 @@ const LIST_START = '2020-01-01';
 const LIST_MONTHS = 23;
 // The last day of the LIST_MONTHS full months: January 2020 to November 2021, i.e. up to 30/11/2021.
 const LIST_END = new Date(Date.UTC(2020, LIST_MONTHS, 0)).toISOString().slice(0, 10);
+// A claim still not closed LIST_MONTHS months after it happened is shown in red in the list.
+function isOverdue(row) {
+  if (row.Cloture || !row.Date_Sinistre) return false;
+  const limit = new Date();
+  limit.setMonth(limit.getMonth() - LIST_MONTHS);
+  return String(row.Date_Sinistre).slice(0, 10) < limit.toISOString().slice(0, 10);
+}
 // Opened from a client file, the list starts on that client's claims, closed ones included.
 const newList = (clientCode = '') => ({
   q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: LIST_END,
@@ -542,7 +549,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                       <thead><tr><th>N° sinistre</th><th>Date</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Expert</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
                       <tbody>
                         {group.rows.map((row) => (
-                          <tr key={row.Num_Sinistre_Agence} className="is-clickable" onClick={() => open(row.Num_Sinistre_Agence)}>
+                          <tr key={row.Num_Sinistre_Agence} className={`is-clickable${isOverdue(row) ? ' is-overdue' : ''}`} title={isOverdue(row) ? `Non clôturé depuis plus de ${LIST_MONTHS} mois` : undefined} onClick={() => open(row.Num_Sinistre_Agence)}>
                             <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
                             <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td title={row.nom_expert || ''}>{row.nom_expert || ''}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
                             <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
