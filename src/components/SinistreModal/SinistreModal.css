@@ -106,8 +106,9 @@
 .snr-list { width: min(1280px, 100%); }
 .snr-table-wrap:has(.snr-claims) { overflow-x: hidden; }
 .snr-table.snr-claims { table-layout: fixed; font-size: 11.5px; }
-.snr-table.snr-claims th, .snr-table.snr-claims td { padding: 5px 6px; overflow: hidden; text-overflow: ellipsis; }
-.snr-table.snr-claims td.snr-risque { max-width: none; }
+.snr-table.snr-claims th, .snr-table.snr-claims td { padding: 5px 6px; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+/* Observation: in full, over several lines when needed */
+.snr-table.snr-claims td.snr-risque { max-width: none; overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.35; }
 .snr-claims th:nth-child(1) { width: 8.5%; }  /* N° sinistre */
 .snr-claims th:nth-child(2) { width: 7%; }    /* Date */
 .snr-claims th:nth-child(3) { width: 4.5%; }  /* Client */
