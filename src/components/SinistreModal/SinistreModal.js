@@ -72,7 +72,7 @@ const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle 
 export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '' }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
-  const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
+  const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], compagnies_adverses: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
   const [form, setForm] = useState(blank);
   const [current, setCurrent] = useState(''); // number of the stored claim being edited ('' = new claim)
   const [proposed, setProposed] = useState('');
@@ -466,7 +466,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <fieldset className="snr-group">
             <legend>Partie adverse</legend>
             {input('Tiers', 'Tiers1', { span: 6, maxLength: 50 })}
-            {choose('Compagnie adverse', 'Code_Compagnie_Advers1', lookups.compagnies, { none: '0', noneLabel: '(Aucune)' })}
+            {choose('Compagnie adverse', 'Code_Compagnie_Advers1', lookups.compagnies_adverses, { none: '0', noneLabel: '(Aucune)' })}
             {input('Immatriculation', 'Num_Imat1', { maxLength: 12 })}
             {input('N° police', 'Num_Int1', { maxLength: 15 })}
             {input('N° sinistre adverse', 'Num_Sinistre_Compagnie_Advers1', { maxLength: 20 })}
@@ -542,7 +542,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             <div className="snr-table-wrap">
               {list.items === null ? <p className="snr-empty">Chargement…</p>
                 : list.items.length === 0 ? <p className="snr-empty">Aucun dossier trouvé.</p>
-                : byAdverseCompany(list.items, lookups.compagnies).map((group) => (
+                : byAdverseCompany(list.items, lookups.compagnies_adverses).map((group) => (
                   <section key={group.code || 'none'} className="snr-claims-group">
                     <h4>{group.label} <b className="snr-count">{group.rows.length}</b></h4>
                     <table className="snr-table snr-claims">
