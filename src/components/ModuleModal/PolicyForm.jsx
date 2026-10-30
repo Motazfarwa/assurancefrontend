@@ -4,6 +4,7 @@ import ClientPolicesModal from "./ClientPolicesModal";
 import { useAuth } from "../../auth/AuthContext";
 import { API_BASE_URL as API_URL } from "../../services/apiBase";
 import { isOfferedCompany } from "../../services/companyApi";
+import { listClients, normalizeClientRecord, rankClients } from "../../services/clientApi";
 
 // A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
 // month only, "dd/mm" as the policy table stores it) on the same day.
@@ -218,6 +219,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const loadedRef = useRef({ num: "", client: "" });
     const [quittances, setQuittances] = useState([]);
     const [nomClient, setNomClient] = useState("");
+    const [nameQuery, setNameQuery] = useState(null); // text typed in "Nom client", null while it shows the client of the code
+    const [allClients, setAllClients] = useState(null); // loaded the first time a name is typed
     const [values, setValues] = useState(
         clientCode ? { ...initialValues, ...(prefill || {}), code_client: clientCode } : initialClient ? { ...initialValues, code_client: initialClient } : initialValues
     );
@@ -625,6 +628,23 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     }, [values.code_client]);
 
 
+    // "Nom client": a typed name proposes the matching clients; picking one fills the code, which loads its policy.
+    const typeName = (value) => {
+        setNameQuery(value);
+        if (allClients) return;
+        setAllClients([]);
+        listClients(accessToken)
+            .then(rows => setAllClients(rows.map(normalizeClientRecord)))
+            .catch(() => setAllClients(null));
+    };
+    const pickClient = (record) => {
+        setNameQuery(null);
+        update("code_client", String(record.clientCode));
+    };
+    const nameMatches = nameQuery?.trim() && allClients
+        ? rankClients(allClients.filter(record => record.clientCode), nameQuery).slice(0, 12)
+        : [];
+
     return (
          <>
         <form className={`policy-legacy-form ${isCreate ? "is-create" : "is-view"}`} onSubmit={save}>
@@ -723,20 +743,37 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <input
                             value={values.code_client}
                             readOnly={Boolean(clientCode)}
-                            onChange={e => update("code_client", e.target.value)}
+                            onChange={e => { setNameQuery(null); update("code_client", e.target.value); }}
                         />
                     </label>
                     )}
 
                     {!isCreate && (
-                    <label className="pf-field pf-field-wide">
+                    <div className="pf-field pf-field-wide pf-client-name">
                         <span>Nom client</span>
                         <input
-                            value={nomClient}
-                            readOnly
-                            placeholder="Détecté automatiquement"
+                            value={nameQuery ?? nomClient}
+                            readOnly={Boolean(clientCode)}
+                            onChange={e => typeName(e.target.value)}
+                            onBlur={() => setTimeout(() => setNameQuery(null), 150)}
+                            placeholder="Saisir un nom ou un prénom"
+                            autoComplete="off"
                         />
-                    </label>
+                        {nameQuery?.trim() && (
+                            <ul className="pf-suggest" role="listbox">
+                                {!allClients?.length ? <li><small>Chargement…</small></li>
+                                    : nameMatches.length === 0 ? <li><small>Aucun client trouvé.</small></li>
+                                    : nameMatches.map(record => (
+                                        <li key={record.clientCode}>
+                                            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => pickClient(record)}>
+                                                <span>{[record.lastName, record.firstName].filter(Boolean).join(" ") || record.relatedName || "Client sans nom"}</span>
+                                                <small>Code {record.clientCode}</small>
+                                            </button>
+                                        </li>
+                                    ))}
+                            </ul>
+                        )}
+                    </div>
                     )}
 
                     <label className="pf-field pf-field-narrow">

@@ -192,7 +192,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   // While typing (quiet), only an exact match does something; on leaving the field, misses are reported.
   async function openByNumber(field, { quiet = false } = {}) {
     const numero = String(formRef.current[field] || '').trim();
-    const restore = () => { if (!quiet && field === 'Num_Sinistre_Agence') setForm((value) => ({ ...value, Num_Sinistre_Agence: current })); };
+    // Only an opened claim gets its number back: in a new one, the typed number is kept and used to create it.
+    const restore = () => { if (!quiet && current && field === 'Num_Sinistre_Agence') setForm((value) => ({ ...value, Num_Sinistre_Agence: current })); };
     if (!numero || numero === current) { restore(); return; }
     try {
       const result = await listSinistres(accessToken, { q: numero, limit: 50 });
@@ -204,7 +205,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       if (!found) {
         if (quiet) return;
         restore();
-        if (field === 'Num_Sinistre_Agence') fail(`Aucun dossier n° ${numero}.`);
+        if (field === 'Num_Sinistre_Agence') { if (current) fail(`Aucun dossier n° ${numero}.`); else info(`Aucun dossier n° ${numero} : nouveau dossier sous ce numéro.`); }
         else if (!current) info(`Aucun dossier avec le n° sinistre compagnie ${numero} : nouveau dossier.`);
         return;
       }
@@ -312,24 +313,31 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const save = useCallback(async () => {
     setTried(true);
     const issue = problem();
-    if (issue) { fail(issue); return; }
+    if (issue) { fail(issue); return null; }
     setBusy(true); setMessage(null);
     try {
       const payload = { ...form };
-      if (!current) delete payload.Num_Sinistre_Agence; // numbered by the server
+      if (!current && !String(payload.Num_Sinistre_Agence || '').trim()) delete payload.Num_Sinistre_Agence; // numbered by the server
       const numero = current
         ? (await updateSinistre(accessToken, current, payload)).numero
         : (await createSinistre(accessToken, payload)).numero;
       const record = await getSinistre(accessToken, numero);
       setForm(await completed(toForm(record))); setCurrent(numero); setDirty(false); setTried(false);
       info(current ? `Dossier ${numero} enregistré.` : `Dossier ${numero} créé.`);
+      return numero;
     } catch (requestError) {
       fail(requestError.message);
+      return null;
     } finally {
       setBusy(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, current, form]);
+
+  // A new claim is created first: its follow-up needs the stored claim number.
+  async function openFollowUp() {
+    if (current || await save()) setTab('suivi');
+  }
 
   async function remove() {
     if (!current || !window.confirm(`Supprimer définitivement le dossier ${current} ?`)) return;
@@ -434,7 +442,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
         <div className="snr-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'sinistre'} className={tab === 'sinistre' ? 'is-active' : ''} onClick={() => setTab('sinistre')}>Sinistre</button>
-          <button type="button" role="tab" aria-selected={tab === 'suivi'} className={tab === 'suivi' ? 'is-active' : ''} onClick={() => setTab('suivi')} disabled={!current} title={current ? 'Étapes, appels et courriers du dossier' : 'Enregistrez le dossier pour saisir son suivi'}>Suivi</button>
+          <button type="button" role="tab" aria-selected={tab === 'suivi'} className={tab === 'suivi' ? 'is-active' : ''} onClick={openFollowUp} disabled={busy} title={current ? 'Étapes, appels et courriers du dossier' : 'Crée le dossier puis ouvre son suivi'}>Suivi</button>
         </div>
 
         {tab === 'suivi' && current ? (
