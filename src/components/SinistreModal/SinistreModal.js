@@ -76,6 +76,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [form, setForm] = useState(blank);
   const [current, setCurrent] = useState(''); // number of the stored claim being edited ('' = new claim)
   const [proposed, setProposed] = useState('');
+  const autoNumber = useRef(''); // the proposed number written in "N° sinistre" of a new claim (not typed by the user)
   const [dirty, setDirty] = useState(false);
   const [tried, setTried] = useState(false); // a save was attempted: required fields are highlighted
   const [busy, setBusy] = useState(false);
@@ -100,12 +101,22 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   }, [accessToken]);
 
   // Number a new claim will get: year and month of the claim date, then the next sequence of that month.
+  // It is written in "N° sinistre" unless the user typed a number of their own there.
   useEffect(() => {
-    if (current) { setProposed(''); return undefined; }
+    if (current) { setProposed(''); autoNumber.current = ''; return undefined; }
     let active = true;
     const timer = setTimeout(() => {
       nextSinistreNumber(accessToken, form.Date_Sinistre ? form.Date_Sinistre.slice(0, 10) : today())
-        .then((result) => { if (active) setProposed(result.numero); })
+        .then((result) => {
+          if (!active) return;
+          setProposed(result.numero);
+          setForm((value) => {
+            const typed = String(value.Num_Sinistre_Agence || '').trim();
+            if (typed && typed !== autoNumber.current) return value;
+            autoNumber.current = result.numero;
+            return { ...value, Num_Sinistre_Agence: result.numero };
+          });
+        })
         .catch(() => { if (active) setProposed(''); });
     }, 300);
     return () => { active = false; clearTimeout(timer); };
@@ -139,7 +150,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   function startNew() {
     if (!confirmLeave()) return;
-    setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setMessage(null); setClientPolicies([]); setTab('sinistre');
+    // Still a new claim: the proposed number is kept (it only changes with the claim date or once a claim is created).
+    setForm(current ? blank() : { ...blank(), Num_Sinistre_Agence: proposed }); autoNumber.current = current ? '' : proposed;
+    setCurrent(''); setDirty(false); setTried(false); setMessage(null); setClientPolicies([]); setTab('sinistre');
   }
 
   // A stored claim may lack the client name, company or branch: they are taken from its client and policy.
@@ -195,6 +208,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     // Only an opened claim gets its number back: in a new one, the typed number is kept and used to create it.
     const restore = () => { if (!quiet && current && field === 'Num_Sinistre_Agence') setForm((value) => ({ ...value, Num_Sinistre_Agence: current })); };
     if (!numero || numero === current) { restore(); return; }
+    if (!current && numero === autoNumber.current) return; // the proposed number of this new claim
     try {
       const result = await listSinistres(accessToken, { q: numero, limit: 50 });
       if (String(formRef.current[field] || '').trim() !== numero) return; // typed on meanwhile
@@ -212,7 +226,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       const foundNumber = String(found.Num_Sinistre_Agence).trim();
       if (foundNumber === current) { restore(); return; }
       // Only the number was typed in a new file: nothing to lose, no confirmation.
-      const typedOnlyNumber = !current && Object.entries(blank()).every(([key, value]) => key === field || String(formRef.current[key]) === String(value));
+      const typedOnlyNumber = !current && Object.entries(blank()).every(([key, value]) => key === field || String(formRef.current[key]) === String(value)
+        || (key === 'Num_Sinistre_Agence' && String(formRef.current[key]).trim() === autoNumber.current));
       if (await open(foundNumber, { ask: !typedOnlyNumber })) info(`Dossier ${foundNumber} chargé.`);
       else restore();
     } catch (requestError) {
@@ -317,7 +332,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     setBusy(true); setMessage(null);
     try {
       const payload = { ...form };
-      if (!current && !String(payload.Num_Sinistre_Agence || '').trim()) delete payload.Num_Sinistre_Agence; // numbered by the server
+      // Left empty or still the proposed number: numbered by the server (never twice the same number).
+      const typedNumber = String(payload.Num_Sinistre_Agence || '').trim();
+      if (!current && (!typedNumber || typedNumber === autoNumber.current)) delete payload.Num_Sinistre_Agence;
       const numero = current
         ? (await updateSinistre(accessToken, current, payload)).numero
         : (await createSinistre(accessToken, payload)).numero;
