@@ -5,6 +5,7 @@ import { getClientByCode, getNextClientCode, saveClient, searchClients } from '.
 import ModuleModal from '../../components/ModuleModal/ModuleModal';
 import PolicyForm from '../../components/ModuleModal/PolicyForm';
 import FicheImportModal from '../../components/FicheImportModal/FicheImportModal';
+import SinistreModal from '../../components/SinistreModal/SinistreModal';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
 import ClientListModal from '../ClientListModal/ClientListModal';
 import UnpaidClientsModal from '../../components/UnpaidClientsModal/UnpaidClientsModal';
@@ -327,7 +328,9 @@ export default function ClientManagementPage({ modal = false }) {
           </div>
         )}
       </section>
-      {activeAction && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}
+      {/* Gestion sinistre: the claims module, its list on the client's claims */}
+      {activeAction?.key === 'claim' && <SinistreModal moduleId={activeAction.module.id} clientCode={client.clientCode} onClose={() => setActiveAction(null)} />}
+      {activeAction && activeAction.key !== 'claim' && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}
       {ficheFile && <FicheImportModal file={ficheFile} accessToken={accessToken} onClose={() => setFicheFile(null)} onApply={applyFiche} />}
       {showUnpaidClients &&<UnpaidClientsModal accessToken={accessToken} onClose={() => setShowUnpaidClients(false)} />}
       {showClientList && <ClientListModal accessToken={accessToken} localClients={clients} onClose={() => setShowClientList(false)} onView={(record) => { setClient({ ...record, _persisted: true }); navigate('/clients/preview'); }} />}

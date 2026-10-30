@@ -44,8 +44,10 @@ const LIST_START = '2020-01-01';
 const LIST_MONTHS = 23;
 // The last day of the LIST_MONTHS full months: January 2020 to November 2021, i.e. up to 30/11/2021.
 const LIST_END = new Date(Date.UTC(2020, LIST_MONTHS, 0)).toISOString().slice(0, 10);
-const newList = () => ({
-  q: '', nonCloture: true, byDate: false, dateMin: LIST_START, dateMax: LIST_END, typeSinistre: '', items: null, total: 0, counts: null,
+// Opened from a client file, the list starts on that client's claims, closed ones included.
+const newList = (clientCode = '') => ({
+  q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: LIST_END,
+  typeSinistre: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 function byAdverseCompany(items, compagnies) {
@@ -60,7 +62,7 @@ function byAdverseCompany(items, compagnies) {
 }
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
-export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620' }) {
+export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '' }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
   const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
@@ -72,7 +74,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState(null); // { kind: 'error' | 'info', text }
-  const [list, setList] = useState(mode === 'manage' ? newList : null);
+  const [list, setList] = useState(() => (mode === 'manage' ? newList(clientCode) : null));
   const [clientPolicies, setClientPolicies] = useState([]); // the typed client's policies, proposed in "N° police"
   const [tab, setTab] = useState('sinistre'); // 'sinistre' | 'suivi' (steps, calls and letters of a stored claim)
   const formRef = useRef(form); // the latest values, for the lookups that run once typing pauses
@@ -102,13 +104,17 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   }, [accessToken, current, form.Date_Sinistre]);
 
   // Claims list: search as you type (the expert's name too), filtered by status, type and date.
-  const listKey = list ? JSON.stringify([list.q, list.nonCloture, list.byDate ? list.dateMin : '', list.byDate ? list.dateMax : '', list.typeSinistre]) : null;
+  const listKey = list ? JSON.stringify([
+    list.q, list.codeClient.trim(), list.nomClient.trim(), list.nonCloture, list.byDate ? list.dateMin : '', list.byDate ? list.dateMax : '', list.typeSinistre,
+  ]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, nonCloture, dateMin, dateMax, typeSinistre] = JSON.parse(listKey);
+    const [q, codeClient, nomClient, nonCloture, dateMin, dateMax, typeSinistre] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
-      listSinistres(accessToken, { q, non_cloture: nonCloture || '', date_min: dateMin, date_max: dateMax, type_sinistre: typeSinistre, limit: 2000 })
+      listSinistres(accessToken, {
+        q, code_client: codeClient, nom_client: nomClient, non_cloture: nonCloture || '', date_min: dateMin, date_max: dateMax, type_sinistre: typeSinistre, limit: 2000,
+      })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
     }, 250);
@@ -411,7 +417,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <button type="button" className="snr-tool" onClick={startNew} disabled={busy}>Nouveau</button>
           <button type="button" className="snr-tool snr-primary" onClick={save} disabled={busy || scanning || (!dirty && Boolean(current))} title="Ctrl+S">{busy ? 'Patientez…' : current ? 'Enregistrer' : 'Créer le dossier'}</button>
           <button type="button" className="snr-tool" onClick={remove} disabled={busy || !current}>Supprimer</button>
-          <button type="button" className="snr-tool" onClick={() => setList(newList())} disabled={busy}>Lister</button>
+          <button type="button" className="snr-tool" onClick={() => setList(newList(clientCode))} disabled={busy}>Lister</button>
           {message && <p className={`snr-message is-${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'} title={message.text}>{message.text}</p>}
           <span className="snr-spacer" />
           <span className="snr-number">{current ? `N° ${current}` : proposed ? `Nouveau · n° ${proposed}` : 'Nouveau dossier'}{dirty && <em> · modifié</em>}</span>
@@ -501,6 +507,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </label>
                 ))}
               </div>
+              <label className="snr-date-filter">
+                <span>Code client</span>
+                <input className="snr-client-code" value={list.codeClient} maxLength={8} onChange={(event) => { const codeClient = event.target.value; setList((value) => ({ ...value, codeClient, items: null })); }} placeholder="Tous" aria-label="Filtrer par code client" />
+              </label>
+              <label className="snr-date-filter">
+                <span>Nom client</span>
+                <input className="snr-client-name" value={list.nomClient} maxLength={60} onChange={(event) => { const nomClient = event.target.value; setList((value) => ({ ...value, nomClient, items: null })); }} placeholder="Tous" aria-label="Filtrer par nom client" />
+              </label>
               <label className="snr-date-filter">
                 <span>Type</span>
                 <select value={list.typeSinistre} onChange={(event) => { const typeSinistre = event.target.value; setList((value) => ({ ...value, typeSinistre, items: null })); }} aria-label="Filtrer par type de sinistre">
