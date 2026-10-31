@@ -69,3 +69,16 @@
 
 /* Feuille de caisse: "Entre deux dates" */
 .jrn-dates { margin-top: 12px; }
+
+/* Feuille de caisse, "Détails": the company's summary sheet */
+.jrn-details { width: min(560px, 100%); margin: 0 auto; }
+.jrn-details-head { display: grid; justify-items: center; gap: 4px; margin-bottom: 14px; font-size: 11px; }
+.jrn-details-head strong { font-size: 12px; }
+.jrn-details-table { min-width: 0; }
+.jrn-details-table tbody td { border-top: 0; border-bottom: 0; height: 20px; }
+.jrn-detail-steps { width: 80%; margin: 18px 0 0 6px; border-collapse: collapse; font-size: 10.5px; }
+.jrn-detail-steps td { padding: 1px 6px; }
+.jrn-detail-steps td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.jrn-detail-result { display: flex; justify-content: space-between; width: 80%; margin: 8px 0 0; padding: 6px 6px 0; border-top: 1px solid #333; font-size: 11px; }
+.jrn-detail-box { padding: 1px 16px; border: 1.5px solid #111; }
+.jrn-details h4 { margin: 22px 0 0 6px; font-size: 11px; }

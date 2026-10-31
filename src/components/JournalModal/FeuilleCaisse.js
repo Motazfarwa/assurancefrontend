@@ -36,7 +36,54 @@ export function cashSheetLines(journals, expenses) {
     { label: 'RS Commission', primes: Math.round(commission * RS_RATE * 1000) / 1000, tq: 0, commission: 0, depenses: 0 },
   ];
   const totals = { primes: sum(lines, 'primes'), tq: sum(lines, 'tq'), commission: sum(lines, 'commission'), depenses: sum(lines, 'depenses') };
-  return { lines, totals, recettes: totals.primes + totals.tq, sorties: totals.commission + totals.depenses };
+  return { lines, totals, recettes: totals.primes + totals.tq, sorties: totals.commission + totals.depenses, summary: cashSummary(journals, expenses) };
+}
+
+const rs = (value) => Math.round(value * RS_RATE * 1000) / 1000;
+// The "Détails" page of the feuille (the company's Excel sheet): encaissements against décaissements, the solde owed
+// to the company, the net commission and the amount to declare (the net commission before its RS).
+function cashSummary(journals, expenses) {
+  const rebates = expenses.filter((row) => row.nature === 'R');
+  const s = {
+    primes: sum(journals, 'primes') + sum(journals, 'tq') + sum(journals, 'frais'),
+    commissionBrute: sum(journals, 'commission'),
+    commRistourne: sum(rebates, 'd_com'),
+    sinistres: sum(expenses.filter((row) => row.nature !== 'R'), 'montant'),
+    ristournes: sum(rebates, 'montant'),
+    miseEnDemeure: 0,
+  };
+  s.rsCommissions = rs(s.commissionBrute);
+  s.rsCommRistourne = rs(s.commRistourne);
+  s.encaissements = s.primes + s.rsCommissions + s.commRistourne + s.miseEnDemeure;
+  s.solde = s.encaissements - s.commissionBrute - s.sinistres - s.ristournes - s.rsCommRistourne;
+  s.commissionNette = s.commissionBrute + s.rsCommRistourne - s.commRistourne - s.rsCommissions;
+  s.aDeclarer = Math.round((s.commissionNette / (1 - RS_RATE)) * 1000) / 1000;
+  return s;
+}
+
+function CashDetails({ company, title, summary: s }) {
+  const left = [['PRIMES ENCAISSÉES', s.primes], ['RS / COMMISSIONS', s.rsCommissions], ['COMM / RISTOURNE', s.commRistourne]];
+  const right = [['COMMISSIONS', s.commissionBrute], ['SINISTRES', s.sinistres], ['RISTOURNES', s.ristournes], ['RS / COMM / RIST', s.rsCommRistourne]];
+  const steps = (rows) => <table className="jrn-detail-steps"><tbody>{rows.map(([sign, label, value]) => <tr key={label}><td>{sign} {label}</td><td>:</td><td className="num">{fmt(value)}</td></tr>)}</tbody></table>;
+  return <div className="jrn-details">
+    <header className="jrn-details-head"><strong>AGENCE JEMMALI - CODE {company.code_agent}</strong><span>FEUILLE DE CAISSE {company.nom_compagnie}</span><span>{title}</span></header>
+    <table className="jrn-sheet-table jrn-details-table">
+      <thead><tr><th colSpan={2}>ENCAISSEMENTS</th><th colSpan={2}>DÉCAISSEMENTS</th></tr></thead>
+      <tbody>{right.map(([label, value], index) => <tr key={label}>
+        <td>{left[index]?.[0] || ''}</td><td className="num">{left[index] ? fmt(left[index][1]) : ''}</td><td>{label}</td><td className="num">{fmt(value)}</td>
+      </tr>)}
+        <tr><td /><td /><td><b>SOLDE {company.nom_compagnie}</b></td><td className="num"><b>{fmt(s.solde)}</b></td></tr>
+      </tbody>
+      <tfoot><tr><td>TOTAL</td><td className="num">{fmt(s.encaissements)}</td><td>TOTAL</td><td className="num">{fmt(s.encaissements)}</td></tr></tfoot>
+    </table>
+    {steps([['+', 'PRIMES ENCAISSÉES', s.primes], ['+', 'RS / COMMISSIONS', s.rsCommissions], ['+', 'COMM / RISTOURNES', s.commRistourne], ['+', 'COÛT DE MISE EN DEMEURE', s.miseEnDemeure],
+      ['-', 'COMMISSION BRUTE', s.commissionBrute], ['-', 'SINISTRES', s.sinistres], ['-', 'RISTOURNES', s.ristournes], ['-', 'RS / COMM / RISTOURNES', s.rsCommRistourne]])}
+    <p className="jrn-detail-result"><b>SOLDE {company.nom_compagnie}</b><b className="num">{fmt(s.solde)}</b></p>
+    <h4>MONTANT DE LA COMMISSION NETTE :</h4>
+    {steps([['+', 'COMMISSION BRUTE', s.commissionBrute], ['+', 'RS / COMM / RISTOURNES', s.rsCommRistourne], ['-', 'COMM / RISTOURNES', s.commRistourne], ['-', 'RS / COMMISSIONS', s.rsCommissions]])}
+    <p className="jrn-detail-result"><b>COMMISSION NETTE</b><b className="num">{fmt(s.commissionNette)}</b></p>
+    <p className="jrn-detail-result"><b>MONTANT À DÉCLARER</b><b className="num jrn-detail-box">{fmt(s.aDeclarer)}</b></p>
+  </div>;
 }
 
 const periodTitle = (debut, fin) => {
@@ -49,6 +96,7 @@ const periodTitle = (debut, fin) => {
 export function CashSheet({ company, date, debut = date, fin = date, onClose }) {
   const { accessToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: '', sheet: null });
+  const [details, setDetails] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -62,8 +110,13 @@ export function CashSheet({ company, date, debut = date, fin = date, onClose }) 
   const { sheet } = state;
   return <div className="jrn-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="jrn-sheet-frame">
-      <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={() => window.print()} disabled={!sheet}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
-      <article className="jrn-sheet">
+      <div className="jrn-sheet-tools">
+        <button type="button" className="expert-cancel" onClick={() => setDetails((current) => !current)} disabled={!sheet}>{details ? '← Feuille de caisse' : 'Détails'}</button>
+        <button type="button" className="expert-submit" onClick={() => window.print()} disabled={!sheet}>Imprimer</button>
+        <button type="button" className="expert-cancel" onClick={onClose}>Fermer</button>
+      </div>
+      {details && sheet ? <article className="jrn-sheet"><CashDetails company={company} title={periodTitle(debut, fin).replace('FEUILLE DE CAISSE ', '')} summary={sheet.summary} /></article>
+      : <article className="jrn-sheet">
         <header className="jrn-sheet-head">
           <div className="jrn-cash-company"><strong>{company.nom_compagnie}</strong><strong>{periodTitle(debut, fin)}</strong></div>
           <div className="jrn-sheet-title"><h1>AGENCE : {company.code_agent}</h1><p>Journal d’encaissement non validé</p></div>
@@ -83,7 +136,7 @@ export function CashSheet({ company, date, debut = date, fin = date, onClose }) 
             <tr className="jrn-cumul"><td>Solde à reverser à la compagnie</td><td className="num" colSpan={4}>{fmt(sheet.recettes - sheet.sorties)}</td></tr>
           </tfoot>
         </table>}
-      </article>
+      </article>}
     </div>
   </div>;
 }
