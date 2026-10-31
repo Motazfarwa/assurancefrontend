@@ -3,8 +3,17 @@
 @media(max-width:700px) { .catalog-modal { max-height:95vh; max-height:95dvh; }.catalog-toolbar { padding:16px 18px 13px; }.catalog-section { margin:14px 18px 0; padding:13px; }.catalog-fields-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }.catalog-actions { padding-right:18px; padding-left:18px; }.catalog-notice { margin-right:18px; margin-left:18px; } }
 @media(max-width:460px) { .catalog-modal { max-height:97vh; max-height:97dvh; }.catalog-toolbar { align-items:stretch; flex-direction:column; padding-right:14px; padding-left:14px; }.catalog-fields-grid { grid-template-columns:1fr; }.catalog-section { margin-right:14px; margin-left:14px; }.catalog-section-heading h3 { font-size:15px; }.catalog-actions { flex-wrap:wrap; padding-right:14px; padding-left:14px; }.catalog-actions button { flex:1; padding-right:10px; padding-left:10px; }.catalog-notice { margin-right:14px; margin-left:14px; } }
 
-/* Adding a company */
-.catalog-toolbar-side { display:flex; align-items:center; gap:12px; }
-.catalog-add { min-height:40px; padding:0 16px; font:inherit; font-size:11px; font-weight:650; white-space:nowrap; }
-.catalog-new-code { width:140px; }
-@media(max-width:460px) { .catalog-toolbar-side { justify-content:space-between; } }
+/* Gestion des compagnies laid out as the legacy screen: a 6-column grid, the actions on top */
+.cmp-toolbar { justify-content:flex-start; align-items:center; gap:8px; }
+.cmp-toolbar button { min-height:38px; padding:0 16px; font:inherit; font-size:11px; font-weight:650; }
+.cmp-toolbar .catalog-count { margin-left:auto; }
+.cmp-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:13px; }
+.cmp-span-2 { grid-column:span 2; }
+.cmp-span-4 { grid-column:span 4; }
+.cmp-span-6 { grid-column:1 / -1; }
+.catalog-check { display:flex; align-items:center; gap:8px; align-self:end; height:37px; color:#405967; font-size:11px; font-weight:650; }
+.catalog-check input { width:15px; height:15px; accent-color:#208477; }
+.cmp-hint { margin:12px 0 0; color:#71838d; font-size:10px; }
+.cmp-message { margin-right:27px; margin-left:27px; }
+.cmp-spacer { min-height:18px; }
+@media(max-width:700px) { .cmp-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .cmp-span-2 { grid-column:span 1; } .cmp-span-4, .cmp-span-6 { grid-column:1 / -1; } }
