@@ -59,8 +59,8 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null); // { items, limit, detail, sans, groups? }: the report being shown
-  // Particulier + mise en demeure: two groups, the automobile particuliers past "jours" days and the others past LATE_DAYS.
-  const relance = filters.typed && filters.type_client === 'P' && filters.mise_en_demeure;
+  // Mise en demeure: two groups, the automobile particuliers past "jours" days and the others past LATE_DAYS.
+  const relance = filters.mise_en_demeure;
 
   useEffect(() => {
     listStatementCompanies(accessToken).then((body) => setCompanies(body.items || [])).catch(() => setCompanies([]));
@@ -80,19 +80,19 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   }, [accessToken, filters.code_client]);
 
   // The name only filters when no code is typed. In relance every client type is read (the "Autres" group holds the
-  // sociétés too), with an échéance at least as old as the shorter of the two delays.
+  // sociétés too). "Entre deux dates" bounds the échéance; without it, relance keeps the échéances at least as old as
+  // the shorter of the two delays.
   const query = () => {
-    const dateFin = filters.dates ? filters.date_fin : '';
     const overdue = shiftDate(today(), -Math.min(Number(filters.jours), LATE_DAYS));
     return {
       code_client: filters.code_client.trim(),
       nom_client: filters.code_client.trim() ? '' : filters.nom_client.trim(),
       piece: filters.piece,
       date_debut: filters.dates ? filters.date_debut : '',
-      date_fin: relance && (!dateFin || dateFin > overdue) ? overdue : dateFin,
+      date_fin: filters.dates ? filters.date_fin : relance ? overdue : '',
+      // Type client is hidden in mise en demeure: both groups need every client type.
       type_client: filters.typed && !relance ? filters.type_client : '',
       code_compagnie: filters.compagnie ? filters.code_compagnie : '',
-      mise_en_demeure: relance ? false : filters.mise_en_demeure,
     };
   };
   async function apercu() {
@@ -104,11 +104,12 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
     try {
       const body = await getUnpaidStatement(accessToken, query());
       // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
-      // société) past LATE_DAYS days.
+      // société) past LATE_DAYS days. With "Entre deux dates", the chosen échéances replace the two delays.
       const autoParticulier = (row) => row.type_client === 'P' && row.automobile;
+      const range = `ÉCHÉANCES DU ${formatDate(filters.date_debut)} AU ${formatDate(filters.date_fin)}`;
       const groups = relance ? [
-        { title: `AUTOMOBILE PARTICULIERS — IMPAYÉS DE PLUS DE ${jours} JOURS`, rows: (body.items || []).filter((row) => autoParticulier(row) && daysLate(row) >= jours) },
-        { title: `AUTRES — IMPAYÉS DE PLUS DE ${LATE_DAYS} JOURS`, rows: (body.items || []).filter((row) => !autoParticulier(row) && daysLate(row) >= LATE_DAYS) },
+        { title: `AUTOMOBILE PARTICULIERS — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${jours} JOURS`}`, rows: (body.items || []).filter((row) => autoParticulier(row) && (filters.dates || daysLate(row) >= jours)) },
+        { title: `AUTRES — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${LATE_DAYS} JOURS`}`, rows: (body.items || []).filter((row) => !autoParticulier(row) && (filters.dates || daysLate(row) >= LATE_DAYS)) },
       ] : null;
       const items = groups ? groups.flatMap((group) => group.rows) : body.items || [];
       if (!items.length) setError('Aucune quittance impayée ne correspond aux critères.');
@@ -159,10 +160,10 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
             </fieldset>
           </div>
           <div className="eti-row">
-            <fieldset className="unpaid-filter-set unpaid-choice"><legend><label><input type="checkbox" name="typed" checked={filters.typed} onChange={update} /> Type client</label></legend>
+            {!relance && <fieldset className="unpaid-filter-set unpaid-choice"><legend><label><input type="checkbox" name="typed" checked={filters.typed} onChange={update} /> Type client</label></legend>
               <label><input type="radio" name="type_client" value="P" checked={filters.type_client === 'P'} onChange={update} disabled={!filters.typed} /> Particulier</label>
               <label><input type="radio" name="type_client" value="S" checked={filters.type_client === 'S'} onChange={update} disabled={!filters.typed} /> Société</label>
-            </fieldset>
+            </fieldset>}
             <div className="eti-checks">
               <label className="eti-check"><input type="checkbox" name="compagnie" checked={filters.compagnie} onChange={update} /> Compagnie :
                 <select name="code_compagnie" value={filters.code_compagnie} onChange={update} disabled={!filters.compagnie}>
