@@ -22,8 +22,7 @@ async function request(path, accessToken, options = {}) {
   return body;
 }
 
-// Frais généraux of the agency (TDepense of nature D or F): options of the form, list, entry and deletion.
+// Frais généraux of the agency (TDepense of nature D or F, administrateur only): options of the form, list and entry.
 export const getFraisOptions = (token) => request('/api/frais-generaux/options', token);
 export const listFrais = (token, params) => request(`/api/frais-generaux?${new URLSearchParams(params)}`, token);
 export const createFrais = (token, values) => request('/api/frais-generaux', token, { method: 'POST', body: JSON.stringify(values) });
-export const deleteFrais = (token, nature, number) => request(`/api/frais-generaux/${encodeURIComponent(nature)}/${encodeURIComponent(number)}`, token, { method: 'DELETE' });

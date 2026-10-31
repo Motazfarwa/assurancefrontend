@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { createFrais, deleteFrais, getFraisOptions, listFrais } from '../../services/fraisApi';
+import { createFrais, getFraisOptions, listFrais } from '../../services/fraisApi';
+import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
 import '../RistourneModal/RistourneModal.css';
+import '../JournalModal/JournalModal.css';
 import './FraisGenerauxModal.css';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -11,17 +13,57 @@ const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 8)}01`;
+const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 
 const entry = (nature = 'D', banque = '') => ({ nature, code_type: '', mode: 'C', date_dep: today(), num_piece: '', code_banque: banque, montant: '', observation: '' });
 
-// Module "Saisie frais généraux": the agency's expenses (salaires, loyers, téléphone…), entered by nature and type,
-// with the frais of the period below to check them (and delete one entered by mistake, while not comptabilisé).
+// The printable list of the frais of a nature over a period, shown in a browser tab of its own.
+function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
+  const { accessToken } = useAuth();
+  const [state, setState] = useState({ loading: true, error: '', data: null });
+  const modeLabel = (code) => options?.modes.find((mode) => mode.code === code)?.libelle || code;
+
+  useEffect(() => {
+    let active = true;
+    listFrais(accessToken, { nature, debut, fin })
+      .then((data) => { if (active) setState({ loading: false, error: '', data }); })
+      .catch((loadError) => { if (active) setState({ loading: false, error: loadError.message, data: null }); });
+    return () => { active = false; };
+  }, [accessToken, nature, debut, fin]);
+
+  const { data } = state;
+  return <div className="jrn-page">
+    <div className="jrn-sheet-frame">
+      <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
+      <article className="jrn-sheet">
+        <header className="jrn-sheet-head">
+          <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
+          <div className="jrn-sheet-title"><h1>{natureLabel}</h1><p>Période du {formatDate(debut)} au {formatDate(fin)}</p></div>
+          <div className="jrn-agency jrn-printed"><span>Date : {formatDate(today())}</span></div>
+        </header>
+        {state.loading ? <p className="jrn-sheet-state">Chargement…</p> : state.error ? <p className="jrn-sheet-state" role="alert">{state.error}</p> : <table className="jrn-sheet-table frg-sheet-table">
+          <thead><tr><th>N°</th><th>Date</th><th>Type frais</th><th>Mode</th><th>N° pièce</th><th>Compte</th><th>Observation</th><th>Montant</th></tr></thead>
+          <tbody>
+            {data.items.map((item) => <tr key={item.num_dep}>
+              <td>{item.num_dep}</td><td>{formatDate(item.date_dep)}</td><td>{item.libelle || item.code_type}</td><td>{modeLabel(item.mode)}</td><td>{item.num_piece}</td><td>{item.code_banque}</td><td>{item.observation}</td><td className="num">{fmt(item.montant)}</td>
+            </tr>)}
+            {!data.items.length && <tr><td colSpan={8} className="jrn-sheet-state">Aucun frais sur la période.</td></tr>}
+          </tbody>
+          <tfoot><tr><td colSpan={7}>Total ({data.items.length} frais)</td><td className="num">{fmt(data.total)}</td></tr></tfoot>
+        </table>}
+      </article>
+    </div>
+  </div>;
+}
+
+// Module "Saisie frais généraux" (administrateur): the agency's expenses (salaires, loyers, téléphone…), entered by
+// nature and type; the frais of a period open as an aperçu in a tab of their own.
 export default function FraisGenerauxModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [options, setOptions] = useState(null);
   const [form, setForm] = useState(entry);
   const [period, setPeriod] = useState({ debut: monthStart(), fin: today() });
-  const [list, setList] = useState({ items: [], total: 0, loading: true });
+  const [report, setReport] = useState(null); // { popup, nature, debut, fin } of the open aperçu
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -41,18 +83,10 @@ export default function FraisGenerauxModal({ moduleId, onClose }) {
     return () => { active = false; };
   }, [accessToken]);
 
-  const load = useCallback(async () => {
-    if (!period.debut || !period.fin || period.fin < period.debut) return;
-    setList((current) => ({ ...current, loading: true }));
-    try { const body = await listFrais(accessToken, { nature: form.nature, ...period }); setList({ ...body, loading: false }); }
-    catch (loadError) { setList({ items: [], total: 0, loading: false }); setError(loadError.message); }
-  }, [accessToken, form.nature, period]);
-
-  useEffect(() => { load(); }, [load]);
-
   const nature = options?.natures.find((item) => item.code === form.nature);
-  const typeLabel = (code) => options?.natures.flatMap((item) => item.types).find((type) => type.code_type === code)?.libelle || code;
-  const modeLabel = (code) => options?.modes.find((mode) => mode.code === code)?.libelle || code;
+  const natureLabel = (code) => options?.natures.find((item) => item.code === code)?.libelle || 'Frais généraux';
+  const typeLabel = (code) => nature?.types.find((type) => type.code_type === code)?.libelle || code;
+  const reversed = Boolean(period.debut && period.fin && period.fin < period.debut);
 
   function change(event) {
     const { name, value } = event.target;
@@ -68,17 +102,15 @@ export default function FraisGenerauxModal({ moduleId, onClose }) {
       setNotice(`Frais n° ${saved.num_dep} enregistré : ${typeLabel(form.code_type)}, ${fmt(form.montant)} DT.`);
       setForm((values) => ({ ...entry(values.nature, values.code_banque), mode: values.mode, date_dep: values.date_dep }));
       typeRef.current?.focus();
-      await load();
     } catch (saveError) { setError(saveError.message); }
     finally { setBusy(false); }
   }
 
-  async function remove(item) {
-    if (!window.confirm(`Supprimer le frais n° ${item.num_dep} (${item.libelle || item.code_type}, ${fmt(item.montant)} DT) ?`)) return;
-    setBusy(true); setError(''); setNotice('');
-    try { await deleteFrais(accessToken, form.nature, item.num_dep); setNotice(`Frais n° ${item.num_dep} supprimé.`); await load(); }
-    catch (deleteError) { setError(deleteError.message); }
-    finally { setBusy(false); }
+  // The aperçu opens in a browser tab of its own; a new aperçu replaces the previous tab (NewWindow closes it).
+  function preview() {
+    setError('');
+    try { setReport({ popup: openReportWindow(natureLabel(form.nature)), nature: form.nature, ...period }); }
+    catch (openError) { setError(openError.message); }
   }
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
@@ -116,25 +148,17 @@ export default function FraisGenerauxModal({ moduleId, onClose }) {
         {error && <div className="expert-error catalog-message rst-message" role="alert">{error}</div>}
         {notice && <div className="catalog-notice" role="status">{notice}</div>}
 
-        <div className="catalog-section frg-list">
-          <div className="frg-list-head">
-            <strong>{nature?.libelle || 'Frais'} saisis</strong>
-            <label className="catalog-field"><span>Du</span><input type="date" value={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, debut: event.target.value }))} /></label>
-            <label className="catalog-field"><span>Au</span><input type="date" value={period.fin} min={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, fin: event.target.value }))} /></label>
-            <span className="frg-total">{list.items.length} frais · {fmt(list.total)} DT</span>
-          </div>
-          <div className="rst-search-list frg-table">
-            {!list.items.length ? <p className="rst-empty">{list.loading ? 'Chargement…' : 'Aucun frais sur la période.'}</p> : <table>
-              <thead><tr><th>N°</th><th>Date</th><th>Type frais</th><th>Mode</th><th>N° pièce</th><th>Compte</th><th>Observation</th><th className="num">Montant</th><th aria-label="Actions" /></tr></thead>
-              <tbody>{list.items.map((item) => <tr key={item.num_dep}>
-                <td>{item.num_dep}</td><td>{formatDate(item.date_dep)}</td><td>{item.libelle || item.code_type}</td><td>{modeLabel(item.mode)}</td><td>{item.num_piece}</td><td>{item.code_banque}</td><td>{item.observation}</td><td className="num">{fmt(item.montant)}</td>
-                <td>{item.comptabilise ? <span className="frg-done">Comptabilisé</span> : <button type="button" className="frg-delete" onClick={() => remove(item)} disabled={busy} aria-label={`Supprimer le frais ${item.num_dep}`}>Supprimer</button>}</td>
-              </tr>)}</tbody>
-            </table>}
-          </div>
+        <div className="catalog-section frg-preview">
+          <strong>{natureLabel(form.nature)} saisis</strong>
+          <label className="catalog-field"><span>Du</span><input type="date" value={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, debut: event.target.value }))} /></label>
+          <label className="catalog-field"><span>Au</span><input type="date" value={period.fin} min={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, fin: event.target.value }))} /></label>
+          <button type="button" className="expert-submit" onClick={preview} disabled={!options || !period.debut || !period.fin || reversed}>Aperçu</button>
         </div>
         <div className="rst-spacer" />
       </div>
     </section>
+    {report && <NewWindow popup={report.popup} title={`${natureLabel(report.nature)} du ${formatDate(report.debut)} au ${formatDate(report.fin)}`} onClose={() => setReport(null)}>
+      <FraisSheet nature={report.nature} natureLabel={natureLabel(report.nature)} debut={report.debut} fin={report.fin} options={options} onClose={() => setReport(null)} />
+    </NewWindow>}
   </div>;
 }

@@ -52,7 +52,7 @@ export default function ModulesWorkspace() {
   const [sinistreModule, setSinistreModule] = useState(null);
   const [activeModuleId, setActiveModuleId] = useState(null);
   const visibleModules = useMemo(
-    () => user.role ? INSURANCE_MODULES.filter((module) => hasPermission(user, module.permission)) : INSURANCE_MODULES,
+    () => INSURANCE_MODULES.filter((module) => (!module.adminOnly || user.isAdmin) && (!user.role || hasPermission(user, module.permission))),
     [user],
   );
   // A category without any module yet (e.g. Comptabilite) stays listed; otherwise it needs a module the user may open.
