@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { deleteCompany, listCompanies, updateCompany } from '../../services/companyApi';
+import { createCompany, deleteCompany, listCompanies, updateCompany } from '../../services/companyApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import './CompanyManagementModal.css';
 
@@ -37,6 +37,7 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
   const [selectedCode, setSelectedCode] = useState('');
   const [company, setCompany] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -51,7 +52,7 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
       const nextCode = items.some((item) => String(item.code_compagnie) === String(preferredCode)) ? String(preferredCode) : items.length ? String(items[0].code_compagnie) : '';
       setSelectedCode(nextCode);
       setCompany(items.find((item) => String(item.code_compagnie) === nextCode) || null);
-      setEditing(false);
+      setEditing(false); setCreating(false);
     } catch (loadError) { setError(loadError.message); }
     finally { setLoading(false); }
   }, [accessToken]);
@@ -62,7 +63,19 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
     const code = event.target.value;
     setSelectedCode(code);
     setCompany(companies.find((item) => String(item.code_compagnie) === code) || null);
-    setEditing(false); setError(''); setNotice('');
+    setEditing(false); setCreating(false); setError(''); setNotice('');
+  }
+
+  // A blank sheet for a new company, proposing the next free code.
+  function startNew() {
+    const next = companies.reduce((max, item) => Math.max(max, Number(item.code_compagnie) || 0), 0) + 1;
+    setCompany({ code_compagnie: String(next), Num_Quittance_Auto: 'N' });
+    setCreating(true); setEditing(true); setError(''); setNotice('');
+  }
+
+  function cancelEdit() {
+    setCompany(companies.find((item) => String(item.code_compagnie) === selectedCode) || null);
+    setEditing(false); setCreating(false); setError('');
   }
 
   function changeField(event) { setCompany((current) => ({ ...current, [event.target.name]: event.target.value })); }
@@ -76,6 +89,13 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
         if (payload[name] === '') payload[name] = null;
         else if (type === 'number' && payload[name] != null) payload[name] = Number(payload[name]);
       });
+      if (creating) {
+        payload.code_compagnie = payload.code_compagnie === '' || payload.code_compagnie == null ? null : Number(payload.code_compagnie);
+        const saved = await createCompany(accessToken, payload);
+        await loadCompanies(saved.code_compagnie);
+        setNotice(`Compagnie ${saved.nom_compagnie} ajoutée (code ${saved.code_compagnie}). Pensez à créer ses branches.`);
+        return;
+      }
       await updateCompany(accessToken, selectedCode, payload);
       setEditing(false); setNotice('Les informations de la compagnie ont été modifiées.');
       await loadCompanies(selectedCode);
@@ -98,10 +118,10 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
     <section className="catalog-modal" role="dialog" aria-modal="true" aria-labelledby="company-title">
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali · Siège</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE {moduleId}</span><h2 id="company-title">Gestion compagnies</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="catalog-body">
-        <div className="catalog-toolbar"><label className="catalog-picker"><span>Code compagnie</span><select value={selectedCode} onChange={selectCompany} disabled={loading || saving}><option value="">Sélectionner une compagnie</option>{companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.code_compagnie} · {item.nom_compagnie}</option>)}</select></label><span className="catalog-count">{companies.length} compagnie{companies.length > 1 ? 's' : ''}</span></div>
-        {loading ? <div className="catalog-empty">Chargement des compagnies…</div> : company ? <form onSubmit={save}>{sections.map(([title, list], index) => <div className="catalog-section" key={title}><div className="catalog-section-heading"><div><span>{title.toUpperCase()}</span>{index === 0 && <h3>{company.nom_compagnie || 'Compagnie sélectionnée'}</h3>}</div>{index === 0 && <span className="catalog-code">Code {company.code_compagnie}</span>}</div><CompanyFields list={list} company={company} editing={editing} onChange={changeField} /></div>)}
+        <div className="catalog-toolbar"><label className="catalog-picker"><span>Code compagnie</span><select value={creating ? '' : selectedCode} onChange={selectCompany} disabled={loading || saving || editing}><option value="">Sélectionner une compagnie</option>{companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.code_compagnie} · {item.nom_compagnie}</option>)}</select></label><div className="catalog-toolbar-side"><span className="catalog-count">{companies.length} compagnie{companies.length > 1 ? 's' : ''}</span><button type="button" className="expert-submit catalog-add" onClick={startNew} disabled={loading || saving || editing}>+ Ajouter une compagnie</button></div></div>
+        {loading ? <div className="catalog-empty">Chargement des compagnies…</div> : company ? <form onSubmit={save}>{sections.map(([title, list], index) => <div className="catalog-section" key={title}><div className="catalog-section-heading"><div><span>{title.toUpperCase()}</span>{index === 0 && <h3>{creating ? 'Nouvelle compagnie' : company.nom_compagnie || 'Compagnie sélectionnée'}</h3>}</div>{index === 0 && (creating ? <label className="catalog-field catalog-new-code"><span>Code compagnie</span><input name="code_compagnie" type="number" min="1" max="32767" value={company.code_compagnie ?? ''} onChange={changeField} required /></label> : <span className="catalog-code">Code {company.code_compagnie}</span>)}</div><CompanyFields list={list} company={company} editing={editing} onChange={changeField} /></div>)}
           {error && <div className="expert-error catalog-message">{error}</div>}{notice && <div className="catalog-notice" role="status">{notice}</div>}
-          <footer className="expert-modal-actions catalog-actions">{editing ? <><button type="button" className="expert-cancel" onClick={() => { setCompany(companies.find((item) => String(item.code_compagnie) === selectedCode)); setEditing(false); }}>Annuler</button><button type="submit" className="expert-submit" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button></> : <><button type="button" className="catalog-delete" onClick={remove} disabled={saving}>Supprimer</button><button type="button" className="expert-submit" onClick={() => setEditing(true)} disabled={saving}>Modifier</button></>}</footer>
+          <footer className="expert-modal-actions catalog-actions">{editing ? <><button type="button" className="expert-cancel" onClick={cancelEdit}>Annuler</button><button type="submit" className="expert-submit" disabled={saving}>{saving ? 'Enregistrement…' : creating ? 'Ajouter la compagnie' : 'Enregistrer les modifications'}</button></> : <><button type="button" className="catalog-delete" onClick={remove} disabled={saving}>Supprimer</button><button type="button" className="expert-submit" onClick={() => setEditing(true)} disabled={saving}>Modifier</button></>}</footer>
         </form> : <div className="catalog-empty">{error || 'Aucune compagnie disponible.'}</div>}
       </div>
     </section>

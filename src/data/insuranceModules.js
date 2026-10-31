@@ -17,6 +17,7 @@ export const INSURANCE_MODULES = [
   { id: '550', category: 'production', title: 'Fusion bordereau', description: 'Verifier puis fusionner le bordereau recu du siege.', permission: P.REPORTS_VIEW, form: 'bordereau-fusion' },
   { id: '730', category: 'production', title: 'Gestion des compagnies', description: 'Fiche de chaque compagnie et de l’agence : code agent, adresse, CAS, numerotation des quittances.', permission: P.REPORTS_VIEW, form: 'companies' },
   { id: '555', category: 'production', title: 'Gestion des ristournes', description: 'Saisir, modifier ou supprimer les ristournes (restitutions de prime) d’une police.', permission: P.REPORTS_VIEW, form: 'ristournes' },
+  { id: '400', category: 'accounting', title: 'Saisie frais generaux', description: 'Saisir les frais de l’agence (salaires, loyers, telephone, STEG…) par nature et type, et consulter ceux de la periode.', permission: P.REPORTS_VIEW, form: 'frais-generaux' },
   { id: '560', category: 'collections', title: 'Saisir les pieces de reglement', description: 'Saisir les cheques, traites et autres reglements en instance.', permission: P.REPORTS_VIEW, form: 'cheques' },
   { id: '565', category: 'collections', title: 'Recette Technique', description: 'Consulter les pieces en instance et les verser sur un compte de l’agence.', permission: P.REPORTS_VIEW, form: 'cheques-instance' },
   { id: '575', category: 'collections', title: 'Reglement client', description: 'Consulter les reglements d’un client et les quittances qu’ils ont payees.', permission: P.REPORTS_VIEW, form: 'reglement-client' },

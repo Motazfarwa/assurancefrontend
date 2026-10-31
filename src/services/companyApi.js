@@ -25,6 +25,9 @@ const EXCLUDED_COMPANIES = new Set(['BIAT']);
 export const isOfferedCompany = (company) => !EXCLUDED_COMPANIES.has(String(company?.nom_compagnie || '').trim().toUpperCase());
 
 export function listCompanies(token) { return request('/api/compagnies', token); }
+export function createCompany(token, values) {
+  return request('/api/compagnies', token, { method: 'POST', body: JSON.stringify(values) });
+}
 export function updateCompany(token, code, values) {
   return request(`/api/compagnies/${encodeURIComponent(code)}`, token, { method: 'PUT', body: JSON.stringify(values) });
 }
