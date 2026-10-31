@@ -260,3 +260,30 @@
   .module-row-code { min-width: 0; padding: 4px; font-size: 10px; }
   .workspace-count { display: none; }
 }
+
+/* ===== Desktop: every module visible at once, as a grid of cards (no scrolling) ===== */
+@media (min-width: 901px) {
+  .workspace-workbench { grid-template-columns: minmax(220px, .42fr) minmax(0, 1.58fr); gap: 16px; padding: 16px; }
+  .workspace-intro { padding: 22px 20px 14px; }
+  .workspace-intro-copy h1 { font-size: clamp(26px, 2.6vw, 40px); }
+  .workspace-intro-copy p { font-size: 12px; }
+  .workspace-illustration { min-height: 0; flex: 1 1 120px; transform: none; }
+  /* Heading and search on one line, then the cards, then the footer */
+  .module-browser { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 360px); grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 16px; padding: 18px 20px 12px; }
+  .module-browser-heading { grid-column: 1; margin-bottom: 12px; }
+  .module-browser-heading h2 { margin: 4px 0 2px; font-size: 22px; }
+  .workspace-search { grid-column: 2; grid-row: 1; align-self: center; height: 38px; margin-bottom: 12px; }
+  .module-table-head { display: none; }
+  .module-list { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); grid-auto-rows: minmax(46px, auto); align-content: start; gap: 7px; min-height: 0; overflow: visible; border: 0; border-radius: 0; }
+  .module-list-empty { grid-column: 1 / -1; }
+  .module-row { min-height: 0; grid-template-columns: auto minmax(0, 1fr) 14px; gap: 9px; padding: 6px 9px; border: 1px solid #e3eaec; border-radius: 8px; }
+  .module-row:last-child { border-bottom: 1px solid #e3eaec; }
+  .module-row:hover { border-color: #b9d8d2; box-shadow: none; }
+  .module-row.is-selected { border-color: #4ba796; box-shadow: none; }
+  .module-row-code { min-width: 40px; padding: 5px 6px; font-size: 11px; }
+  .module-row-info { gap: 2px; padding-left: 0; }
+  .module-row-info strong { font-size: 12.5px; }
+  .module-row-info small { font-size: 10px; }
+  .module-row-action { font-size: 12px; }
+  .module-browser-footer { grid-column: 1 / -1; padding-top: 10px; font-size: 10px; }
+}
