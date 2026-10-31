@@ -83,7 +83,7 @@ export default function ReceiptManager({ clientCode }) {
                   <td title={TYPE_LABELS[text(row.type_quittance)] || ""}>{text(row.type_quittance)}{text(row.annule) === "O" ? " (annulée)" : ""}</td>
                   <td className="rm-number">{money(row.prime_net)}</td><td className="rm-number">{money(row.commission)}</td>
                   <td className="rm-number">{money(row.montant_quittance)}</td>
-                  <td className={`rm-number${amount(row.solde_quittance) > 0.0005 ? (isDue(row) ? " rm-balance" : " rm-not-due") : ""}`} title={isDue(row) ? "" : "Non compté dans le solde impayé"}>{money(row.solde_quittance)}</td>
+                  <td className={`rm-number${isDue(row) && amount(row.solde_quittance) > 0.0005 ? " rm-balance" : ""}`}>{money(isDue(row) ? row.solde_quittance : 0)}</td>
                   <td>{row.Date_Reglement ? "O" : "N"}</td><td>{shortDate(row.Date_Reglement)}</td><td>{shortDate(row.Date_M)}</td>
                 </tr>
               ))}
