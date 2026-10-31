@@ -21,7 +21,7 @@ const blank = () => ({
   Num_Int: '', Num_Imat: '', Code_Client: '', nom_client: '', Code_Compagnie_Assure: '', Code_Type_Branche: '', code_branche: '', Risque: '',
   Tiers1: '', Code_Compagnie_Advers1: '0', Num_Imat1: '', Num_Int1: '', Num_Sinistre_Compagnie_Advers1: '',
   Type_Sinistre: '', Garantie: '', Type_Degats: '', Degats: '', Code_Responsabilite: '0', IDA: false,
-  Code_Expert1: '0', Montant_Devis: '', Montant_Rapport: '', Montant_Reglement: '', Regle: false, Date_Reglement: '', Cloture: false, Date_Cloture: '',
+  Code_Expert1: '0', Montant_Devis: '0', Montant_Rapport: '0', Montant_Quittance: '0', Montant_Reglement: '0', Regle: false, Date_Reglement: '', Cloture: false, Date_Cloture: '',
   Observation: '',
 });
 
@@ -321,7 +321,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     if (!form.Date_Sinistre) return 'La date du sinistre est obligatoire.';
     if (form.Date_Sinistre.slice(0, 10) > today()) return 'La date du sinistre ne peut pas être dans le futur.';
     if (!form.Code_Client.trim() && !form.Num_Int.trim()) return 'Indiquez la police ou le client assuré.';
-    if (form.Regle && !form.Montant_Reglement) return 'Renseignez le montant du règlement.';
+    if (form.Regle && !(Number(form.Montant_Reglement) > 0)) return 'Renseignez le montant du règlement.';
     return '';
   };
 
@@ -511,9 +511,10 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <fieldset className="snr-group">
             <legend>Expertise et règlement</legend>
             {choose('Expert', 'Code_Expert1', lookups.experts, { none: '0', noneLabel: '(Aucun)', span: 6 })}
-            {input('Montant devis', 'Montant_Devis', { type: 'number', span: 2 })}
-            {input('Montant rapport', 'Montant_Rapport', { type: 'number', span: 2 })}
-            {input('Montant réglé', 'Montant_Reglement', { type: 'number', span: 2 })}
+            {input('Montant devis', 'Montant_Devis', { type: 'number' })}
+            {input('Montant rapport', 'Montant_Rapport', { type: 'number' })}
+            {input('Montant quittance', 'Montant_Quittance', { type: 'number' })}
+            {input('Montant réglé', 'Montant_Reglement', { type: 'number' })}
             {flag('Réglé', 'Regle', 'Date_Reglement', closeWhenSettled)}
             {flag('Clôturé', 'Cloture', 'Date_Cloture')}
           </fieldset>
