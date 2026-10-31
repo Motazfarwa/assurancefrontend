@@ -58,3 +58,7 @@
 .jrn-cash-table tr.jrn-cumul td { border-left: 0; border-right: 0; text-align: center; }
 .jrn-cash-table tr.jrn-cumul td:first-child { text-align: left; }
 .jrn-sheet-state { margin: 20px 0; text-align: center; }
+
+/* Etat des moins perçus & trop perçus */
+.jrn-percus-type { display: flex; gap: 18px; margin-top: 10px; }
+.jrn-percus-table { min-width: 640px; margin-top: 14px; }

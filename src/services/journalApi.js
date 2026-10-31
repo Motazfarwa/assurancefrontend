@@ -31,3 +31,5 @@ export const postReceipts = (token, payload) => request('/api/journaux/encaissem
 // Journal de dépense: claim (S) and rebate (R) payments of a company.
 export const getExpensesJournal = (token, params) => request(`/api/journaux/depense?${query(params)}`, token);
 export const postExpenses = (token, payload) => request('/api/journaux/depense/comptabiliser', token, { method: 'POST', body: JSON.stringify(payload) });
+// Etat des moins perçus (type moins) or trop perçus (type trop) of the client settlements between two dates.
+export const getReceivedGaps = (token, params) => request(`/api/journaux/percus?${query(params)}`, token);

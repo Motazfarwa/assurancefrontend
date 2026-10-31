@@ -18,6 +18,8 @@ import ChequeModal from '../ChequeModal/ChequeModal';
 import ChequeInstanceModal from '../ChequeInstanceModal/ChequeInstanceModal';
 import JournalModal from '../JournalModal/JournalModal';
 import FeuilleCaisseModal from '../JournalModal/FeuilleCaisse';
+import EtatPercusModal from '../JournalModal/EtatPercus';
+import RistourneModal from '../RistourneModal/RistourneModal';
 import RecetteModal from '../RecetteModal/RecetteModal';
 import ReglementClientModal from '../ReglementClientModal/ReglementClientModal';
 import SinistreModal from '../SinistreModal/SinistreModal';
@@ -41,6 +43,8 @@ export default function ModulesWorkspace() {
   const [chequeInstanceModule, setChequeInstanceModule] = useState(null);
   const [journalModule, setJournalModule] = useState(null);
   const [feuilleCaisseModule, setFeuilleCaisseModule] = useState(null);
+  const [percusModule, setPercusModule] = useState(null);
+  const [ristourneModule, setRistourneModule] = useState(null);
   const [showRecetteModal, setShowRecetteModal] = useState(false);
   const [reglementClientModule, setReglementClientModule] = useState(null);
   const [sinistreModule, setSinistreModule] = useState(null);
@@ -90,6 +94,16 @@ export default function ModulesWorkspace() {
     if (module.form === 'cheques') {
       setActiveModuleId(module.id);
       setShowChequeModal(true);
+      return;
+    }
+    if (module.form === 'ristournes') {
+      setActiveModuleId(module.id);
+      setRistourneModule(module);
+      return;
+    }
+    if (module.form === 'etat-percus') {
+      setActiveModuleId(module.id);
+      setPercusModule(module);
       return;
     }
     if (module.form === 'feuille-caisse') {
@@ -197,7 +211,7 @@ export default function ModulesWorkspace() {
       </section>
       {selectedModule && selectedCategory && <ModuleModal module={selectedModule} category={selectedCategory} onClose={() => setSelectedModule(null)} />}
       {showExpertModal && <ExpertManagementModal onClose={() => setShowExpertModal(false)} />}
-      {showCompanyModal && <CompanyManagementModal onClose={() => setShowCompanyModal(false)} />}
+      {showCompanyModal && <CompanyManagementModal moduleId={activeModuleId} onClose={() => setShowCompanyModal(false)} />}
       {showBranchModal && <BranchManagementModal onClose={() => setShowBranchModal(false)} />}
       {showDocumentModal && <DocumentEntryModal onClose={() => setShowDocumentModal(false)} />}
       {showUnpaidModal && <AgencyUnpaidModal onClose={() => setShowUnpaidModal(false)} />}
@@ -209,6 +223,8 @@ export default function ModulesWorkspace() {
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
       {feuilleCaisseModule && <FeuilleCaisseModal moduleId={feuilleCaisseModule.id} onClose={() => setFeuilleCaisseModule(null)} />}
+      {percusModule && <EtatPercusModal moduleId={percusModule.id} onClose={() => setPercusModule(null)} />}
+      {ristourneModule && <RistourneModal moduleId={ristourneModule.id} onClose={() => setRistourneModule(null)} />}
       {journalModule && <JournalModal key={journalModule.id} kind={journalModule.form === 'journal-depense' ? 'depense' : 'encaissement'} moduleId={journalModule.id} onClose={() => setJournalModule(null)} />}
       {chequeInstanceModule && <ChequeInstanceModal moduleId={chequeInstanceModule.id} onClose={() => setChequeInstanceModule(null)} />}
       {showRecetteModal && <RecetteModal onClose={() => setShowRecetteModal(false)} />}

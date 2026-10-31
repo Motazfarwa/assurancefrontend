@@ -4,21 +4,26 @@ import { deleteCompany, listCompanies, updateCompany } from '../../services/comp
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import './CompanyManagementModal.css';
 
-const fields = [
-  ['nom_compagnie', 'Libellé', 'text'], ['contre_ass_spe', 'Prime CAS', 'number'],
-  ['Capital_CAS', 'Capital CAS', 'number'], ['Taux_Majoration', 'Taux majoration', 'number'],
-  ['Code_Agent', 'Code agent', 'text'], ['Nbr_Chiffre_Code', 'Longueur branche', 'number'],
-  ['Num_Quittance_Auto', 'N° quittance automatique', 'select'], ['Assistance_Voyage', 'Assistance voyage', 'number'],
-  ['Nom_Agence', 'Nom agence', 'text'], ['Adresse_Agence', 'Adresse agence', 'text'],
-  ['Ville_Agence', 'Ville agence', 'text'], ['CP_Agence', 'Code postal', 'number'],
-  ['Pays_Agence', 'Pays agence', 'text'], ['Tel_Agence', 'Téléphone agence', 'text'],
-  ['Fax_Agence', 'Fax agence', 'text'], ['Adresse_Compagnie', 'Adresse compagnie', 'text'],
-  ['Ville_Compagnie', 'Ville compagnie', 'text'],
+// Laid out as the legacy "Gestion des compagnies" screen: the company, then the agency it is reached through.
+const sections = [
+  ['Compagnie', [
+    ['nom_compagnie', 'Libellé', 'text'], ['Nbr_Chiffre_Code', 'Longueur branche', 'number'],
+    ['contre_ass_spe', 'Prime CAS', 'number'], ['Capital_CAS', 'Capital CAS', 'number'],
+    ['Assistance_Voyage', 'Assistance voyage', 'number'], ['Num_Quittance_Auto', 'N° quittance automatique', 'select'],
+    ['Taux_Majoration', 'Taux majoration', 'number'], ['Adresse_Compagnie', 'Adresse compagnie', 'text'],
+    ['Ville_Compagnie', 'Ville compagnie', 'text'],
+  ]],
+  ['Agence', [
+    ['Adresse_Agence', 'Adresse', 'text'], ['Code_Agent', 'Code', 'text'], ['Ville_Agence', 'Ville', 'text'],
+    ['CP_Agence', 'Code postal', 'number'], ['Pays_Agence', 'Pays', 'text'], ['Tel_Agence', 'Tél', 'text'],
+    ['Fax_Agence', 'Fax', 'text'], ['Nom_Agence', 'Nom agence', 'text'],
+  ]],
 ];
+const fields = sections.flatMap(([, list]) => list);
 
-function CompanyFields({ company, editing, onChange }) {
+function CompanyFields({ list, company, editing, onChange }) {
   return <div className="catalog-fields-grid">
-    {fields.map(([name, label, type]) => <label className="catalog-field" key={name}>
+    {list.map(([name, label, type]) => <label className="catalog-field" key={name}>
       <span>{label}</span>
       {type === 'select' ? <select name={name} value={company[name] ?? ''} disabled={!editing} onChange={onChange}><option value="">Non</option><option value="O">Oui</option></select> :
         <input name={name} type={type} step={type === 'number' ? 'any' : undefined} value={company[name] ?? ''} readOnly={!editing} onChange={onChange} />}
@@ -26,7 +31,7 @@ function CompanyFields({ company, editing, onChange }) {
   </div>;
 }
 
-export default function CompanyManagementModal({ onClose }) {
+export default function CompanyManagementModal({ moduleId = '730', onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [selectedCode, setSelectedCode] = useState('');
@@ -91,10 +96,10 @@ export default function CompanyManagementModal({ onClose }) {
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
     <section className="catalog-modal" role="dialog" aria-modal="true" aria-labelledby="company-title">
-      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali · Siège</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE 730</span><h2 id="company-title">Gestion compagnies</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
+      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali · Siège</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE {moduleId}</span><h2 id="company-title">Gestion compagnies</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="catalog-body">
         <div className="catalog-toolbar"><label className="catalog-picker"><span>Code compagnie</span><select value={selectedCode} onChange={selectCompany} disabled={loading || saving}><option value="">Sélectionner une compagnie</option>{companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.code_compagnie} · {item.nom_compagnie}</option>)}</select></label><span className="catalog-count">{companies.length} compagnie{companies.length > 1 ? 's' : ''}</span></div>
-        {loading ? <div className="catalog-empty">Chargement des compagnies…</div> : company ? <form onSubmit={save}><div className="catalog-section"><div className="catalog-section-heading"><div><span>FICHE COMPAGNIE</span><h3>{company.nom_compagnie || 'Compagnie sélectionnée'}</h3></div><span className="catalog-code">Code {company.code_compagnie}</span></div><CompanyFields company={company} editing={editing} onChange={changeField} /></div>
+        {loading ? <div className="catalog-empty">Chargement des compagnies…</div> : company ? <form onSubmit={save}>{sections.map(([title, list], index) => <div className="catalog-section" key={title}><div className="catalog-section-heading"><div><span>{title.toUpperCase()}</span>{index === 0 && <h3>{company.nom_compagnie || 'Compagnie sélectionnée'}</h3>}</div>{index === 0 && <span className="catalog-code">Code {company.code_compagnie}</span>}</div><CompanyFields list={list} company={company} editing={editing} onChange={changeField} /></div>)}
           {error && <div className="expert-error catalog-message">{error}</div>}{notice && <div className="catalog-notice" role="status">{notice}</div>}
           <footer className="expert-modal-actions catalog-actions">{editing ? <><button type="button" className="expert-cancel" onClick={() => { setCompany(companies.find((item) => String(item.code_compagnie) === selectedCode)); setEditing(false); }}>Annuler</button><button type="submit" className="expert-submit" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button></> : <><button type="button" className="catalog-delete" onClick={remove} disabled={saving}>Supprimer</button><button type="button" className="expert-submit" onClick={() => setEditing(true)} disabled={saving}>Modifier</button></>}</footer>
         </form> : <div className="catalog-empty">{error || 'Aucune compagnie disponible.'}</div>}
