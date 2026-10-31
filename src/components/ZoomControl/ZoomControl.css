@@ -1,0 +1,7 @@
+.zoom-control { display: inline-flex; align-items: center; margin-right: 6px; border: 1px solid #e2e9eb; border-radius: 7px; background: #fff; overflow: hidden; }
+.zoom-control button { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 6px; border: 0; background: none; color: #60737d; font: inherit; font-size: 9px; cursor: pointer; }
+.zoom-control button + button { border-left: 1px solid #e2e9eb; }
+.zoom-control button:hover:not(:disabled) { background: #f4faf8; color: #176e65; }
+.zoom-control button:disabled { opacity: .4; cursor: default; }
+.zoom-control svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.zoom-control .zoom-level { min-width: 44px; font-variant-numeric: tabular-nums; font-weight: 650; }

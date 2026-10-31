@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getExpensesJournal, getReceiptsJournal, listJournalCompanies } from '../../services/journalApi';
+import { getCashSheet, listJournalCompanies } from '../../services/journalApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
+import '../EtatImpayeModal/EtatImpayeModal.css';
 import './JournalModal.css';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -14,15 +15,20 @@ const sum = (rows, key) => rows.reduce((total, row) => total + Number(row[key] |
 // Retenue à la source on the agency's commission, given back to the company as a recette.
 const RS_RATE = 0.1;
 
-// Lines of the feuille de caisse of a company on a date, from what is comptabilisé that day:
-// the JEQ (primes, timbres, commission), its FSSR, every claim and rebate paid, and the RS on the commission.
-export function cashSheetLines(receipts, expenses, date) {
-  const jeqCommission = sum(receipts, 'comm');
+const compact = (value) => String(value).slice(0, 10).replaceAll('-', '');
+
+// Lines of the feuille de caisse of a company over a period, from what is comptabilisé in it: for each journal day its
+// JEQ (primes, timbres, commission) and FSSR, every claim and rebate paid, and the RS on the net commission.
+export function cashSheetLines(journals, expenses) {
+  const several = journals.length > 1;
+  const jeqCommission = sum(journals, 'commission');
   const rebateCommission = sum(expenses.filter((row) => row.nature === 'R'), 'd_com');
   const commission = jeqCommission - rebateCommission;
   const lines = [
-    { label: `JEQ N° ${date.replaceAll('-', '')}`, primes: sum(receipts, 'montant'), tq: sum(receipts, 'timbre'), commission: jeqCommission, depenses: 0 },
-    { label: 'FSSR JEQ', primes: sum(receipts, 'frais'), tq: 0, commission: 0, depenses: 0 },
+    ...journals.flatMap((day) => [
+      { label: `JEQ N° ${compact(day.jour)}`, primes: Number(day.primes || 0), tq: Number(day.tq || 0), commission: Number(day.commission || 0), depenses: 0 },
+      { label: several ? `FSSR JEQ ${compact(day.jour)}` : 'FSSR JEQ', primes: Number(day.frais || 0), tq: 0, commission: 0, depenses: 0 },
+    ]),
     ...expenses.map((row) => ({
       label: `${row.nature === 'R' ? 'Ristourne' : 'Sinistre'} N° ${row.numero || ''}`,
       primes: 0, tq: 0, commission: row.nature === 'R' ? -Number(row.d_com || 0) : 0, depenses: Number(row.montant || 0),
@@ -33,23 +39,25 @@ export function cashSheetLines(receipts, expenses, date) {
   return { lines, totals, recettes: totals.primes + totals.tq, sorties: totals.commission + totals.depenses };
 }
 
-// The printable feuille de caisse (loads the receipts and expenses comptabilisés on the date).
-export function CashSheet({ company, date, onClose }) {
+const periodTitle = (debut, fin) => {
+  if (!debut && !fin) return 'FEUILLE DE CAISSE (TOUTES DATES)';
+  if (debut === fin) return `FEUILLE DE CAISSE LE ${formatDate(debut)}`;
+  return `FEUILLE DE CAISSE DU ${formatDate(debut)} AU ${formatDate(fin)}`;
+};
+
+// The printable feuille de caisse of a company: one day (date), a period (debut, fin) or, without dates, every day.
+export function CashSheet({ company, date, debut = date, fin = date, onClose }) {
   const { accessToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: '', sheet: null });
 
   useEffect(() => {
     let active = true;
-    const params = { compagnie: company.code_compagnie, date, comptabilises: true };
-    Promise.all([getReceiptsJournal(accessToken, params), getExpensesJournal(accessToken, params)])
-      .then(([receipts, expenses]) => {
-        if (!active) return;
-        const done = (body) => (body.items || []).filter((row) => row.comptabilise);
-        setState({ loading: false, error: '', sheet: cashSheetLines(done(receipts), done(expenses), date) });
-      })
+    setState({ loading: true, error: '', sheet: null });
+    getCashSheet(accessToken, { compagnie: company.code_compagnie, debut: debut || '', fin: fin || '' })
+      .then((body) => { if (active) setState({ loading: false, error: '', sheet: cashSheetLines(body.journaux || [], body.depenses || []) }); })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, sheet: null }); });
     return () => { active = false; };
-  }, [accessToken, company.code_compagnie, date]);
+  }, [accessToken, company.code_compagnie, debut, fin]);
 
   const { sheet } = state;
   return <div className="jrn-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -57,7 +65,7 @@ export function CashSheet({ company, date, onClose }) {
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={() => window.print()} disabled={!sheet}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
-          <div className="jrn-cash-company"><strong>{company.nom_compagnie}</strong><strong>FEUILLE DE CAISSE LE {formatDate(date)}</strong></div>
+          <div className="jrn-cash-company"><strong>{company.nom_compagnie}</strong><strong>{periodTitle(debut, fin)}</strong></div>
           <div className="jrn-sheet-title"><h1>AGENCE : {company.code_agent}</h1><p>Journal d’encaissement non validé</p></div>
           <div className="jrn-agency jrn-printed"><span>Date impression : {formatDate(today())}</span></div>
         </header>
@@ -80,12 +88,14 @@ export function CashSheet({ company, date, onClose }) {
   </div>;
 }
 
-// Module "Feuille de caisse": choose the company and the date, then the sheet of what is comptabilisé that day.
+// Module "Feuille de caisse": choose the company and, with "Entre deux dates", the period; without it every day.
 export default function FeuilleCaisseModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [compagnie, setCompagnie] = useState('');
-  const [date, setDate] = useState(today);
+  const [dates, setDates] = useState(false);
+  const [debut, setDebut] = useState(today);
+  const [fin, setFin] = useState(today);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -102,6 +112,7 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
   }, [open, onClose]);
 
   const company = companies.find((item) => String(item.code_compagnie) === String(compagnie));
+  const reversed = dates && Boolean(debut && fin && fin < debut);
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !open) onClose(); }}>
     <section className="unpaid-modal jrn-small" role="dialog" aria-modal="true" aria-labelledby="fc-title">
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>COMPTABILITÉ · MODULE {moduleId}</span><h2 id="fc-title">Feuille de caisse</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
@@ -113,13 +124,17 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
               {companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.nom_compagnie}</option>)}
             </select>
           </label>
-          <label className="acompte-field jrn-date"><span>Feuille de caisse du</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-          <button type="button" className="expert-submit jrn-open" onClick={() => setOpen(true)} disabled={!company || !date}>Aperçu</button>
+          <button type="button" className="expert-submit jrn-open" onClick={() => setOpen(true)} disabled={!company || (dates && (!debut || !fin)) || reversed}>Aperçu</button>
         </div>
+        <fieldset className="unpaid-filter-set eti-dates jrn-dates"><legend><label><input type="checkbox" checked={dates} onChange={(event) => setDates(event.target.checked)} /> Entre deux dates</label></legend>
+          <label className="eti-field"><span>Date début</span><input type="date" value={debut} onChange={(event) => setDebut(event.target.value)} disabled={!dates} /></label>
+          <label className="eti-field"><span>Date fin</span><input type="date" value={fin} min={debut} onChange={(event) => setFin(event.target.value)} disabled={!dates} /></label>
+        </fieldset>
+        {reversed && <div className="expert-error unpaid-error" role="alert">La date de fin précède la date de début.</div>}
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
-        <p className="jrn-hint">La feuille reprend le journal d’encaissement et les sinistres et ristournes comptabilisés à cette date.</p>
+        <p className="jrn-hint">{dates ? 'La feuille reprend les journaux d’encaissement et les sinistres et ristournes comptabilisés entre ces deux dates.' : 'Sans dates, la feuille reprend tous les journaux d’encaissement, sinistres et ristournes comptabilisés.'}</p>
       </div>
     </section>
-    {open && company && <CashSheet company={company} date={date} onClose={() => setOpen(false)} />}
+    {open && company && <CashSheet company={company} debut={dates ? debut : ''} fin={dates ? fin : ''} onClose={() => setOpen(false)} />}
   </div>;
 }

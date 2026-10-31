@@ -24,6 +24,7 @@ import FraisGenerauxModal from '../FraisGenerauxModal/FraisGenerauxModal';
 import RecetteModal from '../RecetteModal/RecetteModal';
 import ReglementClientModal from '../ReglementClientModal/ReglementClientModal';
 import SinistreModal from '../SinistreModal/SinistreModal';
+import ZoomControl from '../ZoomControl/ZoomControl';
 import SyncStatus from '../SyncStatus/SyncStatus';
 import './ModulesWorkspace.css';
 
@@ -168,7 +169,7 @@ export default function ModulesWorkspace() {
         <header className="workspace-topbar">
           <a className="workspace-brand" href="/workspace"><span className="workspace-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>ESPACE PROFESSIONNEL</small></span></a>
           <div className="workspace-company"><div><strong>Assurance Jemmali</strong></div><SyncStatus /></div>
-          <div className="workspace-user"><span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span><span className="workspace-user-copy"><strong>{user.name}</strong><small>{user.role ? (user.role === ROLES.ADMIN ? 'Administrateur' : 'Membre') : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>{user.isAdmin && <button type="button" className="workspace-logout" onClick={() => navigate('/admin/users')}>Utilisateurs</button>}<button type="button" className="workspace-logout" onClick={logout}>Quitter <span aria-hidden="true">↗</span></button></div>
+          <div className="workspace-user"><ZoomControl /><span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span><span className="workspace-user-copy"><strong>{user.name}</strong><small>{user.role ? (user.role === ROLES.ADMIN ? 'Administrateur' : 'Membre') : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>{user.isAdmin && <button type="button" className="workspace-logout" onClick={() => navigate('/admin/users')}>Utilisateurs</button>}<button type="button" className="workspace-logout" onClick={logout}>Quitter <span aria-hidden="true">↗</span></button></div>
         </header>
 
         <fieldset className="nature-selector">

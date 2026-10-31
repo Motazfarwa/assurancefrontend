@@ -21,7 +21,7 @@ const blank = () => ({
   Num_Int: '', Num_Imat: '', Code_Client: '', nom_client: '', Code_Compagnie_Assure: '', Code_Type_Branche: '', code_branche: '', Risque: '',
   Tiers1: '', Code_Compagnie_Advers1: '0', Num_Imat1: '', Num_Int1: '', Num_Sinistre_Compagnie_Advers1: '',
   Type_Sinistre: '', Garantie: '', Type_Degats: '', Degats: '', Code_Responsabilite: '0', IDA: false,
-  Code_Expert1: '0', Montant_Devis: '', Montant_Reglement: '', Regle: false, Date_Reglement: '', Cloture: false, Date_Cloture: '',
+  Code_Expert1: '0', Montant_Devis: '', Montant_Rapport: '', Montant_Reglement: '', Regle: false, Date_Reglement: '', Cloture: false, Date_Cloture: '',
   Observation: '',
 });
 
@@ -511,8 +511,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <fieldset className="snr-group">
             <legend>Expertise et règlement</legend>
             {choose('Expert', 'Code_Expert1', lookups.experts, { none: '0', noneLabel: '(Aucun)', span: 6 })}
-            {input('Montant devis', 'Montant_Devis', { type: 'number', span: 3 })}
-            {input('Montant réglé', 'Montant_Reglement', { type: 'number', span: 3 })}
+            {input('Montant devis', 'Montant_Devis', { type: 'number', span: 2 })}
+            {input('Montant rapport', 'Montant_Rapport', { type: 'number', span: 2 })}
+            {input('Montant réglé', 'Montant_Reglement', { type: 'number', span: 2 })}
             {flag('Réglé', 'Regle', 'Date_Reglement', closeWhenSettled)}
             {flag('Clôturé', 'Cloture', 'Date_Cloture')}
           </fieldset>

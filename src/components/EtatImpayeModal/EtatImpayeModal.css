@@ -17,6 +17,9 @@
 .eti-checks { display: grid; flex: 1 1 280px; align-content: center; gap: 9px; }
 .eti-check { display: flex; align-items: center; gap: 7px; color: #526b75; font-size: 10px; }
 .eti-check input { accent-color: #208477; }
+.eti-days { margin-left: 12px; }
+.eti-days input { width: 64px; height: 30px; padding: 0 8px; border: 1px solid #d9e2e5; border-radius: 6px; background: #fff; color: #294553; font: inherit; font-size: 11px; }
+.eti-empty { margin: 0; padding: 18px 12px; color: #5f7480; font-size: 11px; text-align: center; }
 .eti-check select { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid #d9e2e5; border-radius: 6px; background: #fff; color: #294553; font: inherit; font-size: 11px; }
 
 /* The report, on screen as on paper */

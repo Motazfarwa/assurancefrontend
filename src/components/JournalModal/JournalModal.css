@@ -66,3 +66,6 @@
 /* A printout opened in a browser tab of its own */
 .jrn-page { min-height: 100vh; box-sizing: border-box; padding: 16px; background: #e9eef0; }
 @media print { .jrn-page { min-height: 0; padding: 0; background: none; } }
+
+/* Feuille de caisse: "Entre deux dates" */
+.jrn-dates { margin-top: 12px; }
