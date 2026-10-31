@@ -62,3 +62,7 @@
 /* Etat des moins perçus & trop perçus */
 .jrn-percus-type { display: flex; gap: 18px; margin-top: 10px; }
 .jrn-percus-table { min-width: 640px; margin-top: 14px; }
+
+/* A printout opened in a browser tab of its own */
+.jrn-page { min-height: 100vh; box-sizing: border-box; padding: 16px; background: #e9eef0; }
+@media print { .jrn-page { min-height: 0; padding: 0; background: none; } }

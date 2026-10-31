@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { getReceivedGaps } from '../../services/journalApi';
+import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
@@ -41,9 +42,9 @@ function PercusSheet({ type, debut, fin, onClose }) {
   }, [accessToken, type, debut, fin]);
 
   const { data } = state;
-  return <div className="jrn-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div className="jrn-page">
     <div className="jrn-sheet-frame">
-      <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={() => window.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
+      <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
           <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
@@ -68,32 +69,44 @@ export default function EtatPercusModal({ moduleId, onClose }) {
   const [debut, setDebut] = useState(today);
   const [fin, setFin] = useState(today);
   const [type, setType] = useState('moins');
-  const [open, setOpen] = useState(false);
+  const [report, setReport] = useState(null); // { popup, type, debut, fin } of the open aperçu
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') { if (open) setOpen(false); else onClose(); } };
+    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [onClose]);
+
+  // The aperçu opens in a browser tab of its own; a new aperçu replaces the previous tab (NewWindow closes it).
+  function preview() {
+    setError('');
+    try {
+      setReport({ popup: openReportWindow(KINDS[type].title), type, debut, fin });
+    } catch (openError) { setError(openError.message); }
+  }
 
   const reversed = Boolean(debut && fin && fin < debut);
-  return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !open) onClose(); }}>
+  return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="unpaid-modal jrn-small" role="dialog" aria-modal="true" aria-labelledby="percus-title">
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>RECOUVREMENT · MODULE {moduleId}</span><h2 id="percus-title">Etat des moins perçus & trop perçus</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
         <div className="unpaid-filter-form acompte-filters">
           <label className="acompte-field jrn-date"><span>Date début</span><input type="date" value={debut} onChange={(event) => setDebut(event.target.value)} autoFocus /></label>
           <label className="acompte-field jrn-date"><span>Date fin</span><input type="date" value={fin} onChange={(event) => setFin(event.target.value)} /></label>
-          <button type="button" className="expert-submit jrn-open" onClick={() => setOpen(true)} disabled={!debut || !fin || reversed}>Aperçu</button>
+          <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={!debut || !fin || reversed}>Aperçu</button>
         </div>
         <div className="jrn-percus-type" role="radiogroup" aria-label="Etat">
           <label className="jrn-check"><input type="radio" name="percus-type" checked={type === 'moins'} onChange={() => setType('moins')} />Moins perçu</label>
           <label className="jrn-check"><input type="radio" name="percus-type" checked={type === 'trop'} onChange={() => setType('trop')} />Trop perçu</label>
         </div>
+        {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
         {reversed && <div className="expert-error unpaid-error" role="alert">La date de fin précède la date de début.</div>}
         <p className="jrn-hint">Moins perçu : restes de quittances abandonnés (règlements de type R). Trop perçu : montants payés en plus des quittances.</p>
       </div>
     </section>
-    {open && <PercusSheet type={type} debut={debut} fin={fin} onClose={() => setOpen(false)} />}
+    {report && <NewWindow popup={report.popup} title={`${KINDS[report.type].title} du ${formatDate(report.debut)} au ${formatDate(report.fin)}`} onClose={() => setReport(null)}>
+      <PercusSheet type={report.type} debut={report.debut} fin={report.fin} onClose={() => setReport(null)} />
+    </NewWindow>}
   </div>;
 }
