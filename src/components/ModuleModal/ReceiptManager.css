@@ -30,3 +30,4 @@
 .rm-table .rm-number { text-align: right; font-variant-numeric: tabular-nums; }
 .rm-table .rm-balance, .rm-summary .rm-balance { color: #b34e41; font-weight: 700; }
 .rm-table td.rm-empty { padding: 22px 10px; color: #7b8b95; text-align: center; white-space: normal; }
+.rm-table td.rm-not-due { color: #8a979e; text-decoration: line-through; }

@@ -10,6 +10,10 @@ const amount = (value) => Number(value || 0);
 const today = () => new Date().toISOString().slice(0, 10);
 const yearStart = () => `${new Date().getFullYear()}-01-01`;
 const LIMIT = 2000;
+// What a client owes, as the Etat des impayés counts it: primes (type P) that are not cancelled. Type C (legacy
+// software) and R (ristourne) quittances keep a solde_quittance, but it is not owed by the client.
+const isDue = (row) => text(row.type_quittance) === "P" && text(row.annule) !== "O";
+const TYPE_LABELS = { P: "Prime", C: "Type C (ancien logiciel, non dû)", R: "Ristourne" };
 
 // Read-only table of receipts with the columns of the legacy receipts grid. Opened from a client file it lists that
 // client's receipts; the code, the name and, once "Entre deux dates" is ticked, the échéance narrow the list.
@@ -41,7 +45,7 @@ export default function ReceiptManager({ clientCode }) {
     setFilters((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
   };
   const { rows } = state;
-  const totals = rows.reduce((sum, row) => ({ montant: sum.montant + amount(row.montant_quittance), solde: sum.solde + amount(row.solde_quittance) }), { montant: 0, solde: 0 });
+  const totals = rows.reduce((sum, row) => ({ montant: sum.montant + amount(row.montant_quittance), solde: sum.solde + (isDue(row) ? amount(row.solde_quittance) : 0) }), { montant: 0, solde: 0 });
   const ready = filters.code_client.trim() || filters.nom_client.trim().length >= 2 || filters.byDate;
 
   return (
@@ -60,25 +64,26 @@ export default function ReceiptManager({ clientCode }) {
       {state.error && <p className="rm-error" role="alert">{state.error}</p>}
       <div className="rm-summary">
         <strong>{state.loading ? "Chargement…" : `${rows.length} quittance${rows.length > 1 ? "s" : ""}`}</strong>
-        <span>Montant <b>{money(totals.montant)}</b> · Solde <b className="rm-balance">{money(totals.solde)}</b> TND</span>
+        <span>Montant <b>{money(totals.montant)}</b> · Solde impayé <b className="rm-balance" title="Primes (type P) non annulées, comme l’état des impayés">{money(totals.solde)}</b> TND</span>
       </div>
       <div className="rm-table-wrap">
         <table className="rm-table">
           <thead><tr>
-            <th>N° quittance</th><th>N° police</th><th>Client</th><th>Date saisie</th><th>Effet</th><th>Échéance</th><th>TC</th>
+            <th>N° quittance</th><th>N° police</th><th>Client</th><th>Date saisie</th><th>Effet</th><th>Échéance</th><th>TC</th><th>Type</th>
             <th className="rm-number">P. Net</th><th className="rm-number">MM. Comp</th><th className="rm-number">Mont. Quit.</th><th className="rm-number">Solde</th>
             <th>Reg</th><th>Date Reg</th><th>Date Mvt</th>
           </tr></thead>
           <tbody>
-            {!state.loading && rows.length === 0 ? <tr><td colSpan={14} className="rm-empty">{ready ? "Aucune quittance à afficher" : "Saisissez un code client, un nom ou des dates."}</td></tr>
+            {!state.loading && rows.length === 0 ? <tr><td colSpan={15} className="rm-empty">{ready ? "Aucune quittance à afficher" : "Saisissez un code client, un nom ou des dates."}</td></tr>
               : rows.map((row, index) => (
                 <tr key={`${text(row.num_quittance)}-${index}`}>
                   <td><strong>{text(row.num_quittance)}</strong></td><td>{text(row.num_police)}</td>
                   <td title={text(row.nom_client)}>{text(row.code_client)} {text(row.nom_client)}</td>
                   <td>{shortDate(row.date_saisie)}</td><td>{shortDate(row.date_emission)}</td><td>{shortDate(row.echeance)}</td><td>{text(row.tc)}</td>
+                  <td title={TYPE_LABELS[text(row.type_quittance)] || ""}>{text(row.type_quittance)}{text(row.annule) === "O" ? " (annulée)" : ""}</td>
                   <td className="rm-number">{money(row.prime_net)}</td><td className="rm-number">{money(row.commission)}</td>
                   <td className="rm-number">{money(row.montant_quittance)}</td>
-                  <td className={`rm-number${amount(row.solde_quittance) > 0.0005 ? " rm-balance" : ""}`}>{money(row.solde_quittance)}</td>
+                  <td className={`rm-number${amount(row.solde_quittance) > 0.0005 ? (isDue(row) ? " rm-balance" : " rm-not-due") : ""}`} title={isDue(row) ? "" : "Non compté dans le solde impayé"}>{money(row.solde_quittance)}</td>
                   <td>{row.Date_Reglement ? "O" : "N"}</td><td>{shortDate(row.Date_Reglement)}</td><td>{shortDate(row.Date_M)}</td>
                 </tr>
               ))}
