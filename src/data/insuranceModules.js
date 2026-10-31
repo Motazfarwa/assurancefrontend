@@ -4,8 +4,8 @@ export const MODULE_CATEGORIES = [
   { id: 'production', label: 'Production', icon: '01', description: 'Clients, contrats et quittances' },
   { id: 'accounting', label: 'Comptabilite', icon: '02', description: 'Operations et etats financiers' },
   { id: 'collections', label: 'Recouvrement', icon: '03', description: 'Suivi des impayes et relances' },
-  { id: 'settings', label: 'Parametrage', icon: '04', description: 'Compagnies et configuration' },
-  { id: 'claims', label: 'Sinistres', icon: '05', description: 'Declarations et suivi des dossiers' },
+  { id: 'claims', label: 'Sinistres', icon: '04', description: 'Declarations et suivi des dossiers' },
+  { id: 'settings', label: 'Parametrage', icon: '05', description: 'Compagnies et configuration' },
 ];
 
 export const INSURANCE_MODULES = [
