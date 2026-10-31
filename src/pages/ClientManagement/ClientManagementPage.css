@@ -308,3 +308,9 @@
 .client-page-modal .client-window-modal .client-record-options legend { font-size: clamp(10px, 1.7vh, 13px); }
 .client-page-modal .client-window-modal .client-form-actions { padding: clamp(4px, .9vh, 9px) 28px; }
 .client-page-modal .client-window-modal .client-form-actions button { padding: clamp(4px, .9vh, 9px) 20px; font-size: clamp(11px, 1.8vh, 14px); }
+
+/* Quittances de la police: the police number under the title, and the dialog at (almost) full screen */
+.client-records-dialog > header .client-records-subtitle { margin: 4px 0 0; color: #5f7480; font-size: 13px; }
+.client-records-dialog > header .client-records-subtitle b { color: #1c394b; }
+.client-records-backdrop .client-records-dialog.is-wide { width: min(100%, 1600px); height: calc(100vh - 40px); height: calc(100dvh - 40px); max-height: none; }
+.client-records-dialog.is-wide .client-records-table-wrap { flex: 1; min-height: 0; }

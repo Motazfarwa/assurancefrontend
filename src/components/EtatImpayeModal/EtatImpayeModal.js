@@ -59,7 +59,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null); // { items, limit, detail, sans, groups? }: the report being shown
-  // Particulier + mise en demeure: the automobile quittances overdue by "jours" days, split at LATE_DAYS.
+  // Particulier + mise en demeure: two groups, the automobile particuliers past "jours" days and the others past LATE_DAYS.
   const relance = filters.typed && filters.type_client === 'P' && filters.mise_en_demeure;
 
   useEffect(() => {
@@ -79,35 +79,38 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
     return () => { active = false; window.clearTimeout(timer); };
   }, [accessToken, filters.code_client]);
 
-  // The name only filters when no code is typed. In relance, the échéance must be at least "jours" days old.
+  // The name only filters when no code is typed. In relance every client type is read (the "Autres" group holds the
+  // sociétés too), with an échéance at least as old as the shorter of the two delays.
   const query = () => {
     const dateFin = filters.dates ? filters.date_fin : '';
-    const overdue = shiftDate(today(), -Number(filters.jours));
+    const overdue = shiftDate(today(), -Math.min(Number(filters.jours), LATE_DAYS));
     return {
       code_client: filters.code_client.trim(),
       nom_client: filters.code_client.trim() ? '' : filters.nom_client.trim(),
       piece: filters.piece,
       date_debut: filters.dates ? filters.date_debut : '',
       date_fin: relance && (!dateFin || dateFin > overdue) ? overdue : dateFin,
-      type_client: filters.typed ? filters.type_client : '',
+      type_client: filters.typed && !relance ? filters.type_client : '',
       code_compagnie: filters.compagnie ? filters.code_compagnie : '',
       mise_en_demeure: relance ? false : filters.mise_en_demeure,
-      automobile: relance,
     };
   };
   async function apercu() {
     if (filters.dates && filters.date_debut && filters.date_fin && filters.date_debut > filters.date_fin) { setError('La date de début doit précéder la date de fin.'); return; }
     const jours = Number(filters.jours);
-    if (relance && !(Number.isInteger(jours) && jours >= 1 && jours < LATE_DAYS)) { setError(`Le nombre de jours doit être entre 1 et ${LATE_DAYS - 1}.`); return; }
+    if (relance && !(Number.isInteger(jours) && jours >= 1 && jours <= 365)) { setError('Le nombre de jours doit être entre 1 et 365.'); return; }
     setLoading(true);
     setError('');
     try {
       const body = await getUnpaidStatement(accessToken, query());
-      const items = body.items || [];
+      // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
+      // société) past LATE_DAYS days.
+      const autoParticulier = (row) => row.type_client === 'P' && row.automobile;
       const groups = relance ? [
-        { title: `MISE EN DEMEURE — IMPAYÉS DE PLUS DE ${jours} JOURS`, rows: items.filter((row) => daysLate(row) < LATE_DAYS) },
-        { title: `IMPAYÉS DE PLUS DE ${LATE_DAYS} JOURS`, rows: items.filter((row) => daysLate(row) >= LATE_DAYS) },
+        { title: `AUTOMOBILE PARTICULIERS — IMPAYÉS DE PLUS DE ${jours} JOURS`, rows: (body.items || []).filter((row) => autoParticulier(row) && daysLate(row) >= jours) },
+        { title: `AUTRES — IMPAYÉS DE PLUS DE ${LATE_DAYS} JOURS`, rows: (body.items || []).filter((row) => !autoParticulier(row) && daysLate(row) >= LATE_DAYS) },
       ] : null;
+      const items = groups ? groups.flatMap((group) => group.rows) : body.items || [];
       if (!items.length) setError('Aucune quittance impayée ne correspond aux critères.');
       else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups });
     } catch (requestError) {
@@ -169,7 +172,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
               </label>
               <div className="eti-check">
                 <label className="eti-check"><input type="checkbox" name="mise_en_demeure" checked={filters.mise_en_demeure} onChange={update} /> Mise en demeure</label>
-                {relance && <label className="eti-check eti-days">Nombre jours<input type="number" name="jours" min={1} max={LATE_DAYS - 1} value={filters.jours} onChange={update} /> jours</label>}
+                {relance && <label className="eti-check eti-days">Nombre jours<input type="number" name="jours" min={1} max={365} value={filters.jours} onChange={update} /> jours (auto particuliers ; autres : {LATE_DAYS} jours)</label>}
               </div>
             </div>
           </div>
@@ -218,7 +221,7 @@ function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose
     <header className="eti-preview-bar">
       <button type="button" className="expert-cancel" onClick={onBack}>← Retour aux critères</button>
       <div className="eti-preview-title"><strong>{detail ? 'Mémoire de règlement' : 'Etat des impayées'}</strong>
-        <span>{groups ? `Particulier automobile · mise en demeure : ${groups[0].rows.length} · plus de ${LATE_DAYS} jours : ${groups[1].rows.length} · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
+        <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} · autres : ${groups[1].rows.length} · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
       <button type="button" className="expert-submit" onClick={() => window.print()}>Imprimer</button>
       <button type="button" className="expert-close" onClick={onClose} aria-label="Fermer">×</button>
     </header>
