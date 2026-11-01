@@ -174,7 +174,7 @@
 .snr-pay-note button { margin-left: 8px; padding: 0; border: 0; background: none; color: #187d78; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
 
-/* Valider: saves the claim, then an empty form for the next one */
+/* Soumettre: saves the claim, then an empty form for the next one */
 .snr-submit { border-color: #187d78; background: #187d78; color: #fff; }
 .snr-submit:hover:not(:disabled) { background: #136763 !important; }
 .snr-submit:disabled { border-color: #cfdce3; background: #eef3f5; color: #9aabb4; cursor: default; }

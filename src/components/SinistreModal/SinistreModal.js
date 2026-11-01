@@ -337,7 +337,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return '';
   };
 
-  // "Créer le dossier" / "Enregistrer" keep the claim on screen; "Valider" (`reset`) leaves an empty form for the next one.
+  // "Enregistrer" (an opened claim) keeps the claim on screen; "Soumettre" (`reset`) leaves an empty form for the next one.
   const save = useCallback(async ({ reset = false } = {}) => {
     setTried(true);
     const issue = problem();
@@ -353,7 +353,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         ? (await updateSinistre(accessToken, current, payload)).numero
         : (await createSinistre(accessToken, payload)).numero;
       setReglement(null); // stored with the claim
-      showToast(current ? `Dossier ${numero} enregistré avec succès.` : `Dossier ${numero} créé avec succès.`);
+      showToast(current ? `Sinistre N° ${numero} modifié avec succès.` : `Sinistre N° ${numero} créé avec succès.`);
       if (reset === true) {
         autoNumber.current = '';
         setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setClientPolicies([]); setTab('sinistre');
@@ -397,13 +397,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   // Ctrl+S saves, Échap closes the list.
   useEffect(() => {
     const onKey = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!busy && !scanning && !payDraft) save(); }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!busy && !scanning && !payDraft) save({ reset: !current }); }
       if (event.key === 'Escape' && payDraft) setPayDraft(null);
       else if (event.key === 'Escape' && list) setList(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, scanning, save, list, payDraft]);
+  }, [busy, scanning, save, list, payDraft, current]);
 
   // "Réglé" ticked: the settlement popup opens; the claim is marked settled once the popup is validated.
   function tickRegle(checked) {
@@ -486,8 +486,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
         <div className="snr-toolbar">
           <button type="button" className="snr-tool" onClick={startNew} disabled={busy}>Nouveau</button>
-          <button type="button" className="snr-tool snr-primary" onClick={() => save()} disabled={busy || scanning || (!dirty && Boolean(current))} title="Ctrl+S">{busy ? 'Patientez…' : current ? 'Enregistrer' : 'Créer le dossier'}</button>
-          <button type="button" className="snr-tool snr-submit" onClick={() => save({ reset: true })} disabled={busy || scanning || (!dirty && Boolean(current))} title="Enregistre le dossier puis vide le formulaire pour un nouveau sinistre">Valider</button>
+          {current && <button type="button" className="snr-tool snr-primary" onClick={() => save()} disabled={busy || scanning || !dirty} title="Ctrl+S">{busy ? 'Patientez…' : 'Enregistrer'}</button>}
+          <button type="button" className="snr-tool snr-submit" onClick={() => save({ reset: true })} disabled={busy || scanning || (!dirty && Boolean(current))} title="Enregistre le sinistre puis vide le formulaire pour un nouveau sinistre">{busy && !current ? 'Patientez…' : 'Soumettre'}</button>
           <button type="button" className="snr-tool" onClick={remove} disabled={busy || !current}>Supprimer</button>
           <button type="button" className="snr-tool" onClick={() => setList(newList(clientCode))} disabled={busy}>Lister</button>
           {message && <p className={`snr-message is-${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'} title={message.text}>{message.text}</p>}
