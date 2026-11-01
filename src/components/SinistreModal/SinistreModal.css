@@ -173,7 +173,8 @@
 .snr-pay-note { margin: 0; color: #1d6b62; font-size: 11px; }
 .snr-pay-note button { margin-left: 8px; padding: 0; border: 0; background: none; color: #187d78; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
-/* Success toast (claim created / saved) */
-.snr-toast { position: fixed; top: 20px; right: 22px; z-index: 90; display: flex; align-items: center; gap: 10px; max-width: min(420px, calc(100vw - 28px)); padding: 13px 18px; border: 1px solid #c7e8d9; border-radius: 10px; background: #f0fbf5; box-shadow: 0 12px 35px rgba(20, 60, 43, .18); color: #216f4d; font-size: 12px; font-weight: 700; animation: snr-toast-in .18s ease-out; }
-.snr-toast > span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: #25845f; color: #fff; font-size: 13px; }
-@keyframes snr-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Valider: saves the claim, then an empty form for the next one */
+.snr-submit { border-color: #187d78; background: #187d78; color: #fff; }
+.snr-submit:hover:not(:disabled) { background: #136763 !important; }
+.snr-submit:disabled { border-color: #cfdce3; background: #eef3f5; color: #9aabb4; cursor: default; }

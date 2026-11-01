@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './apiBase';
+import { showToast, submissionMessage } from './toast';
 export const ACCESS_KEY = 'assurance-access-token';
 export const REFRESH_KEY = 'assurance-refresh-token';
 export const TOKENS_CHANGED = 'auth:tokens';
@@ -73,23 +74,31 @@ export function refreshSession() {
 let installed = false;
 
 // Transparently refreshes the access token and replays an API request that came back 401.
+async function authFetch(input, init) {
+  const response = await originalFetch(input, init);
+  const url = typeof input === 'string' ? input : input.url;
+  if (response.status !== 401 || !url.startsWith(API_BASE_URL) || /\/api\/auth\/(login|refresh)/.test(url)) return response;
+
+  const headers = new Headers(init?.headers || (typeof input === 'string' ? undefined : input.headers));
+  const sent = headers.get('Authorization');
+  if (!sent?.startsWith('Bearer ')) return response;
+
+  const stored = getAccessToken();
+  const fresh = stored && `Bearer ${stored}` !== sent ? stored : await refreshSession();
+  if (!fresh) return response;
+
+  headers.set('Authorization', `Bearer ${fresh}`);
+  return originalFetch(typeof input === 'string' ? input : new Request(input, { headers }), { ...init, headers });
+}
+
+// ... and shows the success toast after every submission (save, change, delete) the API accepted, in all modules.
 export function installAuthFetch() {
   if (installed) return;
   installed = true;
   window.fetch = async (input, init) => {
-    const response = await originalFetch(input, init);
-    const url = typeof input === 'string' ? input : input.url;
-    if (response.status !== 401 || !url.startsWith(API_BASE_URL) || /\/api\/auth\/(login|refresh)/.test(url)) return response;
-
-    const headers = new Headers(init?.headers || (typeof input === 'string' ? undefined : input.headers));
-    const sent = headers.get('Authorization');
-    if (!sent?.startsWith('Bearer ')) return response;
-
-    const stored = getAccessToken();
-    const fresh = stored && `Bearer ${stored}` !== sent ? stored : await refreshSession();
-    if (!fresh) return response;
-
-    headers.set('Authorization', `Bearer ${fresh}`);
-    return originalFetch(typeof input === 'string' ? input : new Request(input, { headers }), { ...init, headers });
+    const response = await authFetch(input, init);
+    const url = String(typeof input === 'string' ? input : input?.url || input);
+    if (response.ok && url.startsWith(API_BASE_URL)) showToast(submissionMessage(url, init?.method || (typeof input === 'string' ? 'GET' : input?.method)));
+    return response;
   };
 }

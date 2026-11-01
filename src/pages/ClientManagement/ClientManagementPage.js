@@ -9,6 +9,7 @@ import SinistreModal from '../../components/SinistreModal/SinistreModal';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
 import ClientListModal from '../ClientListModal/ClientListModal';
 import { navigate } from '../../navigation';
+import { showToast } from '../../services/toast';
 import './ClientManagementPage.css';
 
 function ClientField({ client, onChange, name, label, type = 'text', options, wide = false, required = false, maxLength, disabled = false, readOnly = false }) {
@@ -132,6 +133,7 @@ export default function ClientManagementPage({ modal = false }) {
 
   useEffect(() => {
     if (!successToast) return undefined;
+    showToast(successToast); // the app toast, with this page's message
     const timeout = window.setTimeout(() => {
       setSuccessToast('');
       navigate('/workspace');
@@ -245,7 +247,6 @@ export default function ClientManagementPage({ modal = false }) {
 
   return (
     <main className={`client-page${modal ? ' client-page-modal' : ''}`}>
-      {successToast && <div className="client-success-toast" role="status"><span aria-hidden="true">✓</span>{successToast}</div>}
       <section ref={windowRef} className={`client-window${modal ? ' client-window-modal' : ''}`}>
         <header className="client-page-header"><a className="client-page-brand" href="/workspace"><span className="client-brand-mark">A</span><span>GESTION ASSURANCES<small>Assurance Jemmali · Siege</small></span></a><div className="client-page-heading"><span>PRODUCTION · MODULE 100</span><h1>Gestion des clients</h1></div><button type="button" className="client-close-button" onClick={() => navigate('/workspace')} aria-label="Fermer">×</button></header>
         <nav className="client-view-tabs" aria-label="Vue du dossier client"><button type="button" onClick={() => setShowClientList(true)}><span aria-hidden="true">◉</span> Rechercher</button><button type="button" className="is-current" aria-current="page"><span aria-hidden="true">✎</span> Modifier</button></nav>

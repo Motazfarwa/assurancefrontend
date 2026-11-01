@@ -5,6 +5,7 @@ import {
   createSinistre, deleteSinistre, extractSinistre, findClaimPolicy, getSinistre, getSinistreLookups, listClientPolicies, listSinistres, nextSinistreNumber, updateSinistre,
 } from '../../services/sinistreApi';
 import { listAccounts } from '../../services/chequeApi';
+import { showToast } from '../../services/toast';
 import SinistreSuivi from './SinistreSuivi';
 import './SinistreModal.css';
 
@@ -97,13 +98,6 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [reglement, setReglement] = useState(null);
   const [payDraft, setPayDraft] = useState(null); // the settlement popup, open while not null
   const [accounts, setAccounts] = useState([]);
-  const [toast, setToast] = useState(''); // success message, hidden after a few seconds
-
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(''), 3500);
-    return () => clearTimeout(timer);
-  }, [toast]);
   const formRef = useRef(form); // the latest values, for the lookups that run once typing pauses
   formRef.current = form;
   const typingTimers = useRef({});
@@ -343,8 +337,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return '';
   };
 
-  // A new claim, once created, leaves an empty form for the next one, unless `keep` (the follow-up opens on it).
-  const save = useCallback(async ({ keep = false } = {}) => {
+  // "Créer le dossier" / "Enregistrer" keep the claim on screen; "Valider" (`reset`) leaves an empty form for the next one.
+  const save = useCallback(async ({ reset = false } = {}) => {
     setTried(true);
     const issue = problem();
     if (issue) { fail(issue); return null; }
@@ -359,10 +353,10 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         ? (await updateSinistre(accessToken, current, payload)).numero
         : (await createSinistre(accessToken, payload)).numero;
       setReglement(null); // stored with the claim
-      setToast(current ? `Dossier ${numero} enregistré avec succès.` : `Dossier ${numero} créé avec succès.`);
-      if (!current && keep !== true) {
+      showToast(current ? `Dossier ${numero} enregistré avec succès.` : `Dossier ${numero} créé avec succès.`);
+      if (reset === true) {
         autoNumber.current = '';
-        setForm(blank()); setDirty(false); setTried(false); setClientPolicies([]);
+        setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setClientPolicies([]); setTab('sinistre');
         return numero;
       }
       const record = await getSinistre(accessToken, numero);
@@ -379,7 +373,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   // A new claim is created first: its follow-up needs the stored claim number.
   async function openFollowUp() {
-    if (current || await save({ keep: true })) setTab('suivi');
+    if (current || await save()) setTab('suivi');
   }
 
   async function remove() {
@@ -492,7 +486,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
         <div className="snr-toolbar">
           <button type="button" className="snr-tool" onClick={startNew} disabled={busy}>Nouveau</button>
-          <button type="button" className="snr-tool snr-primary" onClick={save} disabled={busy || scanning || (!dirty && Boolean(current))} title="Ctrl+S">{busy ? 'Patientez…' : current ? 'Enregistrer' : 'Créer le dossier'}</button>
+          <button type="button" className="snr-tool snr-primary" onClick={() => save()} disabled={busy || scanning || (!dirty && Boolean(current))} title="Ctrl+S">{busy ? 'Patientez…' : current ? 'Enregistrer' : 'Créer le dossier'}</button>
+          <button type="button" className="snr-tool snr-submit" onClick={() => save({ reset: true })} disabled={busy || scanning || (!dirty && Boolean(current))} title="Enregistre le dossier puis vide le formulaire pour un nouveau sinistre">Valider</button>
           <button type="button" className="snr-tool" onClick={remove} disabled={busy || !current}>Supprimer</button>
           <button type="button" className="snr-tool" onClick={() => setList(newList(clientCode))} disabled={busy}>Lister</button>
           {message && <p className={`snr-message is-${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'} title={message.text}>{message.text}</p>}
@@ -577,8 +572,6 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         </div>
         )}
       </section>
-
-      {toast && <div className="snr-toast" role="status"><span aria-hidden="true">✓</span>{toast}</div>}
 
       {payDraft && (
         <div className="snr-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPayDraft(null); }}>
