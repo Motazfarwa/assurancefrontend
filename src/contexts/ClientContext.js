@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 
 export const EMPTY_CLIENT = {
   clientCode: '', lastName: '', firstName: '', nationality: 'Tunisienne', nationalityOther: '', country: 'Tunisie',
@@ -18,8 +19,31 @@ export const EMPTY_CLIENT = {
 
 const ClientContext = createContext(null);
 
+// The client being viewed / modified is kept for the browser tab, so the fiche client survives a page refresh.
+const STORAGE_KEY = 'assurance-current-client';
+function storedClient() {
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) || 'null');
+    return saved && typeof saved === 'object' ? { ...EMPTY_CLIENT, ...saved } : EMPTY_CLIENT;
+  } catch {
+    return EMPTY_CLIENT;
+  }
+}
+
 export function ClientProvider({ children }) {
-  const [client, setClient] = useState(EMPTY_CLIENT);
+  const { user, isLoading } = useAuth();
+  const [client, setClient] = useState(storedClient);
+
+  useEffect(() => {
+    try { window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(client)); } catch { /* storage unavailable: the fiche just won't survive a refresh */ }
+  }, [client]);
+
+  // Signed out: the next user starts on an empty fiche.
+  useEffect(() => {
+    if (isLoading || user) return;
+    try { window.sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    setClient(EMPTY_CLIENT);
+  }, [user, isLoading]);
   const [clients, setClients] = useState([]);
   const value = useMemo(() => ({ client, setClient, clients, setClients }), [client, clients]);
   return <ClientContext.Provider value={value}>{children}</ClientContext.Provider>;
