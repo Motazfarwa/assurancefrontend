@@ -102,6 +102,7 @@ export default function ClientManagementPage({ modal = false }) {
   const [prefillKey, setPrefillKey] = useState(0);
   const [flowStarted, setFlowStarted] = useState(false);
   const clientSavedRef = useRef(false);
+  const createdHereRef = useRef(false); // the client was created by this flow (not an existing one being modified)
   const fileInputRef = useRef(null);
   const windowRef = useRef(null);
 
@@ -142,6 +143,8 @@ export default function ClientManagementPage({ modal = false }) {
   }, [successToast]);
 
   const newFlow = !client._persisted || flowStarted;
+  // Modifier goes through the same four steps; it may also stop at Coordonnées and save only the client.
+  const editingClient = Boolean(client._persisted) && !createdHereRef.current;
   const handlePolicyStep = useCallback((value) => setPolicyStep(value), []);
 
   // Runs just before the policy is stored: the client has to exist first.
@@ -152,7 +155,8 @@ export default function ClientManagementPage({ modal = false }) {
       throw new Error('Le code postal du domicile (étape Coordonnées) est obligatoire et doit être un nombre.');
     }
     setFlowStarted(true);
-    const saved = await saveClient(accessToken, client, false);
+    if (!client._persisted) createdHereRef.current = true;
+    const saved = await saveClient(accessToken, client, Boolean(client._persisted)); // Modifier: the changes are saved, the client is not created again
     const record = { ...saved, _persisted: true };
     clientSavedRef.current = true;
     setClient(record);
@@ -160,7 +164,7 @@ export default function ClientManagementPage({ modal = false }) {
   }
 
   function handlePolicySaved() {
-    setSuccessToast('Client, police et quittance enregistrés avec succès.');
+    setSuccessToast(editingClient ? 'Client modifié, police et quittance enregistrées avec succès.' : 'Client, police et quittance enregistrés avec succès.');
   }
 
   function changeStep(nextStep) {
@@ -256,7 +260,7 @@ export default function ClientManagementPage({ modal = false }) {
           <span>Gérer pour ce client</span>
           {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
         </div>
-        <div className="client-form-progress" aria-label={`Étape ${step === 3 ? 2 + policyStep : step} sur ${newFlow ? 4 : 2}`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div>{newFlow && <><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step === 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : ''}><span>4</span><strong>Saisir quittance</strong></div></>}</div>
+        <div className="client-form-progress" aria-label={`Étape ${step === 3 ? 2 + policyStep : step} sur 4`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div><><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step === 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : ''}><span>4</span><strong>Saisir quittance</strong></div></></div>
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
         {step <= 2 && <form className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
           {step === 1 && <>
@@ -310,9 +314,9 @@ export default function ClientManagementPage({ modal = false }) {
           {step === 2 && <div className="client-record-options client-step-full"><fieldset><legend>Adresse de correspondance</legend>{['Bureau', 'Domicile'].map((value) => <label key={value}><input type="radio" name="correspondence" checked={client.correspondence === value} onChange={() => updateField('correspondence', value)} />{value}</label>)}</fieldset></div>}
           {notice && <p className="client-save-notice" role="status">{notice}</p>}
           {/* Distinct keys: React must not turn the clicked "Suivant" into the step-2 submit button (that submitted the form on the same click). */}
-          <div className="client-form-actions">{step === 1 ? <><button key="close" type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button key="next" type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button key="back" type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button>{newFlow ? <button key="next-policy" type="button" className="client-primary-button" onClick={goToNextStep}>Suivant : police →</button> : <button key="save" type="submit" className="client-primary-button" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>}</>}</div>
+          <div className="client-form-actions">{step === 1 ? <><button key="close" type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button key="next" type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button key="back" type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button>{!newFlow && <button key="save" type="submit" className="client-secondary-button" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>}<button key="next-policy" type="button" className="client-primary-button" onClick={goToNextStep} disabled={saving}>Suivant : police →</button></>}</div>
         </form>}
-        {newFlow && client.clientCode && (
+        {client.clientCode && (
           <div className={`policy-modal-expanded client-policy-embedded${step === 3 ? '' : ' is-hidden'}`}>
             <PolicyForm
               key={prefillKey}
@@ -323,7 +327,7 @@ export default function ClientManagementPage({ modal = false }) {
               onClose={() => changeStep(2)}
               beforeSave={createClientBeforePolicy}
               onSaved={handlePolicySaved}
-              finalLabel="Créer le client"
+              finalLabel={editingClient ? 'Enregistrer le client et la police' : 'Créer le client'}
             />
           </div>
         )}
