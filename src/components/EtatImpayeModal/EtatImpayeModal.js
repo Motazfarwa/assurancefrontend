@@ -15,7 +15,7 @@ const initialFilters = {
   code_client: '', nom_client: '', view: 'global', piece: 'avec',
   dates: false, date_debut: '2020-01-01', date_fin: today(),
   // Type client is not on screen: always ticked, Particulier.
-  typed: true, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15, jours_autres: 15,
+  typed: true, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15, jours_autres: 60,
 };
 const DAY = 86400000;
 const shiftDate = (iso, days) => new Date(Date.parse(iso) + days * DAY).toISOString().slice(0, 10);
@@ -23,9 +23,13 @@ const daysLate = (row) => Math.floor((Date.parse(today()) - Date.parse(String(ro
 // "T" + "10/2026" as the legacy report prints it; a comptant quittance is just "C".
 const termOf = (row) => (row.tc === 'T' && row.periode ? `T${row.periode}` : row.tc || '');
 const total = (rows) => rows.reduce((sum, row) => sum + amount(row.solde), 0);
-const letterhead = (title) => <div className="eti-letterhead">
+// summary: [label, amount] lines printed under the date (the mise en demeure totals, on its first page).
+const letterhead = (title, summary) => <div className="eti-letterhead">
   <address>{AGENCY.map((line) => <span key={line}>{line}</span>)}</address>
-  <span className="eti-date">Date : <b>{formatDate(today())}</b></span>
+  <div className="eti-head-side">
+    <span className="eti-date">Date : <b>{formatDate(today())}</b></span>
+    {summary && <table className="eti-summary"><tbody>{summary.map(([label, value], index) => <tr key={label} className={index === summary.length - 1 ? 'is-total' : ''}><td>{label}</td><td>{money.format(value)} TND</td></tr>)}</tbody></table>}
+  </div>
   <h3>{title}</h3>
 </div>;
 // Rows (already sorted by code client, compagnie, échéance) grouped by client, then, for the mémoire, by compagnie.
@@ -188,11 +192,11 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
 
 // The preview page (as the legacy report viewer): a toolbar, then the report on paper sheets; "Imprimer" prints only them.
 // One "Etat des impayées" sheet: the quittances by client, with client and general totals.
-function StatementPage({ title, rows, sans }) {
+function StatementPage({ title, rows, sans, summary }) {
   const clients = useMemo(() => byClient(rows), [rows]);
   const span = sans ? 2 : 3;
   return <article className="eti-page">
-    {letterhead(title)}
+    {letterhead(title, summary)}
     {rows.length ? <div className="eti-scroll"><table className="eti-table">
       <thead><tr><th>N° Police</th><th>TC</th><th>Échéance</th><th className="eti-num">Prime</th><th className="eti-num">Solde</th><th>N° quittance</th>{!sans && <th>Pièce(s)</th>}<th>Observation</th></tr></thead>
       {clients.map((client) => <tbody key={client.code_client}>
@@ -229,7 +233,8 @@ function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose
     </header>
     {limit > 0 && items.length >= limit && <p className="eti-limit eti-preview-limit">Résultats limités à {limit} quittances : précisez les critères.</p>}
     <div className="eti-report">
-      {groups ? groups.map((group) => <StatementPage key={group.title} title={group.title} rows={group.rows} sans={sans} />)
+      {groups ? groups.map((group, index) => <StatementPage key={group.title} title={group.title} rows={group.rows} sans={sans}
+        summary={index === 0 ? [['Total automobile particuliers', total(groups[0].rows)], ['Total autres', total(groups[1].rows)], ['Total général', grandTotal]] : undefined} />)
         : !detail ? <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} />
         : clients.map((client) => <article key={client.code_client} className="eti-page">
           {letterhead('MÉMOIRE DE RÈGLEMENT')}
