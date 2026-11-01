@@ -88,7 +88,8 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       nom_client: filters.code_client.trim() ? '' : filters.nom_client.trim(),
       piece: filters.piece,
       date_debut: filters.dates ? filters.date_debut : '',
-      date_fin: filters.dates ? filters.date_fin : relance ? overdue : '',
+      // In relance the échéance is also at least as old as the shorter delay, dates ticked or not.
+      date_fin: relance && (!filters.dates || filters.date_fin > overdue) ? overdue : filters.dates ? filters.date_fin : '',
       // Particulier, except in mise en demeure: its "Autres" group holds the sociétés too.
       type_client: filters.typed && !relance ? filters.type_client : '',
       code_compagnie: filters.compagnie ? filters.code_compagnie : '',
@@ -104,15 +105,15 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
     try {
       const body = await getUnpaidStatement(accessToken, query());
       // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
-      // société) past "jours_autres" days. With "Entre deux dates", the chosen échéances replace the two delays.
+      // société) past "jours_autres" days. "Entre deux dates" only narrows the échéances: the delays still apply.
       const autoParticulier = (row) => row.type_client === 'P' && row.automobile;
       // En demeure, the whole solde of the quittance is owed: a cheque / traite en instance is not cashed yet (it stays
       // listed under Pièce(s)).
       const owed = (body.items || []).map((row) => ({ ...row, solde: row.solde_quittance }));
-      const range = `ÉCHÉANCES DU ${formatDate(filters.date_debut)} AU ${formatDate(filters.date_fin)}`;
+      const range = filters.dates ? ` (ÉCHÉANCES DU ${formatDate(filters.date_debut)} AU ${formatDate(filters.date_fin)})` : '';
       const groups = relance ? [
-        { title: `AUTOMOBILE PARTICULIERS — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${jours} JOURS`}`, rows: owed.filter((row) => autoParticulier(row) && (filters.dates || daysLate(row) >= jours)) },
-        { title: `AUTRES — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${joursAutres} JOURS`}`, rows: owed.filter((row) => !autoParticulier(row) && (filters.dates || daysLate(row) >= joursAutres)) },
+        { title: `AUTOMOBILE PARTICULIERS — IMPAYÉS DE PLUS DE ${jours} JOURS${range}`, rows: owed.filter((row) => autoParticulier(row) && daysLate(row) >= jours) },
+        { title: `AUTRES — IMPAYÉS DE PLUS DE ${joursAutres} JOURS${range}`, rows: owed.filter((row) => !autoParticulier(row) && daysLate(row) >= joursAutres) },
       ] : null;
       const items = groups ? groups.flatMap((group) => group.rows) : body.items || [];
       if (!items.length) setError('Aucune quittance impayée ne correspond aux critères.');
