@@ -107,9 +107,9 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
       // société) past "jours_autres" days. "Entre deux dates" only narrows the échéances: the delays still apply.
       const autoParticulier = (row) => row.type_client === 'P' && row.automobile;
-      // En demeure, the whole solde of the quittance is owed: a cheque / traite en instance is not cashed yet (it stays
-      // listed under Pièce(s)).
-      const owed = (body.items || []).map((row) => ({ ...row, solde: row.solde_quittance }));
+      // Every overdue quittance, with the report's solde: "Avec pièce", net of the pièces en instance (listed under
+      // Pièce(s)), so each group's Total général is its total net of the pièces en instance.
+      const owed = body.items || [];
       const range = filters.dates ? ` (ÉCHÉANCES DU ${formatDate(filters.date_debut)} AU ${formatDate(filters.date_fin)})` : '';
       const groups = relance ? [
         { title: `AUTOMOBILE PARTICULIERS — IMPAYÉS DE PLUS DE ${jours} JOURS${range}`, rows: owed.filter((row) => autoParticulier(row) && daysLate(row) >= jours) },
