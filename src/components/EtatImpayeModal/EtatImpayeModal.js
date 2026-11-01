@@ -223,7 +223,7 @@ function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose
     <header className="eti-preview-bar">
       <button type="button" className="expert-cancel" onClick={onBack}>← Retour aux critères</button>
       <div className="eti-preview-title"><strong>{detail ? 'Mémoire de règlement' : 'Etat des impayées'}</strong>
-        <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} · autres : ${groups[1].rows.length} · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
+        <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} (${money.format(total(groups[0].rows))} TND) · autres : ${groups[1].rows.length} (${money.format(total(groups[1].rows))} TND) · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
       <button type="button" className="expert-submit" onClick={() => window.print()}>Imprimer</button>
       <button type="button" className="expert-close" onClick={onClose} aria-label="Fermer">×</button>
     </header>
