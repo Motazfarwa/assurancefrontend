@@ -8,6 +8,7 @@ import ExpertManagementModal from '../ExpertManagementModal/ExpertManagementModa
 import CompanyManagementModal from '../CompanyManagementModal/CompanyManagementModal';
 import BanqueModal from '../BanqueModal/BanqueModal';
 import AccessUsersModal from '../AccessUsersModal/AccessUsersModal';
+import HistoriqueModal from '../HistoriqueModal/HistoriqueModal';
 import { getMyModules } from '../../services/accessApi';
 import BranchManagementModal from '../BranchManagementModal/BranchManagementModal';
 import DocumentEntryModal from '../DocumentEntryModal/DocumentEntryModal';
@@ -35,6 +36,7 @@ export default function ModulesWorkspace() {
   const { user, logout, accessToken } = useAuth();
   const [allowedModules, setAllowedModules] = useState(null); // set by the admin in Access users; null: every module
   const [showAccessModal, setShowAccessModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [activeCategory, setActiveCategory] = useState('production');
   const [search, setSearch] = useState('');
   const [selectedModule, setSelectedModule] = useState(null);
@@ -185,7 +187,7 @@ export default function ModulesWorkspace() {
         <header className="workspace-topbar">
           <a className="workspace-brand" href="/workspace"><span className="workspace-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>ESPACE PROFESSIONNEL</small></span></a>
           <div className="workspace-company"><div><strong>Assurance Jemmali</strong></div><SyncStatus /></div>
-          <div className="workspace-user"><ZoomControl /><span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span><span className="workspace-user-copy"><strong>{user.name}</strong><small>{user.role ? (user.role === ROLES.ADMIN ? 'Administrateur' : 'Membre') : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>{user.isAdmin && <><button type="button" className="workspace-logout" onClick={() => navigate('/admin/users')}>Utilisateurs</button><button type="button" className="workspace-logout" onClick={() => setShowAccessModal(true)}>Access users</button></>}<button type="button" className="workspace-logout" onClick={logout}>Quitter <span aria-hidden="true">↗</span></button></div>
+          <div className="workspace-user"><ZoomControl /><span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span><span className="workspace-user-copy"><strong>{user.name}</strong><small>{user.role ? (user.role === ROLES.ADMIN ? 'Administrateur' : 'Membre') : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>{user.isAdmin && <><button type="button" className="workspace-logout" onClick={() => navigate('/admin/users')}>Utilisateurs</button><button type="button" className="workspace-logout" onClick={() => setShowAccessModal(true)}>Access users</button><button type="button" className="workspace-logout" onClick={() => setShowHistory(true)}>Historique</button></>}<button type="button" className="workspace-logout" onClick={logout}>Quitter <span aria-hidden="true">↗</span></button></div>
         </header>
 
         <fieldset className="nature-selector">
@@ -236,6 +238,7 @@ export default function ModulesWorkspace() {
       {selectedModule && selectedCategory && <ModuleModal module={selectedModule} category={selectedCategory} onClose={() => setSelectedModule(null)} />}
       {showExpertModal && <ExpertManagementModal onClose={() => setShowExpertModal(false)} />}
       {showCompanyModal && <CompanyManagementModal moduleId={activeModuleId} onClose={() => setShowCompanyModal(false)} />}
+      {showHistory && <HistoriqueModal onClose={() => setShowHistory(false)} />}
       {showAccessModal && <AccessUsersModal onClose={() => setShowAccessModal(false)} />}
       {banqueModule && <BanqueModal moduleId={banqueModule.id} onClose={() => setBanqueModule(null)} />}
       {showBranchModal && <BranchManagementModal onClose={() => setShowBranchModal(false)} />}

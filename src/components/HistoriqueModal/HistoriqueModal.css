@@ -1,0 +1,24 @@
+/* Historique des actions: filters, then the movements table. */
+.his-modal { width: min(1120px, 100%); }
+.his-filters { display: grid; grid-template-columns: 140px 140px 170px 150px minmax(160px, 1fr) auto; align-items: end; gap: 10px; padding: 16px 22px; border-bottom: 1px solid #edf1f2; }
+.his-filters label { display: grid; gap: 5px; min-width: 0; color: #405967; font-size: 10px; font-weight: 650; }
+.his-filters input, .his-filters select { height: 36px; min-width: 0; padding: 0 9px; border: 1px solid #d4e0e4; border-radius: 7px; background: #fff; color: #263e4d; font: inherit; font-size: 11px; }
+.his-filters button { min-height: 36px; padding: 0 16px; font: inherit; font-size: 11px; font-weight: 650; }
+.his-table-wrap { min-height: 220px; flex: 1; overflow: auto; }
+.his-table-wrap table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.his-table-wrap th { position: sticky; top: 0; padding: 8px 12px; border-bottom: 1px solid #dce6e9; background: #f4f8f9; color: #4d6470; font-size: 10px; font-weight: 750; text-align: left; white-space: nowrap; }
+.his-table-wrap td { padding: 7px 12px; border-bottom: 1px solid #eef2f4; color: #263e4d; vertical-align: top; }
+.his-table-wrap td:nth-child(-n+3) { white-space: nowrap; }
+.his-move { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef2f4; color: #4d6470; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.his-move-2 { background: #e6f5ef; color: #1c7a5e; }
+.his-move-3 { background: #e8f0fb; color: #2c5d9b; }
+.his-move-4 { background: #fdecec; color: #a74545; }
+.his-move-7 { background: #fdf0e3; color: #a2621d; }
+.his-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 22px; border-top: 1px solid #edf1f2; color: #5f7480; font-size: 11px; }
+.his-footer > div { display: flex; gap: 8px; }
+.his-footer button { min-height: 36px; padding: 0 16px; font: inherit; font-size: 11px; font-weight: 650; }
+
+@media (max-width: 900px) {
+  .his-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .his-search { grid-column: 1 / -1; }
+}
