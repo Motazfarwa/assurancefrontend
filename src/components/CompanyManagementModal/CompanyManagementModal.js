@@ -42,6 +42,7 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [listing, setListing] = useState(false); // Lister: every company, a click opens it
   const find = (code, list = companies) => list.find((item) => String(item.code_compagnie) === String(code).trim());
 
   const loadCompanies = useCallback(async (preferredCode = '') => {
@@ -133,6 +134,7 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
           {creating ? <button type="submit" className="expert-submit" disabled={saving || !codeText}>{saving ? 'Enregistrement…' : 'Ajouter la compagnie'}</button>
             : editing ? <><button type="submit" className="expert-submit" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button><button type="button" className="expert-cancel" onClick={cancelEdit} disabled={saving}>Annuler</button></>
               : <><button type="button" className="expert-submit" onClick={() => { setEditing(true); setNotice(''); }} disabled={saving || !company}>Modifier</button><button type="button" className="catalog-delete" onClick={remove} disabled={saving || !company}>Supprimer</button></>}
+          <button type="button" className="expert-cancel cmp-list-button" onClick={() => setListing(true)} disabled={saving || (editing && !creating)}>Lister</button>
           <span className="catalog-count">{companies.length} compagnie{companies.length > 1 ? 's' : ''}</span>
         </div>
 
@@ -160,5 +162,21 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
         <div className="cmp-spacer" />
       </form>}
     </section>
+    {listing && <div className="cmp-list-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setListing(false); }}>
+      <section className="cmp-list" role="dialog" aria-modal="true" aria-labelledby="cmp-list-title">
+        <header><h3 id="cmp-list-title">Liste des compagnies</h3><button className="expert-close" onClick={() => setListing(false)} type="button" aria-label="Fermer">×</button></header>
+        <div className="cmp-list-wrap">
+          {companies.length === 0 ? <p className="catalog-empty">Aucune compagnie.</p> : <table>
+            <thead><tr><th>Code</th><th>Libellé</th><th>Longueur branche</th><th>Adresse</th><th>Ville</th><th>Code agent</th></tr></thead>
+            <tbody>{[...companies].sort((a, b) => Number(a.code_compagnie) - Number(b.code_compagnie)).map((item) => (
+              <tr key={item.code_compagnie} className={String(item.code_compagnie) === selectedCode ? 'is-current' : ''} onClick={() => { show(item); setListing(false); }} title="Ouvrir cette compagnie">
+                <td>{item.code_compagnie}</td><td><b>{item.nom_compagnie}</b></td><td>{item.Nbr_Chiffre_Code ?? ''}</td><td>{item.Adresse_Compagnie || ''}</td><td>{item.Ville_Compagnie || ''}</td><td>{item.Code_Agent || ''}</td>
+              </tr>
+            ))}</tbody>
+          </table>}
+        </div>
+        <footer><span>{companies.length} compagnie{companies.length > 1 ? 's' : ''} · cliquez une ligne pour l’ouvrir</span><button type="button" className="expert-cancel" onClick={() => setListing(false)}>Fermer</button></footer>
+      </section>
+    </div>}
   </div>;
 }

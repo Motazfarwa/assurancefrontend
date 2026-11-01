@@ -405,11 +405,36 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return () => window.removeEventListener('keydown', onKey);
   }, [busy, scanning, save, list, payDraft, current]);
 
+  // Agency accounts (TBanque), loaded with the screen: the settlement popup proposes the claim company's account.
+  useEffect(() => {
+    let active = true;
+    listAccounts(accessToken).then((rows) => { if (active) setAccounts(Array.isArray(rows) ? rows : []); }).catch(() => {});
+    return () => { active = false; };
+  }, [accessToken]);
+
+  // The company of the claim's policy (Compagnie field, filled from the policy) collects on its own account: the
+  // newest active account of that company (TBanque.Code_Compagnie), '' when it has none.
+  const companyAccount = (rows, company) => {
+    const own = rows.filter((row) => company && String(row.code_compagnie) === String(company));
+    own.sort((a, b) => String(b.date_ini || '').localeCompare(String(a.date_ini || '')));
+    return own[0]?.code_banque || '';
+  };
+
+  // Accounts arriving after the popup opened: the default is filled in if nothing was chosen yet.
+  useEffect(() => {
+    if (payDraft && !payDraft.code_banque && !payDraft.chosen) {
+      const code = companyAccount(accounts, form.Code_Compagnie_Assure);
+      if (code) setPayDraft((value) => value && ({ ...value, code_banque: value.code_banque || code }));
+    }
+  }, [accounts, payDraft, form.Code_Compagnie_Assure]);
+
   // "Réglé" ticked: the settlement popup opens; the claim is marked settled once the popup is validated.
   function tickRegle(checked) {
     if (!checked) { setReglement(null); change({ Regle: false }); return; }
-    if (!accounts.length) listAccounts(accessToken).then((rows) => setAccounts(Array.isArray(rows) ? rows : [])).catch(() => {});
-    setPayDraft({ num_piece: reglement?.num_piece || '', date_reglement: form.Date_Reglement || today(), code_banque: reglement?.code_banque || '', tried: false });
+    setPayDraft({
+      num_piece: reglement?.num_piece || '', date_reglement: form.Date_Reglement || today(),
+      code_banque: reglement?.code_banque || companyAccount(accounts, form.Code_Compagnie_Assure), tried: false,
+    });
   }
 
   function validatePay(event) {
@@ -587,7 +612,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             </label>
             <label className={payDraft.tried && !payDraft.code_banque ? 'is-missing' : ''}>
               <span>Compte banque <i>*</i></span>
-              <select value={payDraft.code_banque} onChange={(event) => { const code_banque = event.target.value; setPayDraft((value) => ({ ...value, code_banque })); }}>
+              <select value={payDraft.code_banque} onChange={(event) => { const code_banque = event.target.value; setPayDraft((value) => ({ ...value, code_banque, chosen: true })); }}>
                 <option value="">—</option>
                 {accounts.map((row) => <option key={row.code_banque} value={row.code_banque}>{row.nom_banque && row.nom_banque !== row.code_banque ? `${row.code_banque} · ${row.nom_banque}` : row.code_banque}</option>)}
               </select>
