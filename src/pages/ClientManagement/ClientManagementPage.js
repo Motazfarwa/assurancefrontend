@@ -196,7 +196,7 @@ export default function ClientManagementPage({ modal = false }) {
   async function handleSubmit(event) {
     event.preventDefault();
     // A new client is created at the end of the flow (with its policy and first receipt), never alone.
-    if (newFlow) { goToNextStep(); return; }
+    if (newFlow || step === 1) { goToNextStep(); return; } // Modifier too goes through Coordonnées before saving
     if (!client.clientCode.trim()) { setNotice('Le code client est obligatoire.'); return; }
     if (client.homePostalCode === '' || !Number.isInteger(Number(client.homePostalCode))) { setNotice('Le code postal du domicile est obligatoire et doit être un nombre.'); return; }
     setSaving(true);
@@ -309,7 +309,8 @@ export default function ClientManagementPage({ modal = false }) {
           {step === 2 && <FormSection title="Observation" className="client-observation-section client-step-full"><label className="client-field client-field-wide"><span>Remarques sur le client</span><textarea rows={4} maxLength={500} value={client.notes || ''} placeholder="Saisir une observation (facultatif)" onChange={(event) => updateField('notes', event.target.value)} /><small className="client-observation-count">{(client.notes || '').length} / 500</small></label></FormSection>}
           {step === 2 && <div className="client-record-options client-step-full"><fieldset><legend>Adresse de correspondance</legend>{['Bureau', 'Domicile'].map((value) => <label key={value}><input type="radio" name="correspondence" checked={client.correspondence === value} onChange={() => updateField('correspondence', value)} />{value}</label>)}</fieldset></div>}
           {notice && <p className="client-save-notice" role="status">{notice}</p>}
-          <div className="client-form-actions">{step === 1 ? <><button type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button>{newFlow ? <button type="button" className="client-primary-button" onClick={goToNextStep}>Suivant : police →</button> : <button type="submit" className="client-primary-button" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>}</>}</div>
+          {/* Distinct keys: React must not turn the clicked "Suivant" into the step-2 submit button (that submitted the form on the same click). */}
+          <div className="client-form-actions">{step === 1 ? <><button key="close" type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button key="next" type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button key="back" type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button>{newFlow ? <button key="next-policy" type="button" className="client-primary-button" onClick={goToNextStep}>Suivant : police →</button> : <button key="save" type="submit" className="client-primary-button" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>}</>}</div>
         </form>}
         {newFlow && client.clientCode && (
           <div className={`policy-modal-expanded client-policy-embedded${step === 3 ? '' : ' is-hidden'}`}>
