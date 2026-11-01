@@ -15,10 +15,8 @@ const initialFilters = {
   code_client: '', nom_client: '', view: 'global', piece: 'avec',
   dates: false, date_debut: '2020-01-01', date_fin: today(),
   // Type client is not on screen: always ticked, Particulier.
-  typed: true, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15,
+  typed: true, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15, jours_autres: 15,
 };
-// Past this many days after the échéance, a quittance leaves the mise en demeure for the second group.
-const LATE_DAYS = 60;
 const DAY = 86400000;
 const shiftDate = (iso, days) => new Date(Date.parse(iso) + days * DAY).toISOString().slice(0, 10);
 const daysLate = (row) => Math.floor((Date.parse(today()) - Date.parse(String(row.echeance).slice(0, 10))) / DAY);
@@ -60,7 +58,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null); // { items, limit, detail, sans, groups? }: the report being shown
-  // Mise en demeure: two groups, the automobile particuliers past "jours" days and the others past LATE_DAYS.
+  // Mise en demeure: two groups, the automobile particuliers past "jours" days and the others past "jours_autres" days.
   const relance = filters.mise_en_demeure;
 
   useEffect(() => {
@@ -84,7 +82,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   // sociétés too). "Entre deux dates" bounds the échéance; without it, relance keeps the échéances at least as old as
   // the shorter of the two delays.
   const query = () => {
-    const overdue = shiftDate(today(), -Math.min(Number(filters.jours), LATE_DAYS));
+    const overdue = shiftDate(today(), -Math.min(Number(filters.jours), Number(filters.jours_autres)));
     return {
       code_client: filters.code_client.trim(),
       nom_client: filters.code_client.trim() ? '' : filters.nom_client.trim(),
@@ -99,20 +97,22 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   async function apercu() {
     if (filters.dates && filters.date_debut && filters.date_fin && filters.date_debut > filters.date_fin) { setError('La date de début doit précéder la date de fin.'); return; }
     const jours = Number(filters.jours);
-    if (relance && !(Number.isInteger(jours) && jours >= 1 && jours <= 365)) { setError('Le nombre de jours doit être entre 1 et 365.'); return; }
+    const joursAutres = Number(filters.jours_autres);
+    if (relance && ![jours, joursAutres].every((value) => Number.isInteger(value) && value >= 1 && value <= 365)) { setError('Le nombre de jours doit être entre 1 et 365.'); return; }
     setLoading(true);
     setError('');
     try {
       const body = await getUnpaidStatement(accessToken, query());
       // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
-      // société) past LATE_DAYS days. With "Entre deux dates", the chosen échéances replace the two delays.
+      // société) past "jours_autres" days. With "Entre deux dates", the chosen échéances replace the two delays.
       const autoParticulier = (row) => row.type_client === 'P' && row.automobile;
-      // A quittance a pièce en instance already covers (solde "avec pièce" at 0 or less) is not put en demeure.
-      const owed = (body.items || []).filter((row) => amount(row.solde) > 0.0005);
+      // En demeure, the whole solde of the quittance is owed: a cheque / traite en instance is not cashed yet (it stays
+      // listed under Pièce(s)).
+      const owed = (body.items || []).map((row) => ({ ...row, solde: row.solde_quittance }));
       const range = `ÉCHÉANCES DU ${formatDate(filters.date_debut)} AU ${formatDate(filters.date_fin)}`;
       const groups = relance ? [
         { title: `AUTOMOBILE PARTICULIERS — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${jours} JOURS`}`, rows: owed.filter((row) => autoParticulier(row) && (filters.dates || daysLate(row) >= jours)) },
-        { title: `AUTRES — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${LATE_DAYS} JOURS`}`, rows: owed.filter((row) => !autoParticulier(row) && (filters.dates || daysLate(row) >= LATE_DAYS)) },
+        { title: `AUTRES — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${joursAutres} JOURS`}`, rows: owed.filter((row) => !autoParticulier(row) && (filters.dates || daysLate(row) >= joursAutres)) },
       ] : null;
       const items = groups ? groups.flatMap((group) => group.rows) : body.items || [];
       if (!items.length) setError('Aucune quittance impayée ne correspond aux critères.');
@@ -172,7 +172,8 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
               </label>
               <div className="eti-check">
                 <label className="eti-check"><input type="checkbox" name="mise_en_demeure" checked={filters.mise_en_demeure} onChange={update} /> Mise en demeure</label>
-                {relance && <label className="eti-check eti-days">Nombre jours<input type="number" name="jours" min={1} max={365} value={filters.jours} onChange={update} /> jours (auto particuliers ; autres : {LATE_DAYS} jours)</label>}
+                {relance && <label className="eti-check eti-days">Nombre jours<input type="number" name="jours" min={1} max={365} value={filters.jours} onChange={update} /> jours (auto particuliers)</label>}
+                {relance && <label className="eti-check eti-days">Autres<input type="number" name="jours_autres" min={1} max={365} value={filters.jours_autres} onChange={update} /> jours</label>}
               </div>
             </div>
           </div>
