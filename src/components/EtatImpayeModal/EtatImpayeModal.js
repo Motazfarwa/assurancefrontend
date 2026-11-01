@@ -14,7 +14,8 @@ const AGENCY = ['Cabinet d’Assurance Jemmali', '4, Rue Ohod - Mutuelleville', 
 const initialFilters = {
   code_client: '', nom_client: '', view: 'global', piece: 'avec',
   dates: false, date_debut: '2020-01-01', date_fin: today(),
-  typed: false, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15,
+  // Type client is not on screen: always ticked, Particulier.
+  typed: true, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15,
 };
 // Past this many days after the échéance, a quittance leaves the mise en demeure for the second group.
 const LATE_DAYS = 60;
@@ -90,7 +91,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       piece: filters.piece,
       date_debut: filters.dates ? filters.date_debut : '',
       date_fin: filters.dates ? filters.date_fin : relance ? overdue : '',
-      // Type client is hidden in mise en demeure: both groups need every client type.
+      // Particulier, except in mise en demeure: its "Autres" group holds the sociétés too.
       type_client: filters.typed && !relance ? filters.type_client : '',
       code_compagnie: filters.compagnie ? filters.code_compagnie : '',
     };
@@ -106,10 +107,12 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
       // société) past LATE_DAYS days. With "Entre deux dates", the chosen échéances replace the two delays.
       const autoParticulier = (row) => row.type_client === 'P' && row.automobile;
+      // A quittance a pièce en instance already covers (solde "avec pièce" at 0 or less) is not put en demeure.
+      const owed = (body.items || []).filter((row) => amount(row.solde) > 0.0005);
       const range = `ÉCHÉANCES DU ${formatDate(filters.date_debut)} AU ${formatDate(filters.date_fin)}`;
       const groups = relance ? [
-        { title: `AUTOMOBILE PARTICULIERS — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${jours} JOURS`}`, rows: (body.items || []).filter((row) => autoParticulier(row) && (filters.dates || daysLate(row) >= jours)) },
-        { title: `AUTRES — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${LATE_DAYS} JOURS`}`, rows: (body.items || []).filter((row) => !autoParticulier(row) && (filters.dates || daysLate(row) >= LATE_DAYS)) },
+        { title: `AUTOMOBILE PARTICULIERS — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${jours} JOURS`}`, rows: owed.filter((row) => autoParticulier(row) && (filters.dates || daysLate(row) >= jours)) },
+        { title: `AUTRES — ${filters.dates ? range : `IMPAYÉS DE PLUS DE ${LATE_DAYS} JOURS`}`, rows: owed.filter((row) => !autoParticulier(row) && (filters.dates || daysLate(row) >= LATE_DAYS)) },
       ] : null;
       const items = groups ? groups.flatMap((group) => group.rows) : body.items || [];
       if (!items.length) setError('Aucune quittance impayée ne correspond aux critères.');
@@ -160,10 +163,6 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
             </fieldset>
           </div>
           <div className="eti-row">
-            {!relance && <fieldset className="unpaid-filter-set unpaid-choice"><legend><label><input type="checkbox" name="typed" checked={filters.typed} onChange={update} /> Type client</label></legend>
-              <label><input type="radio" name="type_client" value="P" checked={filters.type_client === 'P'} onChange={update} disabled={!filters.typed} /> Particulier</label>
-              <label><input type="radio" name="type_client" value="S" checked={filters.type_client === 'S'} onChange={update} disabled={!filters.typed} /> Société</label>
-            </fieldset>}
             <div className="eti-checks">
               <label className="eti-check"><input type="checkbox" name="compagnie" checked={filters.compagnie} onChange={update} /> Compagnie :
                 <select name="code_compagnie" value={filters.code_compagnie} onChange={update} disabled={!filters.compagnie}>
