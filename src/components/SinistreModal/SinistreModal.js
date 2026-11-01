@@ -4,6 +4,7 @@ import { getClientByCode } from '../../services/clientApi';
 import {
   createSinistre, deleteSinistre, extractSinistre, findClaimPolicy, getSinistre, getSinistreLookups, listClientPolicies, listSinistres, nextSinistreNumber, updateSinistre,
 } from '../../services/sinistreApi';
+import { listAccounts } from '../../services/chequeApi';
 import SinistreSuivi from './SinistreSuivi';
 import './SinistreModal.css';
 
@@ -92,6 +93,10 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [list, setList] = useState(() => (mode === 'manage' && clientCode ? newList(clientCode) : null));
   const [clientPolicies, setClientPolicies] = useState([]); // the typed client's policies, proposed in "N° police"
   const [tab, setTab] = useState('sinistre'); // 'sinistre' | 'suivi' (steps, calls and letters of a stored claim)
+  // Ticking "Réglé" asks for the settlement (piece, date, agency account): kept here and stored in TRegCli with the claim.
+  const [reglement, setReglement] = useState(null);
+  const [payDraft, setPayDraft] = useState(null); // the settlement popup, open while not null
+  const [accounts, setAccounts] = useState([]);
   const formRef = useRef(form); // the latest values, for the lookups that run once typing pauses
   formRef.current = form;
   const typingTimers = useRef({});
@@ -158,7 +163,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     if (!confirmLeave()) return;
     // Still a new claim: the proposed number is kept (it only changes with the claim date or once a claim is created).
     setForm(current ? blank() : { ...blank(), Num_Sinistre_Agence: proposed }); autoNumber.current = current ? '' : proposed;
-    setCurrent(''); setDirty(false); setTried(false); setMessage(null); setClientPolicies([]); setTab('sinistre');
+    setCurrent(''); setDirty(false); setTried(false); setMessage(null); setClientPolicies([]); setTab('sinistre'); setReglement(null);
   }
 
   // A stored claim may lack the client name, company or branch: they are taken from its client and policy.
@@ -192,7 +197,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       const record = await getSinistre(accessToken, numero);
       const loaded = await completed(toForm(record));
       setForm(loaded); setCurrent(String(record.Num_Sinistre_Agence).trim()); setDirty(false); setTried(false); setList(null);
-      setClientPolicies([]);
+      setClientPolicies([]); setReglement(null);
       if (loaded.Code_Client) {
         listClientPolicies(accessToken, loaded.Code_Client)
           .then((rows) => setClientPolicies(asPolicies(rows)))
@@ -341,9 +346,11 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       // Left empty or still the proposed number: numbered by the server (never twice the same number).
       const typedNumber = String(payload.Num_Sinistre_Agence || '').trim();
       if (!current && (!typedNumber || typedNumber === autoNumber.current)) delete payload.Num_Sinistre_Agence;
+      if (form.Regle && reglement) payload.reglement = { ...reglement, date_reglement: form.Date_Reglement || reglement.date_reglement };
       const numero = current
         ? (await updateSinistre(accessToken, current, payload)).numero
         : (await createSinistre(accessToken, payload)).numero;
+      setReglement(null); // stored with the claim
       const record = await getSinistre(accessToken, numero);
       setForm(await completed(toForm(record))); setCurrent(numero); setDirty(false); setTried(false);
       info(current ? `Dossier ${numero} enregistré.` : `Dossier ${numero} créé.`);
@@ -355,7 +362,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       setBusy(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, current, form]);
+  }, [accessToken, current, form, reglement]);
 
   // A new claim is created first: its follow-up needs the stored claim number.
   async function openFollowUp() {
@@ -367,7 +374,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     setBusy(true); setMessage(null);
     try {
       await deleteSinistre(accessToken, current);
-      setForm(blank()); setCurrent(''); setDirty(false); setTab('sinistre');
+      setForm(blank()); setCurrent(''); setDirty(false); setTab('sinistre'); setReglement(null);
       info(`Dossier ${current} supprimé.`);
     } catch (requestError) {
       fail(requestError.message);
@@ -383,12 +390,28 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   // Ctrl+S saves, Échap closes the list.
   useEffect(() => {
     const onKey = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!busy && !scanning) save(); }
-      if (event.key === 'Escape' && list) setList(null);
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!busy && !scanning && !payDraft) save(); }
+      if (event.key === 'Escape' && payDraft) setPayDraft(null);
+      else if (event.key === 'Escape' && list) setList(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, scanning, save, list]);
+  }, [busy, scanning, save, list, payDraft]);
+
+  // "Réglé" ticked: the settlement popup opens; the claim is marked settled once the popup is validated.
+  function tickRegle(checked) {
+    if (!checked) { setReglement(null); change({ Regle: false }); return; }
+    if (!accounts.length) listAccounts(accessToken).then((rows) => setAccounts(Array.isArray(rows) ? rows : [])).catch(() => {});
+    setPayDraft({ num_piece: reglement?.num_piece || '', date_reglement: form.Date_Reglement || today(), code_banque: reglement?.code_banque || '', tried: false });
+  }
+
+  function validatePay(event) {
+    event.preventDefault();
+    const draft = { num_piece: payDraft.num_piece.trim(), date_reglement: payDraft.date_reglement, code_banque: payDraft.code_banque };
+    if (!draft.num_piece || !draft.date_reglement || !draft.code_banque) { setPayDraft((value) => ({ ...value, tried: true })); return; }
+    setReglement(draft); setPayDraft(null);
+    change({ Regle: true, Date_Reglement: draft.date_reglement, ...closeWhenSettled({ Regle: true, Date_Reglement: draft.date_reglement }) });
+  }
 
   // Field helpers -----------------------------------------------------------------------------
   const missing = (name) => tried && ((name === 'Date_Sinistre' && !form.Date_Sinistre) || (['Num_Int', 'Code_Client'].includes(name) && !form.Code_Client.trim() && !form.Num_Int.trim()));
@@ -422,10 +445,12 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   };
   const asOptions = (values) => values.map((value) => ({ id: value, label: value }));
   // `follow(patch)` adds to the change the fields that go with it (a settled claim is closed on the same day).
-  const flag = (label, name, dateName, follow = () => ({})) => (
+  // `onTick(checked)`, when given, handles the checkbox instead (Réglé opens the settlement popup).
+  const flag = (label, name, dateName, follow = () => ({}), onTick = null) => (
     <div className="snr-span-3 snr-flag">
       <label className="snr-check">
         <input type="checkbox" checked={form[name]} onChange={(event) => {
+          if (onTick) { onTick(event.target.checked); return; }
           const patch = { [name]: event.target.checked, ...(event.target.checked && !form[dateName] ? { [dateName]: today() } : {}) };
           change({ ...patch, ...follow({ [dateName]: form[dateName], ...patch }) });
         }} />
@@ -521,8 +546,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {input('Montant rapport', 'Montant_Rapport', { type: 'number' })}
             {input('Montant quittance', 'Montant_Quittance', { type: 'number' })}
             {input('Montant réglé', 'Montant_Reglement', { type: 'number' })}
-            {flag('Réglé', 'Regle', 'Date_Reglement', closeWhenSettled)}
+            {flag('Réglé', 'Regle', 'Date_Reglement', closeWhenSettled, tickRegle)}
             {flag('Clôturé', 'Cloture', 'Date_Cloture')}
+            {reglement && form.Regle && (
+              <p className="snr-span-6 snr-pay-note">
+                Règlement : pièce <b>{reglement.num_piece}</b> · compte <b>{reglement.code_banque}</b> · enregistré avec le dossier
+                <button type="button" onClick={() => tickRegle(true)}>Modifier</button>
+              </p>
+            )}
           </fieldset>
 
           <fieldset className="snr-group snr-observation">
@@ -533,6 +564,34 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         </div>
         )}
       </section>
+
+      {payDraft && (
+        <div className="snr-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPayDraft(null); }}>
+          <form className="snr-pay" role="dialog" aria-modal="true" aria-labelledby="snr-pay-title" onSubmit={validatePay}>
+            <header><h3 id="snr-pay-title">Règlement du sinistre</h3><button type="button" className="snr-close" onClick={() => setPayDraft(null)} aria-label="Fermer">×</button></header>
+            <label className={payDraft.tried && !payDraft.num_piece.trim() ? 'is-missing' : ''}>
+              <span>N° pièce <i>*</i></span>
+              <input autoFocus value={payDraft.num_piece} maxLength={20} onChange={(event) => { const num_piece = event.target.value; setPayDraft((value) => ({ ...value, num_piece })); }} placeholder="Ex : STB 612440" />
+            </label>
+            <label className={payDraft.tried && !payDraft.date_reglement ? 'is-missing' : ''}>
+              <span>Date de règlement <i>*</i></span>
+              <input type="date" value={payDraft.date_reglement} onChange={(event) => { const date_reglement = event.target.value; setPayDraft((value) => ({ ...value, date_reglement })); }} />
+            </label>
+            <label className={payDraft.tried && !payDraft.code_banque ? 'is-missing' : ''}>
+              <span>Compte banque <i>*</i></span>
+              <select value={payDraft.code_banque} onChange={(event) => { const code_banque = event.target.value; setPayDraft((value) => ({ ...value, code_banque })); }}>
+                <option value="">—</option>
+                {accounts.map((row) => <option key={row.code_banque} value={row.code_banque}>{row.nom_banque && row.nom_banque !== row.code_banque ? `${row.code_banque} · ${row.nom_banque}` : row.code_banque}</option>)}
+              </select>
+            </label>
+            {payDraft.tried && <p className="snr-message is-error">Renseignez le N° pièce, la date de règlement et le compte banque.</p>}
+            <footer>
+              <button type="button" className="snr-tool" onClick={() => setPayDraft(null)}>Annuler</button>
+              <button type="submit" className="snr-tool snr-primary">Valider</button>
+            </footer>
+          </form>
+        </div>
+      )}
 
       {list && (
         <div className="snr-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setList(null); }}>
