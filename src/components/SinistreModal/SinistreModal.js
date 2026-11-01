@@ -39,27 +39,27 @@ function toForm(record) {
 
 // Claims list filters: not closed ("Cloture" false, ticked at first) and, once "Entre deux dates" is ticked, the claims
 // between two dates, at first the LIST_MONTHS months from LIST_START (both editable, each on its own). Without
-// "Entre deux dates" every date is listed: the recent claims, and the older ones in red (isOverdue).
+// "Entre deux dates", the list shows the claims of the last OVERDUE_MONTHS months (recent: true).
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
 const LIST_START = '2020-01-01';
 const LIST_MONTHS = 23;
 // The last day of the LIST_MONTHS full months: January 2020 to November 2021, i.e. up to 30/11/2021.
 const LIST_END = new Date(Date.UTC(2020, LIST_MONTHS, 0)).toISOString().slice(0, 10);
-// A claim still not closed OVERDUE_MONTHS months after it happened is shown in red in the list.
+// Months counted by calendar month: in November 2026, a claim of January 2025 is 22 months old.
 const OVERDUE_MONTHS = 22;
-// The day OVERDUE_MONTHS months before today (01/11/2026 -> 01/01/2025).
-function overdueLimit() {
-  const limit = new Date();
-  limit.setMonth(limit.getMonth() - OVERDUE_MONTHS);
-  return limit.toISOString().slice(0, 10);
+// First day of the month "months" months before the current one (November 2026, 22 -> 01/01/2025).
+function monthsAgo(months) {
+  const now = new Date();
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth() - months, 1)).toISOString().slice(0, 10);
 }
+// A claim not closed that has reached OVERDUE_MONTHS months (its month is OVERDUE_MONTHS or more months ago) is red.
 function isOverdue(row) {
   if (row.Cloture || !row.Date_Sinistre) return false;
-  return String(row.Date_Sinistre).slice(0, 10) <= overdueLimit();
+  return String(row.Date_Sinistre).slice(0, 10) < monthsAgo(OVERDUE_MONTHS - 1);
 }
 // Opened from a client file, the list starts on that client's claims, closed ones included, all dates.
 const newList = (clientCode = '') => ({
-  q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: LIST_END,
+  q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: LIST_END, recent: !clientCode,
   typeSinistre: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
@@ -130,7 +130,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   // Claims list: search as you type (the expert's name too), filtered by status, type and date.
   const listKey = list ? JSON.stringify([
-    list.q, list.codeClient.trim(), list.nomClient.trim(), list.nonCloture, list.byDate ? list.dateMin : '', list.byDate ? list.dateMax : '', list.typeSinistre,
+    list.q, list.codeClient.trim(), list.nomClient.trim(), list.nonCloture, list.byDate ? list.dateMin : list.recent ? monthsAgo(OVERDUE_MONTHS) : '', list.byDate ? list.dateMax : '', list.typeSinistre,
   ]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
@@ -594,7 +594,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </section>
                 ))}
             </div>
-            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · {list.byDate ? `sinistres du ${shortDate(list.dateMin)} au ${shortDate(list.dateMax)}` : `toutes les dates · en rouge : non clôturés depuis ${OVERDUE_MONTHS} mois ou plus (jusqu’au ${shortDate(overdueLimit())})`} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · {list.byDate ? `sinistres du ${shortDate(list.dateMin)} au ${shortDate(list.dateMax)}` : list.recent ? `sinistres depuis le ${shortDate(monthsAgo(OVERDUE_MONTHS))} (${OVERDUE_MONTHS} derniers mois) · en rouge : ${OVERDUE_MONTHS} mois atteints` : 'toutes les dates'} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}
