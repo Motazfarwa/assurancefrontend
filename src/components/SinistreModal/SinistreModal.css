@@ -178,3 +178,23 @@
 .snr-submit { border-color: #187d78; background: #187d78; color: #fff; }
 .snr-submit:hover:not(:disabled) { background: #136763 !important; }
 .snr-submit:disabled { border-color: #cfdce3; background: #eef3f5; color: #9aabb4; cursor: default; }
+
+/* N° sinistre: dropdown of the claims, by number in ascending order, filtered while typing */
+.snr-picker { position: relative; }
+.snr-picker-menu { position: fixed; z-index: 2000; overflow: hidden; border: 1px solid #cfe0e4; border-radius: 9px; background: #fff; box-shadow: 0 14px 34px rgba(18, 45, 60, .18); }
+.snr-picker-head { padding: 7px 11px; border-bottom: 1px solid #edf2f3; background: #f6fafa; color: #587079; font-size: 10px; font-weight: 650; }
+.snr-picker-menu ul { max-height: var(--snr-picker-height, 300px); margin: 0; padding: 4px; overflow-y: auto; list-style: none; }
+.snr-picker-menu li { display: grid; grid-template-columns: 92px 76px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; color: #2c4350; font-size: 11px; cursor: pointer; }
+.snr-picker-menu li.is-active { background: #e6f4f1; }
+.snr-picker-menu li b { color: #17323f; font-variant-numeric: tabular-nums; }
+.snr-picker-menu li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5d717b; }
+.snr-picker-menu li .snr-picker-client { color: #2c4350; }
+.snr-picker-menu li em { padding: 1px 7px; border-radius: 999px; background: #fff4e0; color: #9a6514; font-size: 9px; font-style: normal; font-weight: 700; white-space: nowrap; }
+.snr-picker-menu li em.is-paid { background: #e6f5ef; color: #1c7a5e; }
+.snr-picker-menu li em.is-closed { background: #eef2f4; color: #4d6470; }
+.snr-picker-menu li.snr-picker-empty { display: block; color: #7a8d96; text-align: center; cursor: default; }
+@media (max-width: 600px) {
+
+  .snr-picker-menu li { grid-template-columns: 84px minmax(0, 1fr) auto; }
+  .snr-picker-menu li > span:nth-of-type(1) { display: none; }
+}

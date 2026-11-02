@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listNotifications, markNotificationsRead } from '../../services/notificationApi';
+import HistoryDetailDialog from '../HistoriqueModal/HistoryDetailDialog';
 import './NotificationBell.css';
 
 const REFRESH_MS = 30000;
@@ -18,6 +19,7 @@ export default function NotificationBell({ onOpenHistory }) {
   const [data, setData] = useState({ unread: 0, items: [] });
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
+  const [detail, setDetail] = useState(null); // the administrator opens what exactly an action did
   const rootRef = useRef(null);
 
   const load = useCallback(() => {
@@ -70,7 +72,8 @@ export default function NotificationBell({ onOpenHistory }) {
             {error && <p className="notif-empty">{error}</p>}
             {!error && !items.length && <p className="notif-empty">Aucune action enregistrée pour le moment.</p>}
             {items.map((item) => (
-              <div className={`notif-item ${item.unread ? 'is-new' : ''}`} key={item.n}>
+              <div className={`notif-item ${item.unread ? 'is-new' : ''}${user.isAdmin ? ' is-clickable' : ''}`} key={item.n}
+                {...(user.isAdmin ? { role: 'button', tabIndex: 0, title: 'Voir le détail de l’action', onClick: () => { setOpen(false); setDetail(item.n); }, onKeyDown: (event) => { if (event.key === 'Enter') { setOpen(false); setDetail(item.n); } } } : {})}>
                 <span className={`notif-move notif-move-${item.code ?? 0}`}>{item.mvt === 'Suppresion' ? 'Suppression' : item.mvt}</span>
                 <div className="notif-copy">
                   <p>{item.design || item.mvt}</p>
@@ -84,6 +87,7 @@ export default function NotificationBell({ onOpenHistory }) {
           )}
         </div>
       )}
+      {detail && <HistoryDetailDialog n={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }

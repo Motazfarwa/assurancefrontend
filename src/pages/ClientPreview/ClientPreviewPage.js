@@ -15,7 +15,7 @@ function DetailSection({ title, children }) {
   return <section className="client-detail-section"><h2>{title}</h2><div className="client-detail-grid">{children}</div></section>;
 }
 
-const POLICY_COLUMNS = [['num_police', 'N° police'], ['code_branche', 'Branche'], ['risque', 'Risque'], ['effet', 'Date effet'], ['expiration', 'Expiration'], ['prime_total', 'Prime totale']];
+const POLICY_COLUMNS = [['num_police', 'N° police'], ['code_branche', 'Branche'], ['risque', 'Risque'], ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['prime_total', 'Prime totale'], ['obser', 'Observation'], ['commission', 'Commission']];
 // Same columns as the legacy receipts grid. Effet = receipt start (emission) date; Reg = settled (has a settlement date).
 const RECEIPT_COLUMNS = [['num_quittance', 'N° quittance'], ['date_saisie', 'Date Saisie'], ['date_emission', 'Effet'], ['tc', 'TC'], ['prime_net', 'P. Net'], ['reg', 'Reg'], ['Date_Reglement', 'Date Reg'], ['commission', 'MM. Comp'], ['Date_M', 'Date Mvt'], ['montant_quittance', 'Mont. Quit.'], ['solde_quittance', 'Solde']];
 
@@ -54,14 +54,52 @@ const initialValue = (record, field) => {
   return field.type === 'date' ? String(value).slice(0, 10) : String(value);
 };
 
-function RecordsDialog({ kicker, title, subtitle, columns: fixedColumns, records, loading, error, onClose, actions, nested = false, wide = false, filters, onFilterChange }) {
+// Policy status, as in the legacy "Liste des polices" (same rule as the API): AN = in force, expired once its
+// expiration date is past; SS / RE / RV = suspended or terminated.
+const POLICY_STATUSES = [['tous', 'Tous'], ['vigueur', 'En vigueur'], ['susp', 'Susp. / Rés.'], ['expirees', 'Expirées']];
+function policyStatus(policy) {
+  const etat = String(policy.etat || '').trim().toUpperCase();
+  if (etat === 'AN') return policy.expiration && String(policy.expiration).slice(0, 10) < new Date().toISOString().slice(0, 10) ? 'Expirée' : 'En vigueur';
+  if (['SS', 'RE', 'RV'].includes(etat)) return 'Suspendue / résiliée';
+  return '';
+}
+const POLICY_DETAILS = [
+  ['num_police', 'N° police'], ['num_int', 'N° dossier'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
+  ['code_compagnie', 'Compagnie'], ['code_branche', 'Branche'], ['risque', 'Risque'], ['etat', 'État'],
+  ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['duree', 'Durée (mois)'],
+  ['num_imat', 'Immatriculation'], ['marque', 'Marque'], ['Garantie', 'Garantie'], ['Franchise', 'Franchise'],
+  ['capital', 'Capital'], ['prime_net', 'Prime nette'], ['commission', 'Commission'], ['prime_total', 'Prime totale'],
+  ['obser', 'Observation'],
+];
+
+function RecordsDialog({ kicker, title, subtitle, columns: fixedColumns, records, loading, error, onClose, actions, nested = false, wide = false, filters, onFilterChange, statusTabs, onRowClick }) {
   const columns = fixedColumns || Object.keys(records[0] || {}).map((key) => [key, key]);
   return <div className={`client-records-backdrop${nested ? ' is-nested' : ''}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className={`client-records-dialog${wide ? " is-wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
       <header><div><span>{kicker}</span><h2>{title}</h2>{subtitle && <p className="client-records-subtitle">{subtitle}</p>}</div><button type="button" onClick={onClose} aria-label="Fermer">×</button></header>
-      {filters && <div className="client-records-filters">{filters.map((filter) => <label key={filter.key}><span>{filter.label}</span><input type={filter.type || 'text'} value={filter.value} onChange={(event) => onFilterChange(filter.key, event.target.value)} placeholder={filter.placeholder} maxLength={filter.maxLength} /></label>)}</div>}
-      {loading ? <p className="client-records-message">Chargement des enregistrements…</p> : error ? <p className="client-records-message is-error">{error}</p> : records.length === 0 ? <p className="client-records-message">Aucun enregistrement trouvé.</p> : <div className="client-records-table-wrap"><table><thead><tr>{columns.map(([, label]) => <th key={label}>{label}</th>)}{actions && <th />}</tr></thead><tbody>{records.map((record, index) => <tr key={`${record.num_quittance || record.num_int || record.num_police || ''}-${index}`}>{columns.map(([key]) => <td key={key} className={`is-col-${key}`}>{formatValue(record[key])}</td>)}{actions && <td><div className="client-row-actions">{actions(record)}</div></td>}</tr>)}</tbody></table></div>}
+      {(filters || statusTabs) && <div className="client-records-filters">
+        {filters?.map((filter) => <label key={filter.key}><span>{filter.label}</span><input type={filter.type || 'text'} value={filter.value} onChange={(event) => onFilterChange(filter.key, event.target.value)} placeholder={filter.placeholder} maxLength={filter.maxLength} /></label>)}
+        {statusTabs && <div className="client-records-status" role="group" aria-label="État des polices">{statusTabs.options.map(([value, label]) => <button type="button" key={value} className={statusTabs.value === value ? 'is-active' : ''} aria-pressed={statusTabs.value === value} onClick={() => statusTabs.onChange(value)}>{label}</button>)}</div>}
+      </div>}
+      {loading ? <p className="client-records-message">Chargement des enregistrements…</p> : error ? <p className="client-records-message is-error">{error}</p> : records.length === 0 ? <p className="client-records-message">Aucun enregistrement trouvé.</p> : <div className="client-records-table-wrap"><table><thead><tr>{columns.map(([, label]) => <th key={label}>{label}</th>)}{actions && <th />}</tr></thead><tbody>{records.map((record, index) => <tr key={`${record.num_quittance || record.num_int || record.num_police || ''}-${index}`} className={onRowClick ? 'is-clickable' : undefined} onClick={onRowClick ? () => onRowClick(record) : undefined} title={onRowClick ? 'Voir le détail' : undefined}>{columns.map(([key]) => <td key={key} className={`is-col-${key}`}>{formatValue(record[key])}</td>)}{actions && <td onClick={(event) => event.stopPropagation()}><div className="client-row-actions">{actions(record)}</div></td>}</tr>)}</tbody></table></div>}
       <footer><span>{loading ? '' : `${records.length} résultat${records.length > 1 ? 's' : ''}`}</span><button className="client-secondary-button" type="button" onClick={onClose}>Fermer</button></footer>
+    </section>
+  </div>;
+}
+
+// The details of one policy, with its actions (Modifier is here, not in the list).
+function PolicyDetailDialog({ policy, onClose, actions }) {
+  const value = (key) => {
+    if (key === 'etat') return [String(policy.etat || '').trim(), policyStatus(policy)].filter(Boolean).join(' · ') || '—';
+    return formatValue(policy[key]);
+  };
+  return <div className="client-records-backdrop is-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="client-records-dialog policy-detail-dialog" role="dialog" aria-modal="true" aria-label={`Police ${policy.num_police || policy.num_int}`}>
+      <header><div><span>MODULE 110 · DÉTAIL DE LA POLICE</span><h2>Police {policy.num_police || policy.num_int}</h2>{policyStatus(policy) && <p className="client-records-subtitle">{policyStatus(policy)}</p>}</div><button type="button" onClick={onClose} aria-label="Fermer">×</button></header>
+      <dl className="policy-detail-grid">
+        {POLICY_DETAILS.map(([key, label]) => <div key={key} className={key === 'risque' || key === 'obser' ? 'is-wide' : undefined}><dt>{label}</dt><dd>{value(key)}</dd></div>)}
+      </dl>
+      <footer><div className="client-row-actions policy-detail-actions">{actions}</div><button className="client-secondary-button" type="button" onClick={onClose}>Fermer</button></footer>
     </section>
   </div>;
 }
@@ -136,7 +174,8 @@ export default function ClientPreviewPage() {
   const [receiptsState, setReceiptsState] = useState({ loading: false, error: '', records: [] });
   const [claimsPolicy, setClaimsPolicy] = useState(null);
   const [claimsState, setClaimsState] = useState({ loading: false, error: '', records: [] });
-  const [policyFilters, setPolicyFilters] = useState({ code_client: '', nom_client: '', num_police: '' });
+  const [policyFilters, setPolicyFilters] = useState({ code_client: '', nom_client: '', num_police: '', statut: 'tous' });
+  const [detailPolicy, setDetailPolicy] = useState(null);
   const [receiptFilters, setReceiptFilters] = useState({ code_client: '', nom_client: '', num_quittance: '', date_saisie: '' });
   const [receiptsScoped, setReceiptsScoped] = useState(true); // until a filter is edited, only the opened policy's receipts
   const [editing, setEditing] = useState(null);
@@ -148,9 +187,12 @@ export default function ClientPreviewPage() {
   async function loadPolicies(filters = policyFilters) {
     setPoliciesState((current) => ({ ...current, loading: true, error: '' }));
     try {
-      setPoliciesState({ loading: false, error: '', records: await searchRecords(accessToken, 'policies', filters) });
+      const records = await searchRecords(accessToken, 'policies', filters);
+      setPoliciesState({ loading: false, error: '', records });
+      return records;
     } catch (error) {
       setPoliciesState({ loading: false, error: error.message, records: [] });
+      return [];
     }
   }
 
@@ -180,7 +222,7 @@ export default function ClientPreviewPage() {
   }, [receiptsPolicy, receiptFilters, receiptsScoped]);
 
   function showPolicies() {
-    setPolicyFilters({ code_client: client.clientCode || '', nom_client: '', num_police: '' });
+    setPolicyFilters({ code_client: client.clientCode || '', nom_client: '', num_police: '', statut: 'tous' });
     setPoliciesState({ loading: true, error: '', records: [] });
     setPoliciesOpen(true);
   }
@@ -206,8 +248,11 @@ export default function ClientPreviewPage() {
     const isPolicy = editing.kind === 'policies';
     await updateClientRecord(accessToken, editing.kind, isPolicy ? editing.record.num_int : editing.record.num_quittance, changes);
     setEditing(null);
-    if (isPolicy) await loadPolicies();
-    else await loadReceipts();
+    if (isPolicy) {
+      const records = await loadPolicies();
+      // The detail window shows the policy as saved.
+      setDetailPolicy((current) => (current ? records.find((item) => String(item.num_int).trim() === String(current.num_int).trim()) || current : current));
+    } else await loadReceipts();
   }
 
   async function exportExcel() {
@@ -284,7 +329,8 @@ export default function ClientPreviewPage() {
         {hasLien(client) && <DetailSection title="Lien"><Detail label="Code de contact" value={realValue(client.relatedCode)} /><Detail label="Nom du contact" value={realValue(client.relatedName)} /><Detail label="Quérabilité" value={realValue(client.relationship)} /></DetailSection>}
         <DetailSection title="Informations du dossier"><Detail label="Type client" value={client.clientType} /><Detail label="Exonéré" value={client.taxExempt ? 'Oui' : 'Non'} /><Detail label="Observation" value={client.notes} /></DetailSection>
       </article>
-      {policiesOpen && <RecordsDialog kicker="DOSSIER CLIENT · MODULE 110" title="Polices du client" columns={POLICY_COLUMNS} {...policiesState} filters={[{ key: 'num_police', label: 'N° police', value: policyFilters.num_police, placeholder: 'Ex : 0522…' }, { key: 'nom_client', label: 'Nom client', value: policyFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'code_client', label: 'Code client', value: policyFilters.code_client, placeholder: 'Tous les clients', maxLength: 8 }]} onFilterChange={(key, value) => setPolicyFilters((current) => ({ ...current, [key]: value }))} onClose={() => setPoliciesOpen(false)} actions={(policy) => <><button type="button" onClick={() => showReceipts(policy)}>Quittances</button><button type="button" onClick={() => showClaims(policy)}>Sinistres</button>{canEdit(policy) && <button type="button" onClick={() => setEditing({ kind: 'policies', record: policy })}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}</>} />}
+      {policiesOpen && <RecordsDialog kicker="DOSSIER CLIENT · MODULE 110" title="Polices du client" columns={POLICY_COLUMNS} {...policiesState} filters={[{ key: 'num_police', label: 'N° police', value: policyFilters.num_police, placeholder: 'Ex : 0522…' }, { key: 'nom_client', label: 'Nom client', value: policyFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'code_client', label: 'Code client', value: policyFilters.code_client, placeholder: 'Tous les clients', maxLength: 8 }]} onFilterChange={(key, value) => setPolicyFilters((current) => ({ ...current, [key]: value }))} statusTabs={{ options: POLICY_STATUSES, value: policyFilters.statut, onChange: (statut) => setPolicyFilters((current) => ({ ...current, statut })) }} onRowClick={setDetailPolicy} onClose={() => { setPoliciesOpen(false); setDetailPolicy(null); }} actions={(policy) => <><button type="button" onClick={() => showReceipts(policy)}>Quittances</button><button type="button" onClick={() => showClaims(policy)}>Sinistres</button></>} />}
+      {detailPolicy && <PolicyDetailDialog policy={detailPolicy} onClose={() => setDetailPolicy(null)} actions={<><button type="button" onClick={() => showReceipts(detailPolicy)}>Quittances</button><button type="button" onClick={() => showClaims(detailPolicy)}>Sinistres</button>{canEdit(detailPolicy) && <button type="button" className="is-primary" onClick={() => setEditing({ kind: 'policies', record: detailPolicy })}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}</>} />}
       {claimsPolicy && <RecordsDialog nested kicker={`POLICE ${claimsPolicy.num_police || claimsPolicy.num_int} · SINISTRES`} title="Sinistres de la police" columns={CLAIM_COLUMNS} {...claimsState} onClose={() => setClaimsPolicy(null)} />}
       {receiptsPolicy && <RecordsDialog nested wide kicker="MODULE 130" title="Quittances de la police" subtitle={<>N° police : <b>{receiptsPolicy.num_police || receiptsPolicy.num_int}</b></>} columns={RECEIPT_COLUMNS} {...receiptsState} filters={[{ key: 'code_client', label: 'Code client', value: receiptFilters.code_client, placeholder: 'Tous', maxLength: 8 }, { key: 'nom_client', label: 'Nom client', value: receiptFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'num_quittance', label: 'N° quittance', value: receiptFilters.num_quittance, placeholder: 'Ex : 2026…' }, { key: 'date_saisie', label: 'Date saisie', value: receiptFilters.date_saisie, type: 'date' }]} onFilterChange={(key, value) => { setReceiptsScoped(false); setReceiptFilters((current) => ({ ...current, [key]: value })); }} onClose={() => setReceiptsPolicy(null)} actions={(receipt) => canEdit(receipt) && <button type="button" onClick={() => setEditing({ kind: 'receipts', record: receipt })}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>} />}
       {editing && <EditRecordDialog key={editing.record.num_quittance || editing.record.num_int} kicker={editing.kind === 'policies' ? 'MODULE 110' : 'MODULE 130'} title={editing.kind === 'policies' ? `Modifier la police ${editing.record.num_police || editing.record.num_int}` : `Modifier la quittance ${editing.record.num_quittance}`} fields={editFields(editing.kind === 'policies' ? POLICY_FIELDS : RECEIPT_FIELDS)} record={editing.record} onSave={saveEdit} onClose={() => setEditing(null)} />}

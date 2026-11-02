@@ -40,13 +40,11 @@ function toForm(record) {
 }
 
 // Claims list filters: not closed ("Cloture" false, ticked at first) and, once "Entre deux dates" is ticked, the claims
-// between two dates, at first the LIST_MONTHS months from LIST_START (both editable, each on its own). Without
-// "Entre deux dates", the list shows the claims of the last OVERDUE_MONTHS months (recent: true).
+// between two dates, at first 01/01/2020 to 02/01/2025 (both editable, each on its own); those claims are shown in red.
+// Without "Entre deux dates", the list shows the claims of the last OVERDUE_MONTHS months (recent: true).
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
 const LIST_START = '2020-01-01';
-const LIST_MONTHS = 23;
-// The last day of the LIST_MONTHS full months: January 2020 to November 2021, i.e. up to 30/11/2021.
-const LIST_END = new Date(Date.UTC(2020, LIST_MONTHS, 0)).toISOString().slice(0, 10);
+const LIST_END = '2025-01-02';
 // Months counted by calendar month: in November 2026, a claim of January 2025 is 22 months old.
 const OVERDUE_MONTHS = 22;
 // First day of the month "months" months before the current one (November 2026, 22 -> 01/01/2025).
@@ -59,6 +57,125 @@ function isOverdue(row) {
   if (row.Cloture || !row.Date_Sinistre) return false;
   return String(row.Date_Sinistre).slice(0, 10) < monthsAgo(OVERDUE_MONTHS - 1);
 }
+// With "Entre deux dates" ticked, a claim that happened between the two dates (both included) is red.
+function inRange(row, list) {
+  const day = String(row.Date_Sinistre || '').slice(0, 10);
+  return Boolean(day) && day >= list.dateMin && day <= list.dateMax;
+}
+const redReason = (row, list) => {
+  if (list.byDate) return inRange(row, list) ? `Sinistre survenu entre le ${shortDate(list.dateMin)} et le ${shortDate(list.dateMax)}` : '';
+  return isOverdue(row) ? `Non clôturé depuis plus de ${OVERDUE_MONTHS} mois` : '';
+};
+// "N° sinistre" with a dropdown of the claims, by number in ascending order: all of them when the field is opened,
+// those whose number starts with what is typed while typing (pages of PICKER_PAGE, more loaded on scroll).
+const PICKER_PAGE = 50;
+function SinistreNumberPicker({ accessToken, value, ignored, missing, onChange, onType, onLeave, onPick }) {
+  const [menu, setMenu] = useState({ open: false, items: [], total: 0, loading: false, prefix: '', active: -1 });
+  const [place, setPlace] = useState(null);
+  const requestId = useRef(0);
+  const timer = useRef(null);
+  const listRef = useRef(null);
+  const inputRef = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // The menu floats over the dialog (whose body scrolls and would cut it), right under the field.
+  useEffect(() => {
+    if (!menu.open) return undefined;
+    const measure = () => {
+      const box = inputRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const width = Math.min(Math.max(box.width, 440), window.innerWidth - 24);
+      setPlace({ top: box.bottom + 3, left: Math.max(12, Math.min(box.left, window.innerWidth - width - 12)), width, maxHeight: Math.max(160, Math.min(320, window.innerHeight - box.bottom - 60)) });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => { window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true); };
+  }, [menu.open]);
+
+  // The proposed number of a new claim or the number of the opened one is not a search: the whole list is shown.
+  const prefixOf = (text) => { const typed = String(text || '').trim(); return ignored.includes(typed) ? '' : typed; };
+
+  async function load(prefix, offset = 0) {
+    const id = ++requestId.current;
+    setMenu((current) => ({ ...current, open: true, loading: true, prefix, ...(offset ? {} : { items: [], active: -1 }) }));
+    try {
+      const result = await listSinistres(accessToken, { numero: prefix, limit: PICKER_PAGE, offset });
+      if (id !== requestId.current) return; // typed on meanwhile
+      setMenu((current) => ({ ...current, loading: false, total: result.total, items: offset ? [...current.items, ...result.items] : result.items }));
+    } catch {
+      if (id === requestId.current) setMenu((current) => ({ ...current, loading: false }));
+    }
+  }
+
+  function pick(row) {
+    setMenu((current) => ({ ...current, open: false }));
+    onPick(String(row.Num_Sinistre_Agence).trim());
+  }
+
+  function onKeyDown(event) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!menu.open) { load(prefixOf(value)); return; }
+      setMenu((current) => {
+        const last = current.items.length - 1;
+        const active = event.key === 'ArrowDown' ? Math.min(last, current.active + 1) : Math.max(0, current.active - 1);
+        listRef.current?.children[active]?.scrollIntoView({ block: 'nearest' });
+        return { ...current, active };
+      });
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (menu.open && menu.items[menu.active]) pick(menu.items[menu.active]);
+      else { setMenu((current) => ({ ...current, open: false })); onLeave(); }
+    } else if (event.key === 'Escape' && menu.open) {
+      event.stopPropagation();
+      setMenu((current) => ({ ...current, open: false }));
+    }
+  }
+
+  const more = menu.items.length < menu.total;
+  return (
+    <label className={`snr-span-3 snr-search snr-picker${missing ? ' is-missing' : ''}`}>
+      <span>N° sinistre</span>
+      <input
+        ref={inputRef} value={value} maxLength={12} placeholder="🔍 Ex : 202610003" autoComplete="off"
+        role="combobox" aria-expanded={menu.open} aria-controls="snr-picker-list" aria-autocomplete="list"
+        onFocus={() => load(prefixOf(value))}
+        onClick={() => { if (!menu.open) load(prefixOf(value)); }}
+        onKeyDown={onKeyDown}
+        onBlur={() => { setMenu((current) => ({ ...current, open: false })); onLeave(); }}
+        onChange={(event) => {
+          const typed = event.target.value;
+          onChange(typed);
+          clearTimeout(timer.current);
+          timer.current = setTimeout(() => { load(prefixOf(typed)); onType(); }, 200);
+        }}
+      />
+      {menu.open && place && (
+        <div className="snr-picker-menu" style={{ top: place.top, left: place.left, width: place.width, '--snr-picker-height': `${place.maxHeight}px` }} onMouseDown={(event) => event.preventDefault() /* keeps the focus: a click picks, it does not leave */}>
+          <div className="snr-picker-head">
+            {menu.loading && !menu.items.length ? 'Recherche…' : menu.prefix ? `${menu.total} sinistre${menu.total > 1 ? 's' : ''} commençant par « ${menu.prefix} »` : `${menu.total} sinistres, par n° croissant`}
+          </div>
+          <ul id="snr-picker-list" role="listbox" ref={listRef}
+            onScroll={(event) => { const box = event.currentTarget; if (more && !menu.loading && box.scrollTop + box.clientHeight >= box.scrollHeight - 40) load(menu.prefix, menu.items.length); }}>
+            {menu.items.map((row, index) => (
+              <li key={row.Num_Sinistre_Agence} role="option" aria-selected={index === menu.active} className={index === menu.active ? 'is-active' : undefined}
+                onMouseEnter={() => setMenu((current) => ({ ...current, active: index }))} onClick={() => pick(row)}>
+                <b>{String(row.Num_Sinistre_Agence).trim()}</b>
+                <span>{shortDate(row.Date_Sinistre) || '—'}</span>
+                <span className="snr-picker-client">{[String(row.Code_Client || '').trim(), row.nom_client].filter(Boolean).join(' · ') || '—'}</span>
+                {row.Cloture ? <em className="is-closed">Clôturé</em> : row.Regle ? <em className="is-paid">Réglé</em> : <em>En cours</em>}
+              </li>
+            ))}
+            {!menu.loading && !menu.items.length && <li className="snr-picker-empty">Aucun sinistre {menu.prefix ? `commençant par « ${menu.prefix} »` : ''}</li>}
+            {menu.loading && menu.items.length > 0 && <li className="snr-picker-empty">Chargement…</li>}
+          </ul>
+        </div>
+      )}
+    </label>
+  );
+}
+
 // Opened from a client file, the list starts on that client's claims, closed ones included, all dates.
 const newList = (clientCode = '') => ({
   q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: LIST_END, recent: !clientCode,
@@ -512,7 +629,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <fieldset className="snr-group">
             <legend>Dossier</legend>
             {/* Both claim numbers first: typing either one opens that claim with all its information. */}
-            {input('N° sinistre', 'Num_Sinistre_Agence', { span: 3, maxLength: 12, onBlur: () => openByNumber('Num_Sinistre_Agence'), onType: () => openByNumber('Num_Sinistre_Agence', { quiet: true }), placeholder: '🔍 Ex : 202610003', search: true })}
+            <SinistreNumberPicker
+              accessToken={accessToken} value={form.Num_Sinistre_Agence} missing={missing('Num_Sinistre_Agence')}
+              ignored={[current, autoNumber.current].filter(Boolean).map(String)}
+              onChange={(typed) => change({ Num_Sinistre_Agence: typed })}
+              onType={() => openByNumber('Num_Sinistre_Agence', { quiet: true })}
+              onLeave={() => openByNumber('Num_Sinistre_Agence')}
+              onPick={(numero) => { if (numero !== current) open(numero); }}
+            />
             {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { span: 3, maxLength: 20, onBlur: () => openByNumber('Num_Sinistre_Compagnie_Assure'), onType: () => openByNumber('Num_Sinistre_Compagnie_Assure', { quiet: true }), placeholder: '🔍 Ex : 20260125954V', search: true })}
             {input('Date et heure du sinistre', 'Date_Sinistre', { type: 'datetime-local', span: 4, required: true })}
             {input('Date saisie', 'Date_Saisie', { type: 'date', span: 2 })}
@@ -652,7 +776,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                       <thead><tr><th>N° sinistre</th><th>Date sinistre</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Expert</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
                       <tbody>
                         {group.rows.map((row) => (
-                          <tr key={row.Num_Sinistre_Agence} className={`is-clickable${isOverdue(row) ? ' is-overdue' : ''}`} title={isOverdue(row) ? `Non clôturé depuis plus de ${OVERDUE_MONTHS} mois` : undefined} onClick={() => open(row.Num_Sinistre_Agence)}>
+                          <tr key={row.Num_Sinistre_Agence} className={`is-clickable${redReason(row, list) ? ' is-overdue' : ''}`} title={redReason(row, list) || undefined} onClick={() => open(row.Num_Sinistre_Agence)}>
                             <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
                             <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td title={row.nom_expert || ''}>{row.nom_expert || ''}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
                             <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>

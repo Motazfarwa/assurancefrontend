@@ -18,3 +18,5 @@ export const listHistory = (accessToken, filters) => {
   return request(accessToken, `?${query}`);
 };
 export const listHistoryUsers = (accessToken) => request(accessToken, '/utilisateurs');
+// One action and what exactly was done: { ..., details: { type, table, changements: [{ champ, avant, apres }] | valeurs: [{ champ, valeur }] } }.
+export const getHistoryDetail = (accessToken, n) => request(accessToken, `/${encodeURIComponent(n)}`);

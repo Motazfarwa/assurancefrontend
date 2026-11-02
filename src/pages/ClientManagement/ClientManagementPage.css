@@ -316,4 +316,31 @@
 .client-records-dialog.is-wide .client-records-table-wrap { flex: 1; min-height: 0; }
 
 /* Polices du client: the risque is a free text, it wraps instead of widening the table */
-.client-records-table-wrap td.is-col-risque { min-width: 220px; max-width: 380px; white-space: normal; line-height: 1.4; overflow-wrap: anywhere; }
+.client-records-table-wrap td.is-col-risque, .client-records-table-wrap td.is-col-obser { min-width: 220px; max-width: 380px; white-space: normal; line-height: 1.4; overflow-wrap: anywhere; }
+
+/* Polices du client: status buttons (Tous / En vigueur / Susp. Rés. / Expirées), rows open the policy's details */
+.client-records-filters .client-records-status { display: flex; align-self: flex-end; margin-left: auto; overflow: hidden; border: 1px solid #d3dfe5; border-radius: 8px; background: #fff; }
+.client-records-status button { min-height: 32px; padding: 0 14px; border: 0; border-left: 1px solid #e1e9ec; background: transparent; color: #3d5966; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.client-records-status button:first-child { border-left: 0; }
+.client-records-status button:hover { background: #f1f8f6; }
+.client-records-status button.is-active { background: #187d78; color: #fff; }
+.client-records-status button:focus-visible { outline: 2px solid #63b9a9; outline-offset: -2px; }
+.client-records-table-wrap tr.is-clickable { cursor: pointer; }
+.client-records-table-wrap tr.is-clickable:hover td { background: #f1f8f6; }
+
+.policy-detail-dialog { width: min(100%, 760px); }
+.policy-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 18px; margin: 0; padding: 18px 20px; overflow: auto; }
+.policy-detail-grid > div { min-width: 0; }
+.policy-detail-grid > div.is-wide { grid-column: 1 / -1; }
+.policy-detail-grid dt { margin: 0 0 3px; color: #6b8089; font-size: 10px; font-weight: 650; }
+.policy-detail-grid dd { margin: 0; color: #1f3644; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.policy-detail-dialog > footer { border-top: 1px solid #e4eaec; }
+.policy-detail-actions { justify-content: flex-start; }
+.client-records-dialog .client-row-actions button.is-primary { border-color: #187d78; background: #187d78; color: #fff; }
+.client-records-dialog .client-row-actions button.is-primary:hover { background: #14695f; }
+@media (max-width: 640px) {
+  .client-records-filters .client-records-status { width: 100%; margin-left: 0; }
+  .client-records-status button { flex: 1 1 0; padding: 0 6px; }
+  .policy-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .policy-detail-dialog > footer { flex-wrap: wrap; }
+}

@@ -28,3 +28,6 @@
 .notif-move-7 { background: #fdf0e3; color: #a2621d; }
 .notif-all { display: block; width: 100%; padding: 11px; border: 0; border-top: 1px solid #edf1f3; background: #fafcfc; color: #1d7a6b; font-size: 12px; font-weight: 700; cursor: pointer; }
 .notif-all:hover { background: #eef7f5; }
+
+.notif-item.is-clickable { cursor: pointer; }
+.notif-item.is-clickable:hover, .notif-item.is-clickable:focus-visible { background: #eef7f5; outline: none; }

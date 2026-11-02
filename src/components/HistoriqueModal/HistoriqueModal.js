@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { listHistory, listHistoryUsers } from '../../services/historiqueApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
+import HistoryDetailDialog from './HistoryDetailDialog';
 import './HistoriqueModal.css';
 
 // The movements written in TMouchard (legacy wording, "Suppresion" included).
@@ -22,6 +23,7 @@ export default function HistoriqueModal({ onClose }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [detail, setDetail] = useState(null); // N of the action whose details are shown
 
   useEffect(() => { listHistoryUsers(accessToken).then(setUsers).catch(() => setUsers([])); }, [accessToken]);
 
@@ -65,9 +67,10 @@ export default function HistoriqueModal({ onClose }) {
       <div className="his-table-wrap">
         {!rows.length ? <p className="catalog-empty">{loading ? 'Chargement de l’historique…' : 'Aucune action sur cette période.'}</p> : <table>
           <thead><tr><th>Date</th><th>Heure</th><th>Utilisateur</th><th>Mouvement</th><th>Désignation</th></tr></thead>
-          <tbody>{rows.map((row) => <tr key={row.n}>
+          <tbody>{rows.map((row) => <tr key={row.n} className="is-clickable" onClick={() => setDetail(row.n)} title="Voir le détail de l’action">
             <td>{frDate(row.date)}</td><td>{row.heure}</td><td><b>{row.utilisateur}</b></td>
-            <td><span className={`his-move his-move-${row.code ?? 0}`}>{row.mvt === 'Suppresion' ? 'Suppression' : row.mvt}</span></td><td>{row.design}</td>
+            <td><span className={`his-move his-move-${row.code ?? 0}`}>{row.mvt === 'Suppresion' ? 'Suppression' : row.mvt}</span></td>
+            <td>{row.design}{row.has_details && <span className="his-has-detail">Détail</span>}</td>
           </tr>)}</tbody>
         </table>}
       </div>
@@ -80,5 +83,6 @@ export default function HistoriqueModal({ onClose }) {
         </div>
       </footer>
     </section>
+    {detail && <HistoryDetailDialog n={detail} onClose={() => setDetail(null)} />}
   </div>;
 }
