@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { createRistourne, deleteRistourne, getRistourne, getRistournePolicy, searchRistournes, updateRistourne } from '../../services/ristourneApi';
+import { createRistourne, deleteRistourne, extractRistournes, getRistourne, getRistournePolicy, searchRistournes, updateRistourne } from '../../services/ristourneApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
 import './RistourneModal.css';
@@ -35,6 +35,13 @@ export default function RistourneModal({ moduleId, onClose }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState(null); // { q, items, loading }
+  const [imported, setImported] = useState(null); // the document read: { compagnie, type_document, date_document, source, lignes }
+  const [showImport, setShowImport] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [importLine, setImportLine] = useState(null); // index of the imported line in the form
+  const [savedLines, setSavedLines] = useState([]);
+  const [lineWarnings, setLineWarnings] = useState([]);
+  const fileRef = useRef(null);
   const numberRef = useRef(null);
   const searchId = useRef(0);
   const editing = mode !== 'view';
@@ -42,18 +49,42 @@ export default function RistourneModal({ moduleId, onClose }) {
   useEffect(() => {
     const onKey = (event) => {
       if (event.key !== 'Escape') return;
-      if (search) setSearch(null); else if (editing) cancel(); else onClose();
+      if (search) setSearch(null); else if (showImport) setShowImport(false); else if (editing) cancel(); else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
   function show(item) {
-    setCurrent(item); setForm(toForm(item)); setPolicy(item); setMode('view');
+    setCurrent(item); setForm(toForm(item)); setPolicy(item); setMode('view'); setImportLine(null); setLineWarnings([]);
+  }
+
+  async function importFile(file) {
+    setBusy(true); setReading(true); setError(''); setNotice('');
+    try {
+      const document = await extractRistournes(accessToken, file);
+      if (!document.lignes?.length) { setError('Aucune ristourne trouvée dans ce document.'); return; }
+      setImported({ ...document, fileName: file.name }); setSavedLines([]); setShowImport(true);
+    } catch (importError) { setError(importError.message); }
+    finally { setBusy(false); setReading(false); }
+  }
+
+  // Puts one line of the document in the form as a new ristourne; the user checks it, then saves it.
+  function loadLine(line, index) {
+    setCurrent(null);
+    setForm({
+      ...blank(), num_ristourne: line.num_ristourne || '', num_police: line.num_police || '',
+      date_du: line.date_du || '', date_au: line.date_au || '',
+      nette: line.nette ?? '', decommission: line.decommission ?? '', detaxe: line.detaxe ?? '',
+      observation: (line.motif || '').slice(0, 50),
+    });
+    setPolicy(line.policy || (line.candidates?.length ? { candidates: line.candidates } : null));
+    setMode('new'); setImportLine(index); setLineWarnings(line.warnings || []); setShowImport(false); setError('');
+    setNotice(`Ligne ${index + 1} du document chargée : vérifiez chaque champ avec le document, puis Enregistrer.`);
   }
 
   function reset(message = '') {
-    setCurrent(null); setForm(blank()); setPolicy(null); setMode('view'); setNotice(message);
+    setCurrent(null); setForm(blank()); setPolicy(null); setMode('view'); setNotice(message); setImportLine(null); setLineWarnings([]);
   }
 
   async function open(number) {
@@ -66,7 +97,11 @@ export default function RistourneModal({ moduleId, onClose }) {
 
   async function lookupPolicy(number) {
     if (!String(number).trim()) { setPolicy(null); return; }
-    try { setPolicy(await getRistournePolicy(accessToken, number)); setError(''); }
+    try {
+      const found = await getRistournePolicy(accessToken, number);
+      setPolicy(found.candidates ? { candidates: found.candidates } : found); // a shared number: the user chooses
+      setError('');
+    }
     catch (policyError) { setPolicy(null); setError(policyError.message); }
   }
 
@@ -88,15 +123,18 @@ export default function RistourneModal({ moduleId, onClose }) {
   async function save(event) {
     event.preventDefault();
     if (!policy) { setError('Saisissez une police existante.'); return; }
+    if (!policy.num_int || policy.candidates) { setError('Plusieurs polices portent ce n° : choisissez la bonne police.'); return; }
     const values = {
       ...form,
       num_police: policy.num_police || form.num_police,
+      num_int: policy.num_int,
       date_du: form.date_du || null, date_au: form.date_au || null, date_saisie: form.date_saisie || null,
       nette: round3(form.nette), decommission: round3(form.decommission), detaxe: round3(form.detaxe),
     };
     setBusy(true); setError(''); setNotice('');
     try {
       const saved = mode === 'new' ? await createRistourne(accessToken, values) : await updateRistourne(accessToken, current.num_ristourne, values);
+      if (mode === 'new' && importLine !== null) setSavedLines((lines) => [...lines, importLine]);
       show(saved);
       setNotice(mode === 'new' ? `Ristourne ${saved.num_ristourne} ajoutée.` : `Ristourne ${saved.num_ristourne} modifiée.`);
     } catch (saveError) { setError(saveError.message); }
@@ -138,7 +176,10 @@ export default function RistourneModal({ moduleId, onClose }) {
             <button type="button" className="expert-cancel" onClick={() => { setMode('edit'); setNotice(''); }} disabled={busy || !current || locked}>Modifier</button>
             <button type="button" className="catalog-delete" onClick={remove} disabled={busy || !current || locked}>Supprimer</button>
             <button type="button" className="expert-cancel" onClick={() => runSearch('')} disabled={busy}>Chercher</button>
+            <button type="button" className="expert-cancel rst-import" onClick={() => fileRef.current?.click()} disabled={busy} title="PDF ou image (JPG, PNG) d’un avis ou bordereau de ristourne">{reading ? 'Lecture du document…' : '⬆ Importer un document'}</button>
+            {imported && <button type="button" className="expert-cancel" onClick={() => setShowImport(true)} disabled={busy}>Lignes importées ({savedLines.length}/{imported.lignes.length})</button>}
           </>}
+          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) importFile(file); }} />
           {locked && !editing && <span className="rst-lock">Comptabilisée le {formatDate(current.date_comptabilise)} : non modifiable</span>}
         </div>
 
@@ -160,8 +201,15 @@ export default function RistourneModal({ moduleId, onClose }) {
             {field('date_saisie', 'Date saisie', { type: 'date' })}
             {shown('Code client', policy?.code_client)}
             <label className="catalog-field rst-wide"><span>Nom client</span><input value={policy?.nom_client ?? ''} readOnly tabIndex={-1} /></label>
+            {editing && policy?.candidates && <label className="catalog-field rst-full rst-choose"><span>Plusieurs polices portent le n° {form.num_police} : choisissez la bonne</span>
+              <select value="" onChange={(event) => setPolicy(policy.candidates.find((item) => item.num_int === event.target.value) || policy)}>
+                <option value="">— Choisir la police —</option>
+                {policy.candidates.map((item) => <option key={item.num_int} value={item.num_int}>{item.nom_client || 'Client sans nom'} · client {item.code_client} · {item.nom_compagnie || item.code_compagnie} · {[item.code_branche, item.nom_branche].filter(Boolean).join(' ')} (n° interne {item.num_int})</option>)}
+              </select>
+            </label>}
           </div>
         </div>
+        {editing && lineWarnings.length > 0 && <div className="rst-warnings" role="note"><strong>À vérifier sur le document :</strong><ul>{lineWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
 
         <div className="catalog-section">
           <div className="rst-grid">
@@ -193,6 +241,39 @@ export default function RistourneModal({ moduleId, onClose }) {
               <td>{item.num_ristourne}</td><td>{formatDate(item.date_saisie)}</td><td>{item.num_police}</td><td>{item.nom_client}</td><td>{item.nom_compagnie}</td><td className="num">{fmt(item.totale)}</td><td className="num">{fmt(item.solde)}</td>
             </tr>)}</tbody>
           </table>}
+        </div>
+      </div>}
+
+      {showImport && imported && <div className="rst-search" role="dialog" aria-label="Ristournes lues dans le document">
+        <div className="rst-search-head rst-import-head">
+          <div>
+            <strong>{imported.lignes.length} ristourne{imported.lignes.length > 1 ? 's' : ''} lue{imported.lignes.length > 1 ? 's' : ''} dans {imported.fileName}</strong>
+            <small>{[imported.type_document, imported.compagnie, imported.date_document && `du ${formatDate(imported.date_document)}`].filter(Boolean).join(' · ') || 'Document de ristourne'}
+              {imported.source === 'ocr' && ' · lecture OCR simple : seules les polices reconnues sont listées, montants et dates à saisir'}</small>
+          </div>
+          <button type="button" className="expert-cancel" onClick={() => setShowImport(false)}>Fermer</button>
+        </div>
+        <p className="rst-import-hint">Rien n’est enregistré automatiquement. Chargez une ligne, vérifiez-la avec le document, puis Enregistrer. Une case vide signifie que la valeur n’est pas lisible sur le document.</p>
+        <div className="rst-search-list">
+          <table className="rst-import-table">
+            <thead><tr><th>#</th><th>N° ristourne</th><th>Police</th><th>Client (document → base)</th><th>Du</th><th>Au</th><th className="num">Nette</th><th className="num">Décom.</th><th className="num">Détaxe</th><th className="num">Totale</th><th /></tr></thead>
+            <tbody>{imported.lignes.map((line, index) => {
+              const saved = savedLines.includes(index);
+              return <Fragment key={index}>
+                <tr className={saved ? 'is-saved' : line.warnings?.length ? 'has-warning' : ''}>
+                  <td>{index + 1}</td><td>{line.num_ristourne || '—'}</td><td>{line.num_police || '—'}</td>
+                  <td>{line.client || '—'}{line.policy && <small className="rst-db"> → {line.policy.nom_client} ({line.policy.nom_compagnie || line.policy.code_compagnie})</small>}</td>
+                  <td>{formatDate(line.date_du) || '—'}</td><td>{formatDate(line.date_au) || '—'}</td>
+                  <td className="num">{line.nette == null ? '—' : fmt(line.nette)}</td><td className="num">{line.decommission == null ? '—' : fmt(line.decommission)}</td>
+                  <td className="num">{line.detaxe == null ? '—' : fmt(line.detaxe)}</td><td className="num">{line.totale == null ? '—' : fmt(line.totale)}</td>
+                  <td className="rst-line-action">{saved ? <span className="rst-ok">Enregistrée</span>
+                    : line.exists ? <button type="button" className="expert-cancel" onClick={() => { setShowImport(false); open(line.num_ristourne); }}>Ouvrir l’existante</button>
+                    : <button type="button" className="expert-submit" onClick={() => loadLine(line, index)}>Charger</button>}</td>
+                </tr>
+                {line.warnings?.length > 0 && !saved && <tr className="rst-warning-row"><td /><td colSpan={10}>{line.warnings.join(' · ')}</td></tr>}
+              </Fragment>;
+            })}</tbody>
+          </table>
         </div>
       </div>}
     </section>
