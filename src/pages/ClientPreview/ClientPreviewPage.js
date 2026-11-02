@@ -101,6 +101,15 @@ function EditRecordDialog({ title, kicker, fields, record, onSave, onClose }) {
   </div>;
 }
 
+// Lien = the contact (TClient.code_locuteur / nom_locuteur). The legacy software filled these with placeholders
+// meaning "none" ('S', '.', 'X', 'SANS', '0'…); TClient.code is not a contact (a leftover 788 on 123 clients).
+const NO_VALUE = new Set(['0', 'S', 'SS', 'X', 'XX', 'SANS', 'IND', 'NEANT', 'AUCUN', 'NON', 'RAS']);
+const realValue = (value) => {
+  const text = String(value ?? '').trim();
+  return text && /[\p{L}\p{N}]/u.test(text) && !NO_VALUE.has(text.toUpperCase().replace(/[\s.]/g, '')) ? text : '';
+};
+const hasLien = (client) => Boolean(realValue(client.relatedCode) || realValue(client.relatedName) || realValue(client.relationship));
+
 // Only the administrator modifies a policy / receipt; another user may only correct a commission already set.
 const hasCommission = (record) => Number(record?.commission || 0) !== 0;
 
@@ -260,7 +269,7 @@ export default function ClientPreviewPage() {
         <DetailSection title="Identité"><Detail label="Code client" value={client.clientCode} /><Detail label="Date de création" value={client.createdAt} /><Detail label="Nom" value={client.lastName} /><Detail label="Prénom" value={client.firstName} /><Detail label="Nationalité" value={client.nationality} /><Detail label="Pays" value={client.country} /><Detail label="Date de naissance" value={client.birthDate} /><Detail label="Lieu de naissance" value={client.birthPlace} /><Detail label="Profession" value={client.profession} /><Detail label="Situation familiale" value={client.civilStatus} /><Detail label="N° de pièce d’identité" value={client.identityNumber} /><Detail label="Lieu de délivrance" value={client.identityPlace} /><Detail label="N° de permis" value={client.licenseNumber} /></DetailSection>
         <DetailSection title="Coordonnées"><Detail label="Adresse du domicile" value={client.homeAddress} /><Detail label="Ville / code postal" value={[client.homeCity, client.homePostalCode].filter(Boolean).join(' · ')} /><Detail label="Téléphone domicile" value={client.homePhone} /><Detail label="Adresse du bureau" value={client.officeAddress} /><Detail label="Téléphone bureau" value={client.officePhone} /><Detail label="Email" value={client.email} /><Detail label="Adresse de correspondance" value={client.correspondence} /></DetailSection>
         {/* Shown only when the client has a contact code or a quérabilité: a name alone is legacy filler (CAFETIER, S, X…). */}
-        {(String(client.referenceCode || client.relatedCode || '').trim() || String(client.relationship || '').trim()) && <DetailSection title="Lien"><Detail label="Code de contact" value={client.referenceCode || client.relatedCode} /><Detail label="Nom du contact" value={client.relatedName} /><Detail label="Quérabilité" value={client.relationship} /></DetailSection>}
+        {hasLien(client) && <DetailSection title="Lien"><Detail label="Code de contact" value={realValue(client.relatedCode)} /><Detail label="Nom du contact" value={realValue(client.relatedName)} /><Detail label="Quérabilité" value={realValue(client.relationship)} /></DetailSection>}
         <DetailSection title="Informations du dossier"><Detail label="Type client" value={client.clientType} /><Detail label="Exonéré" value={client.taxExempt ? 'Oui' : 'Non'} /><Detail label="Observation" value={client.notes} /></DetailSection>
       </article>
       {policiesOpen && <RecordsDialog kicker="DOSSIER CLIENT · MODULE 110" title="Polices du client" columns={POLICY_COLUMNS} {...policiesState} filters={[{ key: 'num_police', label: 'N° police', value: policyFilters.num_police, placeholder: 'Ex : 0522…' }, { key: 'nom_client', label: 'Nom client', value: policyFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'code_client', label: 'Code client', value: policyFilters.code_client, placeholder: 'Tous les clients', maxLength: 8 }]} onFilterChange={(key, value) => setPolicyFilters((current) => ({ ...current, [key]: value }))} onClose={() => setPoliciesOpen(false)} actions={(policy) => <><button type="button" onClick={() => showReceipts(policy)}>Quittances</button><button type="button" onClick={() => showClaims(policy)}>Sinistres</button>{canEdit(policy) && <button type="button" onClick={() => setEditing({ kind: 'policies', record: policy })}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}</>} />}

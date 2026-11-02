@@ -116,21 +116,23 @@ export default function ClientManagementPage({ modal = false }) {
     return () => { active = false; };
   }, [accessToken, client._persisted, client.clientCode, setClient]);
 
-  // Typing a contact code fills the contact name and quérabilité from that client's record.
+  // Typing a contact code (TClient.code_locuteur) fills the contact name from that client's record. Only on typing:
+  // opening a client must never invent a link (TClient.code, a legacy value shared by many clients, is not one).
+  const contactTypedRef = useRef(false);
   useEffect(() => {
-    const code = String(client.referenceCode ?? '').trim();
-    if (!code) return undefined;
+    const code = String(client.relatedCode ?? '').trim();
+    if (!code || !contactTypedRef.current) return undefined;
     let active = true;
     const timer = window.setTimeout(async () => {
       try {
         const contact = await getClientByCode(accessToken, code);
         if (!active) return;
         const name = [contact.lastName, contact.firstName].filter(Boolean).join(' ') || contact.nom_client || '';
-        setClient((current) => (String(current.referenceCode ?? '').trim() === code ? { ...current, relatedCode: code, relatedName: name, relationship: contact.title || contact.relationship || '' } : current));
+        setClient((current) => (String(current.relatedCode ?? '').trim() === code ? { ...current, relatedName: name } : current));
       } catch { /* unknown code: keep what was typed */ }
     }, 400);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [accessToken, client.referenceCode, setClient]);
+  }, [accessToken, client.relatedCode, setClient]);
 
   useEffect(() => {
     if (!successToast) return undefined;
@@ -186,6 +188,7 @@ export default function ClientManagementPage({ modal = false }) {
   }
 
   function updateField(name, value) {
+    if (name === 'relatedCode') contactTypedRef.current = true;
     setClient((current) => ({ ...current, [name]: value }));
     setNotice('');
   }
@@ -290,7 +293,7 @@ export default function ClientManagementPage({ modal = false }) {
             </>}
           </FormSection>
           <FormSection title="Lien" className="client-link-section">
-            <ClientField client={client} onChange={updateField} name="referenceCode" label="Code de contact" type="number" />
+            <ClientField client={client} onChange={updateField} name="relatedCode" label="Code de contact" type="number" />
             <ClientField client={client} onChange={updateField} name="relatedName" label="Nom du contact" />
             <ClientField client={client} onChange={updateField} name="relationship" label="Quérabilité" />
           </FormSection>
