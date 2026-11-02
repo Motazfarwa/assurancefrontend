@@ -1,0 +1,12 @@
+import { API_BASE_URL } from './apiBase';
+
+async function request(accessToken, path, method = 'GET') {
+  const response = await fetch(`${API_BASE_URL}/api/notifications${path}`, { method, headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` } });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Notifications indisponibles.');
+  return body;
+}
+
+// The latest actions: every user's for the administrator, one's own otherwise. { unread, items: [{ n, utilisateur, mvt, design, date, heure, unread }] }.
+export const listNotifications = (accessToken, limit = 30) => request(accessToken, `?limit=${limit}`);
+export const markNotificationsRead = (accessToken) => request(accessToken, '/lu', 'PUT');

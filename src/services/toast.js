@@ -7,7 +7,7 @@ export function showToast(text) {
 }
 
 // Requests that send data without saving anything (sign in, document reading, assistant, lookups): no toast.
-const SILENT = [/\/api\/auth\//, /\/api\/assistant\//, /\/extract\b/, /\/ocr/, /\/api\/bordereaux\/clients\b/];
+const SILENT = [/\/api\/auth\//, /\/api\/assistant\//, /\/api\/notifications\b/,/\/extract\b/, /\/ocr/, /\/api\/bordereaux\/clients\b/];
 
 // Message for a successful submission to the API, or '' when the request is not one.
 export function submissionMessage(url, method) {
