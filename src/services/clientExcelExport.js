@@ -1,3 +1,5 @@
+import { nationalityLabel } from './clientApi';
+
 const POLICY_LABELS = {
   num_int: 'N° dossier', num_police: 'N° police', code_branche: 'Branche', effet: 'Date effet',
   expiration: 'Expiration', etat: 'État', prime_total: 'Prime totale',
@@ -10,7 +12,7 @@ const RECEIPT_LABELS = {
 function clientRows(client) {
   return [
     ['Code client', client.clientCode], ['Date de création', client.createdAt], ['Nom', client.lastName],
-    ['Prénom', client.firstName], ['Nationalité', client.nationality], ['Pays', client.country],
+    ['Prénom', client.firstName], ['Nationalité', nationalityLabel(client)], ['Pays', client.country],
     ['Date de naissance', client.birthDate], ['Lieu de naissance', client.birthPlace],
     ['Profession', client.profession], ['Situation familiale', client.civilStatus],
     ['N° de pièce d’identité', client.identityNumber], ['Lieu de délivrance', client.identityPlace],

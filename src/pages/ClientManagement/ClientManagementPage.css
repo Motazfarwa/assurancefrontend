@@ -314,3 +314,6 @@
 .client-records-dialog > header .client-records-subtitle b { color: #1c394b; }
 .client-records-backdrop .client-records-dialog.is-wide { width: min(100%, 1600px); height: calc(100vh - 40px); height: calc(100dvh - 40px); max-height: none; }
 .client-records-dialog.is-wide .client-records-table-wrap { flex: 1; min-height: 0; }
+
+/* Polices du client: the risque is a free text, it wraps instead of widening the table */
+.client-records-table-wrap td.is-col-risque { min-width: 220px; max-width: 380px; white-space: normal; line-height: 1.4; overflow-wrap: anywhere; }

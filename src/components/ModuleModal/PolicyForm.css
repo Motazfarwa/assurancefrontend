@@ -558,3 +558,96 @@
 .pf-suggest button { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 5px; background: none; color: #173247; font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
 .pf-suggest button:hover, .pf-suggest button:focus { background: #eef6f5; }
 .pf-suggest button small { color: #587079; font-weight: 500; }
+
+/* ===== Tablet and phone: one clear column, sections one under the other, nothing overlapping =====
+   (placed last, and with .policy-legacy-form in each selector, so it wins over the desktop one-screen rules above) */
+@media (max-width: 900px) {
+  .module-modal.policy-modal-expanded { width: 100vw !important; max-width: 100vw !important; height: 100dvh !important; max-height: 100dvh !important; border-radius: 0; }
+  .policy-modal-expanded .policy-legacy-form.is-view,
+  .policy-modal-expanded .policy-legacy-form.is-create {
+    display: flex; flex-direction: column; gap: 22px;
+    flex: 1 0 auto; overflow: visible; padding: 16px 16px 20px;
+  }
+  .policy-modal-expanded .policy-legacy-form > *,
+  .policy-modal-expanded .policy-legacy-form .pf-info-row > * { grid-column: auto !important; grid-row: auto !important; width: 100%; margin: 0; }
+  /* Reading order: identification, police, tous risques + garanties, observation, quittances, messages, buttons */
+  .policy-modal-expanded .policy-legacy-form > .pf-toolbar { order: 0; }
+  .policy-modal-expanded .policy-legacy-form > .pf-identification { order: 1; }
+  .policy-modal-expanded .policy-legacy-form .pf-info-row > .pf-policy-info { order: 2; }
+  .policy-modal-expanded .policy-legacy-form > .pf-right-column,
+  .policy-modal-expanded .policy-legacy-form > .pf-garanties { order: 3; }
+  .policy-modal-expanded .policy-legacy-form .pf-info-row > .pf-observation-side { order: 4; }
+  .policy-modal-expanded .policy-legacy-form > .pf-quittance-info { order: 5; }
+  .policy-modal-expanded .policy-legacy-form > .pf-observation-section { order: 6; }
+  .policy-modal-expanded .policy-legacy-form > .pf-error,
+  .policy-modal-expanded .policy-legacy-form > .pf-success { order: 7; }
+  .policy-modal-expanded .policy-legacy-form > .pf-footer { order: 8; }
+
+  .policy-modal-expanded .policy-legacy-form .pf-section { padding: 20px 14px 14px; }
+  .policy-modal-expanded .policy-legacy-form .pf-section h3 { margin: -29px 0 12px; font-size: 13px; }
+  .policy-modal-expanded .policy-legacy-form .pf-right-column { gap: 22px; }
+
+  /* Fields: full labels, comfortable height */
+  .policy-modal-expanded .policy-legacy-form .pf-field { gap: 5px; font-size: 12px; }
+  .policy-modal-expanded .policy-legacy-form .pf-field > span { white-space: normal; overflow: visible; line-height: 1.25; }
+  .policy-modal-expanded .policy-legacy-form .pf-field input,
+  .policy-modal-expanded .policy-legacy-form .pf-field select { height: 40px; min-height: 40px; font-size: 14px; }
+  .policy-modal-expanded .policy-legacy-form .pf-check { min-height: 32px; font-size: 13px; white-space: normal; }
+  .policy-modal-expanded .policy-legacy-form .pf-check input { width: 18px; height: 18px; flex: none; }
+
+  /* Grids: three columns on a tablet */
+  .policy-modal-expanded .policy-legacy-form .pf-grid,
+  .policy-modal-expanded .policy-legacy-form .pf-grid.pf-grid-identification,
+  .policy-modal-expanded .policy-legacy-form .pf-policy-info .pf-grid,
+  .policy-modal-expanded .policy-legacy-form .pf-grid.pf-grid-garanties { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .policy-modal-expanded .policy-legacy-form .pf-grid-identification > .pf-field { grid-column: span 1; }
+  .policy-modal-expanded .policy-legacy-form .pf-grid-identification > .pf-field-wide { grid-column: span 2; }
+  .policy-modal-expanded .policy-legacy-form .pf-grid > .pf-field.pf-risque { grid-column: 1 / -1; }
+  .policy-modal-expanded .policy-legacy-form .pf-field.pf-risque textarea { height: auto; min-height: 84px; font-size: 14px; }
+
+  /* Renouvelable / Ferme on one line, then the term fields */
+  .policy-modal-expanded .policy-legacy-form .pf-term-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .policy-modal-expanded .policy-legacy-form .pf-term-row > .pf-check { min-height: 32px; align-self: center; }
+  .policy-modal-expanded .policy-legacy-form .pf-check-row { gap: 10px 18px; margin-bottom: 14px; }
+  .policy-modal-expanded .policy-legacy-form .pf-franchise { flex-wrap: wrap; font-size: 13px; }
+  .policy-modal-expanded .policy-legacy-form .pf-franchise input { height: 38px; font-size: 14px; }
+  .policy-modal-expanded .policy-legacy-form .pf-tousrisque { gap: 10px 18px; padding: 12px 14px; }
+
+  .policy-modal-expanded .policy-legacy-form .pf-observation,
+  .policy-modal-expanded .policy-legacy-form .pf-info-row .pf-observation-side .pf-observation,
+  .policy-modal-expanded .policy-legacy-form .pf-observation-section .pf-observation { width: 100%; height: auto; min-height: 90px; font-size: 14px; resize: vertical; }
+  .policy-modal-expanded .policy-legacy-form .pf-receipts-wrap { max-height: 320px; overflow: auto; }
+
+  .policy-modal-expanded .policy-legacy-form .pf-toolbar { gap: 10px; }
+  .policy-modal-expanded .policy-legacy-form .pf-toolbar strong { font-size: 14px; }
+  .policy-modal-expanded .policy-legacy-form .pf-toolbar button { min-height: 38px; font-size: 13px; }
+  .policy-modal-expanded .policy-legacy-form > .pf-footer { position: sticky; bottom: 0; z-index: 5; margin: 0 -16px -20px; padding: 12px 16px; border-top: 1px solid #e4eaec; background: #fff; }
+  .policy-modal-expanded .policy-legacy-form > .pf-footer button { flex: 1 1 0; min-height: 44px; font-size: 14px; }
+}
+
+/* Phone: two fields per row */
+@media (max-width: 600px) {
+  .policy-modal-expanded .module-modal-header { padding: 12px 16px !important; }
+  .policy-modal-expanded .policy-legacy-form.is-view,
+  .policy-modal-expanded .policy-legacy-form.is-create { padding: 14px 12px 18px; gap: 20px; }
+  .policy-modal-expanded .policy-legacy-form .pf-grid,
+  .policy-modal-expanded .policy-legacy-form .pf-grid.pf-grid-identification,
+  .policy-modal-expanded .policy-legacy-form .pf-policy-info .pf-grid,
+  .policy-modal-expanded .policy-legacy-form .pf-grid.pf-grid-garanties,
+  .policy-modal-expanded .policy-legacy-form .pf-term-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; }
+  .policy-modal-expanded .policy-legacy-form .pf-grid-identification > .pf-field-wide { grid-column: 1 / -1; }
+  .policy-modal-expanded .policy-legacy-form .pf-section { padding: 20px 12px 12px; }
+  .policy-modal-expanded .policy-legacy-form .pf-dc-list { grid-template-columns: 1fr; }
+  .policy-modal-expanded .policy-legacy-form .pf-franchise.pf-inline-date input { width: 100%; }
+  .policy-modal-expanded .policy-legacy-form > .pf-footer { margin: 0 -12px -18px; padding: 10px 12px; }
+}
+
+/* Very small phone: one field per row */
+@media (max-width: 360px) {
+  .policy-modal-expanded .policy-legacy-form .pf-grid,
+  .policy-modal-expanded .policy-legacy-form .pf-grid.pf-grid-identification,
+  .policy-modal-expanded .policy-legacy-form .pf-policy-info .pf-grid,
+  .policy-modal-expanded .policy-legacy-form .pf-term-row { grid-template-columns: 1fr; }
+  .policy-modal-expanded .policy-legacy-form .pf-grid-identification > .pf-field,
+  .policy-modal-expanded .policy-legacy-form .pf-grid-identification > .pf-field-wide { grid-column: 1 / -1; }
+}

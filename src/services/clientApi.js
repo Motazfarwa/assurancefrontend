@@ -107,7 +107,7 @@ export function toClientPayload(client) {
     LieuCIN: client.identityPlace || null,
     DateCIN: dateOnly(client.identityDate),
     Pays: client.country || null,
-    Nationnalite: client.nationality === 'Autre' ? (client.nationalityOther || 'Autre') : (client.nationality || null),
+    Nationnalite: nationalityToSave(client),
     LieuNaissance: client.birthPlace || null,
     Sit_Fam: civilStatus[client.civilStatus] || null,
     Titre: client.title || null,
@@ -171,6 +171,33 @@ export function rankClients(records, query) {
     .map((item) => item.record);
 }
 
+// Nationality as stored in TClient.Nationnalite (often in capitals: 'ITALIENNE', 'TUNISIENNE'). It matches one of the
+// listed choices whatever its case or accents; any other value is kept exactly as stored ('Autre' + its text).
+export const NATIONALITIES = ['Tunisienne', 'Italienne', 'Française'];
+const foldText = (value) => String(value ?? '').trim().normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
+const storedNationality = (value) => {
+  const text = String(value ?? '').trim();
+  return /\p{L}/u.test(text) ? text : ''; // '.', '0'… mean "not filled in"
+};
+function nationalityFields(raw) {
+  const stored = storedNationality(raw);
+  if (!stored) return { nationality: '', nationalityOther: '' };
+  const listed = NATIONALITIES.find((option) => foldText(option) === foldText(stored));
+  return listed ? { nationality: listed, nationalityOther: '' } : { nationality: 'Autre', nationalityOther: stored };
+}
+
+// The nationality to save: the stored value unchanged when the user kept it, else what was chosen or typed.
+function nationalityToSave(client) {
+  const chosen = client.nationality === 'Autre' ? String(client.nationalityOther || '').trim() : (client.nationality || '');
+  const stored = storedNationality(client.Nationnalite);
+  if (stored && foldText(chosen) === foldText(stored)) return client.Nationnalite;
+  if (!chosen && !stored) return client.Nationnalite ?? null; // left empty: '.', '0'… stay as they were
+  return chosen || null;
+}
+
+// The nationality to display.
+export const nationalityLabel = (client) => (client.nationality === 'Autre' ? String(client.nationalityOther || '').trim() : client.nationality) || '';
+
 export function normalizeClientRecord(record) {
   const type = record.Type_Client;
   const homePhones = record.telephones_domicile || [{ value: record.tel || '', label: '' }, ...Array.from({ length: 3 }, () => ({ value: '', label: '' }))];
@@ -182,8 +209,7 @@ export function normalizeClientRecord(record) {
     clientCode: record.code_client || record.clientCode || '',
     lastName: record.Nom || record.lastName || '',
     firstName: record.Prenom || record.firstName || '',
-    nationality: ['Tunisienne', 'Italienne', 'Française'].includes(record.Nationnalite) ? record.Nationnalite : record.Nationnalite ? 'Autre' : (record.nationality || ''),
-    nationalityOther: record.Nationnalite && !['Tunisienne', 'Italienne', 'Française', 'Autre'].includes(record.Nationnalite) ? record.Nationnalite : record.nationalityOther || '',
+    ...('Nationnalite' in record ? nationalityFields(record.Nationnalite) : { nationality: record.nationality || '', nationalityOther: record.nationalityOther || '' }),
     homePhones,
     homeEmails,
     officePhones,
