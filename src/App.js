@@ -8,6 +8,9 @@ import LoginPage from './pages/Login/LoginPage';
 import AssistantWidget from './components/AssistantWidget/AssistantWidget';
 import AppToast from './components/AppToast/AppToast';
 
+// The "Assistant IA" button is hidden for now; set to true to show it again.
+const SHOW_ASSISTANT = false;
+
 function ForbiddenPage() {
   return <main className="access-denied"><div><span className="dashboard-kicker">ACCESS DENIED</span><h1>You do not have permission to view this page.</h1><a href="/login">Return to sign in</a></div></main>;
 }
@@ -45,7 +48,7 @@ function App() {
   const Page = routes[pathname] || LoginPage;
   return <>
     <Page />
-    {pathname !== '/login' && <AssistantWidget />}
+    {SHOW_ASSISTANT && pathname !== '/login' && <AssistantWidget />}
     <AppToast />
   </>;
 }
