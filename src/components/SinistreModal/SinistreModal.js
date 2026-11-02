@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientByCode } from '../../services/clientApi';
 import {
-  createSinistre, deleteSinistre, extractSinistre, findClaimPolicy, getSinistre, getSinistreLookups, listClientPolicies, listSinistres, nextSinistreNumber, updateSinistre,
+  createSinistre, extractSinistre, findClaimPolicy, getSinistre, getSinistreLookups, listClientPolicies, listSinistres, nextSinistreNumber, updateSinistre,
 } from '../../services/sinistreApi';
 import { listAccounts } from '../../services/chequeApi';
 import { showToast } from '../../services/toast';
@@ -159,13 +159,6 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   }
 
   const confirmLeave = () => !dirty || window.confirm('Les modifications non enregistrées seront perdues. Continuer ?');
-
-  function startNew() {
-    if (!confirmLeave()) return;
-    // Still a new claim: the proposed number is kept (it only changes with the claim date or once a claim is created).
-    setForm(current ? blank() : { ...blank(), Num_Sinistre_Agence: proposed }); autoNumber.current = current ? '' : proposed;
-    setCurrent(''); setDirty(false); setTried(false); setMessage(null); setClientPolicies([]); setTab('sinistre'); setReglement(null);
-  }
 
   // A stored claim may lack the client name, company or branch: they are taken from its client and policy.
   async function completed(loaded) {
@@ -376,20 +369,6 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     if (current || await save()) setTab('suivi');
   }
 
-  async function remove() {
-    if (!current || !window.confirm(`Supprimer définitivement le dossier ${current} ?`)) return;
-    setBusy(true); setMessage(null);
-    try {
-      await deleteSinistre(accessToken, current);
-      setForm(blank()); setCurrent(''); setDirty(false); setTab('sinistre'); setReglement(null);
-      info(`Dossier ${current} supprimé.`);
-    } catch (requestError) {
-      fail(requestError.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function close() {
     if (confirmLeave()) onClose();
   }
@@ -510,10 +489,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         </header>
 
         <div className="snr-toolbar">
-          <button type="button" className="snr-tool" onClick={startNew} disabled={busy}>Nouveau</button>
           {current && <button type="button" className="snr-tool snr-primary" onClick={() => save()} disabled={busy || scanning || !dirty} title="Ctrl+S">{busy ? 'Patientez…' : 'Enregistrer'}</button>}
           <button type="button" className="snr-tool snr-submit" onClick={() => save({ reset: true })} disabled={busy || scanning || (!dirty && Boolean(current))} title="Enregistre le sinistre puis vide le formulaire pour un nouveau sinistre">{busy && !current ? 'Patientez…' : 'Soumettre'}</button>
-          <button type="button" className="snr-tool" onClick={remove} disabled={busy || !current}>Supprimer</button>
           <button type="button" className="snr-tool" onClick={() => setList(newList(clientCode))} disabled={busy}>Lister</button>
           {message && <p className={`snr-message is-${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'} title={message.text}>{message.text}</p>}
           <span className="snr-spacer" />

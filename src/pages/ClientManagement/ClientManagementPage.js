@@ -106,6 +106,18 @@ export default function ClientManagementPage({ modal = false }) {
   const fileInputRef = useRef(null);
   const windowRef = useRef(null);
 
+  // Modifying an existing client starts from the database, not from a copy kept in the browser: saving a stale copy
+  // would write its old values back (once, when the screen opens; later edits are the user's).
+  useEffect(() => {
+    const code = String(client.clientCode || '').trim();
+    if (!client._persisted || !code) return undefined;
+    let active = true;
+    getClientByCode(accessToken, code)
+      .then((fresh) => { if (active) setClient((current) => (String(current.clientCode).trim() === code ? { ...fresh, _persisted: true } : current)); })
+      .catch(() => { /* offline or deleted: keep what is shown */ });
+    return () => { active = false; };
+  }, [accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // A new client gets the last client code + 1, shown read-only.
   useEffect(() => {
     if (client._persisted || client.clientCode) return undefined;

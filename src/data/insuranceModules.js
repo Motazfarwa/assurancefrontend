@@ -31,6 +31,6 @@ export const INSURANCE_MODULES = [
   { id: '340', category: 'collections', title: 'Etat des impayes', description: 'Quittances impayees avec ou sans piece en instance, global par client ou memoire de reglement.', permission: P.REPORTS_VIEW, form: 'etat-impaye' },
   { id: '350', category: 'collections', title: 'Etat des acomptes', description: 'Quittances partiellement reglees : montant regle et reste a payer par client.', permission: P.REPORTS_VIEW, form: 'acompte' },
 
-  { id: '600', category: 'claims', title: 'Declarer un sinistre', description: 'Ouvrir un dossier de sinistre.', permission: P.CLAIMS_CREATE, form: 'sinistre-new' },
+  { id: '600', category: 'claims', title: 'Declarer un sinistre', description: 'Ouvrir un dossier de sinistre.', permission: P.CLAIMS_CREATE, adminOnly: true, form: 'sinistre-new' }, // employees declare from Gestion des sinistres (620)
   { id: '620', category: 'claims', title: 'Gestion des sinistres', description: 'Saisir, scanner (constat, declaration) et suivre les dossiers sinistres.', permission: P.CLAIMS_VIEW_ALL, form: 'sinistre' },
 ];

@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useClient } from '../../contexts/ClientContext';
 import { navigate } from '../../navigation';
 import { listClientRecords, searchRecords, updateClientRecord } from '../../services/clientRecordsApi';
+import { getClientByCode } from '../../services/clientApi';
 import { downloadClientExcel } from '../../services/clientExcelExport';
 import '../ClientManagement/ClientManagementPage.css';
 
@@ -114,8 +115,19 @@ const hasLien = (client) => Boolean(realValue(client.relatedCode) || realValue(c
 const hasCommission = (record) => Number(record?.commission || 0) !== 0;
 
 export default function ClientPreviewPage() {
-  const { client } = useClient();
+  const { client, setClient } = useClient();
   const { accessToken, user } = useAuth();
+  // The fiche always shows the client as stored in the database, never a copy kept in the browser (that copy
+  // may hold old or unsaved values, e.g. a contact filled in by mistake).
+  useEffect(() => {
+    const code = String(client.clientCode || '').trim();
+    if (!client._persisted || !code || !accessToken) return undefined;
+    let active = true;
+    getClientByCode(accessToken, code)
+      .then((fresh) => { if (active) setClient((current) => (String(current.clientCode).trim() === code ? { ...fresh, _persisted: true } : current)); })
+      .catch(() => { /* offline or deleted: keep what is shown */ });
+    return () => { active = false; };
+  }, [accessToken, client.clientCode, client._persisted, setClient]);
   const canEdit = (record) => Boolean(user?.isAdmin) || hasCommission(record);
   const editFields = (fields) => (user?.isAdmin ? fields : fields.filter((field) => field.key === 'commission'));
   const [policiesOpen, setPoliciesOpen] = useState(false);
