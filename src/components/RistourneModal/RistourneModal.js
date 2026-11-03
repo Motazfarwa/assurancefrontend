@@ -80,7 +80,9 @@ export default function RistourneModal({ moduleId, onClose }) {
     return {
       rows: lines.length ? rows.filter(([, value]) => value !== undefined) : [],
       empty: 'Aucune ristourne trouvée dans ce document.',
-      note: document.source === 'ocr' ? 'Lecture OCR simple (service IA indisponible) : vérifiez chaque valeur.' : 'Lu par l’IA. « Appliquer » ouvre la liste des ristournes : chargez-les une à une, vérifiez puis enregistrez.',
+      note: document.source === 'ai'
+        ? 'Lu par l’IA. « Voir les ristournes lues » ouvre la liste : chargez-les une à une, vérifiez puis enregistrez.'
+        : 'Lu par reconnaissance de texte (OCR) : vérifiez chaque montant avec le document avant d’enregistrer.',
       warnings: [...new Set(lines.flatMap((line) => line.warnings || []))],
     };
   };
@@ -294,6 +296,6 @@ export default function RistourneModal({ moduleId, onClose }) {
         </div>
       </div>}
     </section>
-    {importFile && <DocumentImportDialog file={importFile} kicker={`PRODUCTION · MODULE ${moduleId} · IMPORT`} title="Importer un document de ristourne" read={() => extractRistournes(accessToken, importFile)} summarize={summarizeImport} applyLabel="Voir les ristournes lues" onApply={applyImport} onClose={() => setImportFile(null)} />}
+    {importFile && <DocumentImportDialog file={importFile} kicker={`PRODUCTION · MODULE ${moduleId} · IMPORT`} title="Importer un document de ristourne" read={(onProgress) => extractRistournes(accessToken, importFile, onProgress)} summarize={summarizeImport} applyLabel="Voir les ristournes lues" onApply={applyImport} onClose={() => setImportFile(null)} />}
   </div>;
 }
