@@ -15,7 +15,7 @@ function DetailSection({ title, children }) {
   return <section className="client-detail-section"><h2>{title}</h2><div className="client-detail-grid">{children}</div></section>;
 }
 
-const POLICY_COLUMNS = [['num_police', 'N° police'], ['code_branche', 'Branche'], ['risque', 'Risque'], ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['prime_total', 'Prime totale'], ['obser', 'Observation'], ['commission', 'Commission']];
+const POLICY_COLUMNS = [['num_police', 'N° police'], ['nom_compagnie', 'Compagnie'], ['risque', 'Risque'], ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['prime_total', 'Prime totale'], ['obser', 'Observation'], ['commission', 'Commission']];
 // Same columns as the legacy receipts grid. Effet = receipt start (emission) date; Reg = settled (has a settlement date).
 const RECEIPT_COLUMNS = [['num_quittance', 'N° quittance'], ['date_saisie', 'Date Saisie'], ['date_emission', 'Effet'], ['tc', 'TC'], ['prime_net', 'P. Net'], ['reg', 'Reg'], ['Date_Reglement', 'Date Reg'], ['commission', 'MM. Comp'], ['Date_M', 'Date Mvt'], ['montant_quittance', 'Mont. Quit.'], ['solde_quittance', 'Solde']];
 
@@ -56,7 +56,7 @@ const initialValue = (record, field) => {
 
 // Policy status, as in the legacy "Liste des polices" (same rule as the API): AN = in force, expired once its
 // expiration date is past; SS / RE / RV = suspended or terminated.
-const POLICY_STATUSES = [['tous', 'Tous'], ['vigueur', 'En vigueur'], ['susp', 'Susp. / Rés.'], ['expirees', 'Expirées']];
+const POLICY_STATUSES = [['vigueur', 'En vigueur'], ['susp', 'Susp. / Rés.'], ['expirees', 'Expirées']];
 function policyStatus(policy) {
   const etat = String(policy.etat || '').trim().toUpperCase();
   if (etat === 'AN') return policy.expiration && String(policy.expiration).slice(0, 10) < new Date().toISOString().slice(0, 10) ? 'Expirée' : 'En vigueur';
@@ -65,7 +65,7 @@ function policyStatus(policy) {
 }
 const POLICY_DETAILS = [
   ['num_police', 'N° police'], ['num_int', 'N° dossier'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
-  ['code_compagnie', 'Compagnie'], ['code_branche', 'Branche'], ['risque', 'Risque'], ['etat', 'État'],
+  ['nom_compagnie', 'Compagnie'], ['code_branche', 'Branche'], ['risque', 'Risque'], ['etat', 'État'],
   ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['duree', 'Durée (mois)'],
   ['num_imat', 'Immatriculation'], ['marque', 'Marque'], ['Garantie', 'Garantie'], ['Franchise', 'Franchise'],
   ['capital', 'Capital'], ['prime_net', 'Prime nette'], ['commission', 'Commission'], ['prime_total', 'Prime totale'],
@@ -174,7 +174,7 @@ export default function ClientPreviewPage() {
   const [receiptsState, setReceiptsState] = useState({ loading: false, error: '', records: [] });
   const [claimsPolicy, setClaimsPolicy] = useState(null);
   const [claimsState, setClaimsState] = useState({ loading: false, error: '', records: [] });
-  const [policyFilters, setPolicyFilters] = useState({ code_client: '', nom_client: '', num_police: '', statut: 'tous' });
+  const [policyFilters, setPolicyFilters] = useState({ code_client: '', nom_client: '', num_police: '', statut: 'vigueur' });
   const [detailPolicy, setDetailPolicy] = useState(null);
   const [receiptFilters, setReceiptFilters] = useState({ code_client: '', nom_client: '', num_quittance: '', date_saisie: '' });
   const [receiptsScoped, setReceiptsScoped] = useState(true); // until a filter is edited, only the opened policy's receipts
@@ -222,7 +222,7 @@ export default function ClientPreviewPage() {
   }, [receiptsPolicy, receiptFilters, receiptsScoped]);
 
   function showPolicies() {
-    setPolicyFilters({ code_client: client.clientCode || '', nom_client: '', num_police: '', statut: 'tous' });
+    setPolicyFilters({ code_client: client.clientCode || '', nom_client: '', num_police: '', statut: 'vigueur' });
     setPoliciesState({ loading: true, error: '', records: [] });
     setPoliciesOpen(true);
   }
