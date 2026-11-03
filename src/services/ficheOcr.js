@@ -418,6 +418,9 @@ export async function readDocumentText(file, onProgress) {
   }
 }
 
+// The fiche fields found in a text read elsewhere (the server OCR, printed and handwritten).
+export const ficheFromText = (text) => mergeReadings([text], 'ocr');
+
 // Each reading is parsed on its own and the first non-empty value wins, so one bad pass cannot hide a good one.
 function mergeReadings(texts, source) {
   const readings = texts.map((text) => extractFields(text));

@@ -1,4 +1,4 @@
-import { readAiThenOcr } from './documentReading';
+import { readWithOcr } from './documentReading';
 
 import { API_BASE_URL } from './apiBase';
 
@@ -47,10 +47,7 @@ const followUp = (kind) => ({
 export const sinistreEtapes = followUp('etapes');
 export const sinistreAppels = followUp('appels');
 
-// Reads a scanned constat amiable / déclaration (JPG, PNG or PDF), handwritten included: the AI first, OCR in the
-// browser when it is unavailable; the server finds the claim's values and recognises the agency's policy.
-export const extractSinistre = (token, file, onProgress) => readAiThenOcr(file, onProgress, {
-  ai: (payload) => request('/api/sinistres/extract', token, { method: 'POST', body: JSON.stringify(payload) }),
-  fromText: (text) => request('/api/sinistres/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) }),
-  isEmpty: (result) => !Object.keys(result.sinistre || {}).length,
-});
+// Reads a scanned constat amiable / déclaration (JPG, PNG or PDF) by OCR (handwriting too with the server OCR); the
+// server finds the claim's values in its text and recognises the agency's policy.
+export const extractSinistre = (token, file, onProgress) => readWithOcr(token, file, onProgress,
+  (text) => request('/api/sinistres/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) }));

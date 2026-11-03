@@ -1,4 +1,4 @@
-import { readAiThenOcr } from './documentReading';
+import { readWithOcr } from './documentReading';
 import { API_BASE_URL } from './apiBase';
 
 async function request(path, accessToken, options = {}) {
@@ -29,10 +29,7 @@ export const createBanque = (token, values) => request('/api/banques', token, { 
 export const updateBanque = (token, code, values) => request(`/api/banques/${encodeURIComponent(code)}`, token, { method: 'PUT', body: JSON.stringify(values) });
 export const deleteBanque = (token, code) => request(`/api/banques/${encodeURIComponent(code)}`, token, { method: 'DELETE' });
 
-// Reads a scanned RIB / attestation / relevé bancaire (JPG, PNG or PDF): the AI first, OCR in the browser when it is
-// unavailable; the bank, the RIB, the holder… are found in it.
-export const extractBanque = (token, file, onProgress) => readAiThenOcr(file, onProgress, {
-  ai: (payload) => request('/api/banques/extract', token, { method: 'POST', body: JSON.stringify(payload) }),
-  fromText: (text) => request('/api/banques/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) }),
-  isEmpty: (result) => !Object.values(result.fields || {}).some(Boolean),
-});
+// Reads a scanned RIB / attestation / relevé bancaire (JPG, PNG or PDF) by OCR; the server finds the bank, the RIB,
+// the holder… in its text.
+export const extractBanque = (token, file, onProgress) => readWithOcr(token, file, onProgress,
+  (text) => request('/api/banques/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) }));

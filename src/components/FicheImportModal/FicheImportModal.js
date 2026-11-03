@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { checkValue, isPdf, scanFiche, scanFicheWithAI } from '../../services/ficheOcr';
+import { checkValue, ficheFromText, isPdf, scanFiche } from '../../services/ficheOcr';
+import { serverOcrText } from '../../services/documentReading';
 import './FicheImportModal.css';
 
 const GROUPS = [
@@ -34,7 +35,7 @@ function buildPatches(rows) {
 }
 
 export default function FicheImportModal({ file, accessToken, onClose, onApply }) {
-  const [method, setMethod] = useState('ai'); // ai, then ocr if the AI could not read the document
+  const [method, setMethod] = useState('serveur'); // serveur: OCR of printed + handwritten text; navigateur: OCR in the browser
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('scanning');
   const [error, setError] = useState('');
@@ -47,21 +48,22 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
 
   useEffect(() => {
     let active = true;
-    let reported = false; // the OCR reports its own progress; the AI reading gets an estimate
+    let reported = false; // the browser OCR reports its own progress; the server OCR gets an estimate
     const started = Date.now();
     const timer = setInterval(() => {
-      if (active && !reported) setProgress(0.92 * (1 - Math.exp(-(Date.now() - started) / 12000)));
+      if (active && !reported) setProgress(0.92 * (1 - Math.exp(-(Date.now() - started) / 6000)));
     }, 250);
-    // The AI reads printed and handwritten documents; when it is unavailable (Google busy, quota, network) the
-    // document is read by OCR in the browser instead, so the import always gives a result.
-    scanFicheWithAI(file, accessToken)
-      .catch(() => {
-        if (active) setMethod('ocr');
-        return scanFiche(file, (value) => { reported = true; if (active) setProgress(value); });
+    const onProgress = (value) => { reported = true; if (active) setProgress(value); };
+    // OCR only (no AI): the server OCR reads printed and handwritten text and the fiche fields are found in it;
+    // without it, the browser's OCR reads the document in several passes (printed text).
+    serverOcrText(accessToken, file)
+      .then((read) => {
+        const engine = read.trim() ? 'serveur' : 'navigateur';
+        if (active) setMethod(engine);
+        return engine === 'serveur' ? ficheFromText(read) : scanFiche(file, onProgress);
       })
       .then((result) => {
         if (!active) return;
-        setMethod(result.source === 'ai' ? 'ai' : 'ocr');
         setText(result.text);
         setRows(result.fields.map((field) => ({ ...field, use: Boolean(field.value) && !field.warning })));
         setStatus('done');
@@ -105,12 +107,12 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
               <div className="fiche-progress" role="status">
                 <strong>Lecture du document… {Math.round(progress * 100)} %</strong>
                 <div><i style={{ width: `${Math.max(4, progress * 100)}%` }} /></div>
-                <small>{method === 'ai' ? 'Analyse du document par l’IA (texte imprimé et manuscrit)…' : 'IA indisponible : lecture du texte par OCR dans le navigateur…'}</small>
+                <small>{method === 'serveur' ? 'Lecture OCR du texte imprimé et manuscrit…' : 'Lecture OCR du texte (français et arabe) dans le navigateur, page par page…'}</small>
               </div>
             )}
             {status === 'error' && <p className="fiche-error" role="alert">{error}</p>}
             {status === 'done' && <>
-              <p className="fiche-hint">{method === 'ai' ? 'Lu par l’IA. ' : 'Lu par OCR (IA indisponible) : le texte manuscrit peut manquer. '}Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
+              <p className="fiche-hint">{method === 'serveur' ? 'Lu par OCR (texte imprimé et manuscrit). ' : 'Lu par OCR dans le navigateur (texte imprimé ; le manuscrit peut manquer). '}Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
               {GROUPS.map((group) => (
                 <fieldset key={group.id}>
                   <legend>{group.label}</legend>

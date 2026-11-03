@@ -199,6 +199,33 @@ const newList = (clientCode = '') => ({
   typeSinistre: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
+// Columns of the claims list: [field, label, kind]; a click on a header sorts by it, a second click reverses the order.
+const CLAIM_COLUMNS = [
+  ['Num_Sinistre_Agence', 'N° sinistre', 'text'], ['Date_Sinistre', 'Date sinistre', 'date'], ['Code_Client', 'Client', 'text'],
+  ['nom_client', 'Nom client', 'text'], ['Num_Int', 'N° police', 'text'], ['Num_Imat', 'Immat.', 'text'], ['Type_Sinistre', 'Type', 'text'],
+  ['nom_expert', 'Expert', 'text'], ['Risque', 'Observation', 'text'], ['Montant_Devis', 'Devis', 'number'], ['Montant_Reglement', 'Réglé', 'number'],
+];
+const KINDS = Object.fromEntries(CLAIM_COLUMNS.map(([key, , kind]) => [key, kind]));
+// Empty values always go last, whatever the order.
+function sortClaims(rows, { key, dir }) {
+  const kind = KINDS[key];
+  const valueOf = (row) => {
+    const value = row[key];
+    if (value === null || value === undefined || String(value).trim() === '') return null;
+    if (kind === 'number') return Number(value) || 0;
+    if (kind === 'date') return String(value).slice(0, 19);
+    return String(value).trim();
+  };
+  const sign = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const left = valueOf(a);
+    const right = valueOf(b);
+    if (left === null || right === null) return left === right ? 0 : left === null ? 1 : -1;
+    const order = kind === 'number' ? left - right : String(left).localeCompare(String(right), 'fr', { numeric: true, sensitivity: 'base' });
+    return order * sign || String(a.Num_Sinistre_Agence).localeCompare(String(b.Num_Sinistre_Agence), 'fr', { numeric: true });
+  });
+}
+
 function byAdverseCompany(items, compagnies) {
   const names = new Map(compagnies.map((option) => [String(option.id), option.label]));
   const groups = new Map();
@@ -227,6 +254,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [message, setMessage] = useState(null); // { kind: 'error' | 'info', text }
   // Module 620 opens on a new claim ("Lister" shows the list); from a client file it opens on that client's claims.
   const [list, setList] = useState(() => (mode === 'manage' && clientCode ? newList(clientCode) : null));
+  const [claimSort, setClaimSort] = useState({ key: 'Date_Sinistre', dir: 'asc' }); // the oldest claims first
   const [clientPolicies, setClientPolicies] = useState([]); // the typed client's policies, proposed in "N° police"
   const [tab, setTab] = useState('sinistre'); // 'sinistre' | 'suivi' (steps, calls and letters of a stored claim)
   // Ticking "Réglé" asks for the settlement (piece, date, agency account): kept here and stored in TRegCli with the claim.
@@ -469,9 +497,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return {
       rows: filled.length || read.length ? [['Type de document', kind], ['Police de l’agence', result.police ? `${result.police.num_int} (véhicule ${result.vehicule_assure})` : 'Aucune reconnue'], ...filled, ...read] : [],
       empty: 'Aucune information lisible dans ce document : saisissez le dossier à la main.',
-      note: result.source === 'ai'
-        ? 'Lu par l’IA (texte imprimé et manuscrit). Les lignes « Dossier » remplissent le formulaire ; les autres sont ce qui est écrit sur le document.'
-        : 'IA indisponible : lu par OCR. Le texte manuscrit peut manquer : vérifiez avec le document.',
+      note: `${result.engine === 'serveur' ? 'Lu par OCR (texte imprimé et manuscrit).' : 'Lu par OCR dans le navigateur (texte imprimé ; le manuscrit peut manquer).'} Les lignes « Dossier » remplissent le formulaire ; vérifiez-les avec le document.`,
     };
   };
 
@@ -809,9 +835,16 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   <section key={group.code || 'none'} className="snr-claims-group">
                     <h4>{group.label} <b className="snr-count">{group.rows.length}</b></h4>
                     <table className="snr-table snr-claims">
-                      <thead><tr><th>N° sinistre</th><th>Date sinistre</th><th>Client</th><th>Nom client</th><th>N° police</th><th>Immat.</th><th>Type</th><th>Expert</th><th>Observation</th><th className="is-number">Devis</th><th className="is-number">Réglé</th></tr></thead>
+                      <thead><tr>{CLAIM_COLUMNS.map(([key, label, kind]) => {
+                        const active = claimSort.key === key;
+                        return <th key={key} className={kind === 'number' ? 'is-number' : undefined} aria-sort={active ? (claimSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                          <button type="button" className={`snr-sort${active ? ' is-active' : ''}`} onClick={() => setClaimSort((current) => ({ key, dir: current.key === key && current.dir === 'asc' ? 'desc' : 'asc' }))} title="Trier par cette colonne (cliquez de nouveau pour inverser)">
+                            {label}<span aria-hidden="true">{active ? (claimSort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+                          </button>
+                        </th>;
+                      })}</tr></thead>
                       <tbody>
-                        {group.rows.map((row) => (
+                        {sortClaims(group.rows, claimSort).map((row) => (
                           <tr key={row.Num_Sinistre_Agence} className={`is-clickable${redReason(row, list) ? ' is-overdue' : ''}`} title={redReason(row, list) || undefined} onClick={() => open(row.Num_Sinistre_Agence)}>
                             <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
                             <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td title={row.nom_expert || ''}>{row.nom_expert || ''}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>

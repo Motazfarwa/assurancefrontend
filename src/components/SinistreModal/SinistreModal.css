@@ -198,3 +198,11 @@
   .snr-picker-menu li { grid-template-columns: 84px minmax(0, 1fr) auto; }
   .snr-picker-menu li > span:nth-of-type(1) { display: none; }
 }
+
+/* Claims list: every header sorts the list (▲ ascending, ▼ descending) */
+.snr-table th .snr-sort { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; text-align: inherit; white-space: nowrap; cursor: pointer; }
+.snr-table th.is-number .snr-sort { flex-direction: row-reverse; }
+.snr-table th .snr-sort span { color: #9fb3bc; font-size: 9px; }
+.snr-table th .snr-sort:hover span, .snr-table th .snr-sort.is-active span { color: #187d78; }
+.snr-table th .snr-sort.is-active { color: #14695f; }
+.snr-table th .snr-sort:focus-visible { outline: 2px solid #63b9a9; outline-offset: 2px; border-radius: 3px; }

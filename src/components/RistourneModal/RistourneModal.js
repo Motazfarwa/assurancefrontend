@@ -80,9 +80,7 @@ export default function RistourneModal({ moduleId, onClose }) {
     return {
       rows: lines.length ? rows.filter(([, value]) => value !== undefined) : [],
       empty: 'Aucune ristourne trouvée dans ce document.',
-      note: document.source === 'ai'
-        ? 'Lu par l’IA. « Voir les ristournes lues » ouvre la liste : chargez-les une à une, vérifiez puis enregistrez.'
-        : 'Lu par reconnaissance de texte (OCR) : vérifiez chaque montant avec le document avant d’enregistrer.',
+      note: `Lu par OCR${document.engine === 'serveur' ? ' (texte imprimé et manuscrit)' : ' dans le navigateur'}. « Voir les ristournes lues » ouvre la liste : vérifiez chaque montant avec le document, puis enregistrez.`,
       warnings: [...new Set(lines.flatMap((line) => line.warnings || []))],
     };
   };
