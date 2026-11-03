@@ -350,7 +350,7 @@ export default function ClientManagementPage({ modal = false }) {
       {/* Gestion sinistre: the claims module, its list on the client's claims */}
       {activeAction?.key === 'claim' && <SinistreModal moduleId={activeAction.module.id} clientCode={client.clientCode} onClose={() => setActiveAction(null)} />}
       {activeAction && activeAction.key !== 'claim' && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}
-      {ficheFile && <FicheImportModal file={ficheFile} onClose={() => setFicheFile(null)} onApply={applyFiche} />}
+      {ficheFile && <FicheImportModal file={ficheFile} accessToken={accessToken} onClose={() => setFicheFile(null)} onApply={applyFiche} />}
       {showClientList && <ClientListModal accessToken={accessToken} localClients={clients} onClose={() => setShowClientList(false)} onView={(record) => { setClient({ ...record, _persisted: true }); navigate('/clients/preview'); }} />}
     </main>
   );

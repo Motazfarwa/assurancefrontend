@@ -67,6 +67,22 @@ const redReason = (row, list) => {
   if (list.byDate) return inRange(row, list) ? `Sinistre survenu entre le ${shortDate(list.dateMin)} et le ${shortDate(list.dateMax)}` : '';
   return isOverdue(row) ? `Non clôturé depuis plus de ${OVERDUE_MONTHS} mois` : '';
 };
+// The values read on a constat / déclaration (server field names), with their labels in the import window.
+const VEHICLE_LABELS = [
+  ['compagnie', 'Compagnie'], ['num_police', 'N° police'], ['agence', 'Agence'], ['attestation', 'Attestation'],
+  ['nom_assure', 'Assuré'], ['adresse_assure', 'Adresse de l’assuré'], ['telephone_assure', 'Téléphone de l’assuré'],
+  ['conducteur', 'Conducteur'], ['adresse_conducteur', 'Adresse du conducteur'], ['permis', 'Permis de conduire'],
+  ['marque', 'Marque / type'], ['immatriculation', 'Immatriculation'], ['trajet', 'Trajet'], ['cases', 'Circonstances cochées'],
+  ['degats', 'Dégâts apparents'], ['observations', 'Observations'],
+];
+const READ_LABELS = {
+  date_sinistre: 'Date', heure_sinistre: 'Heure', lieu_sinistre: 'Lieu', blesses: 'Blessés', degats_autres: 'Dégâts à d’autres biens',
+  temoins: 'Témoins', num_sinistre_compagnie: 'N° sinistre compagnie',
+  ...Object.fromEntries(VEHICLE_LABELS.map(([key, label]) => [`a_${key}`, `Véhicule A · ${label}`])),
+  ...Object.fromEntries(VEHICLE_LABELS.map(([key, label]) => [`b_${key}`, `Véhicule B · ${label}`])),
+  circonstances: 'Résumé des circonstances',
+};
+
 // "N° sinistre" with a dropdown of the claims, by number in ascending order: all of them when the field is opened,
 // those whose number starts with what is typed while typing (pages of PICKER_PAGE, more loaded on scroll).
 const PICKER_PAGE = 50;
@@ -441,15 +457,21 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     info(`${kindLabel} lu (${result.source === 'ai' ? 'IA' : 'OCR'}) · ${result.police ? `véhicule ${result.vehicule_assure} = votre assuré (police ${result.police.num_int})` : 'aucune police de l’agence reconnue'} · vérifiez puis enregistrez.`);
   }
 
+  // Everything read on the constat / déclaration, vehicle A then vehicle B (what fills the form is listed first).
   const summarizeImport = (result) => {
     const patch = importPatch(result);
-    const rows = Object.entries(patch).filter(([, value]) => value !== '' && value !== 'null')
-      .map(([key, value]) => [key.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase()), key === 'Date_Sinistre' ? value.replace('T', ' ') : value]);
-    const kind = result.fields?.type_document === 'constat' ? 'Constat amiable' : result.fields?.type_document === 'declaration' ? 'Déclaration de sinistre' : 'Document';
+    const fields = result.fields || {};
+    const filled = Object.entries(patch).filter(([, value]) => value !== '' && value !== 'null')
+      .map(([key, value]) => [`Dossier · ${key.replace(/_/g, ' ')}`, key === 'Date_Sinistre' ? value.replace('T', ' ') : value]);
+    const read = Object.entries(READ_LABELS).filter(([key]) => fields[key] && String(fields[key]).trim() && String(fields[key]) !== 'null')
+      .map(([key, label]) => [label, String(fields[key]).trim()]);
+    const kind = fields.type_document === 'constat' ? 'Constat amiable' : fields.type_document === 'declaration' ? 'Déclaration de sinistre' : 'Document';
     return {
-      rows: rows.length ? [['Type de document', kind], ['Police de l’agence', result.police ? `${result.police.num_int} (véhicule ${result.vehicule_assure})` : 'Aucune reconnue'], ...rows] : [],
+      rows: filled.length || read.length ? [['Type de document', kind], ['Police de l’agence', result.police ? `${result.police.num_int} (véhicule ${result.vehicule_assure})` : 'Aucune reconnue'], ...filled, ...read] : [],
       empty: 'Aucune information lisible dans ce document : saisissez le dossier à la main.',
-      note: result.source === 'ai' ? 'Lu par l’IA.' : 'Lecture OCR simple : vérifiez chaque valeur.',
+      note: result.source === 'ai'
+        ? 'Lu par l’IA (texte imprimé et manuscrit). Les lignes « Dossier » remplissent le formulaire ; les autres sont ce qui est écrit sur le document.'
+        : 'IA indisponible : lu par OCR. Le texte manuscrit peut manquer : vérifiez avec le document.',
     };
   };
 

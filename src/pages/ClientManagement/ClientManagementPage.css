@@ -344,3 +344,18 @@
   .policy-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .policy-detail-dialog > footer { flex-wrap: wrap; }
 }
+
+/* Polices du client: every column visible at once (no sideways scrollbar on a computer screen) */
+.client-records-backdrop .client-records-dialog.is-policies { width: min(100%, 1400px); }
+.client-records-dialog.is-policies .client-records-table-wrap { overflow-x: hidden; }
+.client-records-dialog.is-policies .client-records-table-wrap table { table-layout: auto; }
+.client-records-dialog.is-policies .client-records-table-wrap th,
+.client-records-dialog.is-policies .client-records-table-wrap td { padding: 9px 8px; }
+.client-records-dialog.is-policies .client-records-table-wrap td.is-col-risque,
+.client-records-dialog.is-policies .client-records-table-wrap td.is-col-obser { min-width: 150px; max-width: 260px; }
+.client-records-dialog.is-policies .client-row-actions { gap: 4px; }
+.client-records-dialog.is-policies .client-row-actions button { padding: 0 8px; }
+@media (max-width: 1100px) {
+  /* not enough room for every column: the table scrolls inside its box again */
+  .client-records-dialog.is-policies .client-records-table-wrap { overflow-x: auto; }
+}

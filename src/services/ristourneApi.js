@@ -1,4 +1,4 @@
-import { readDocumentText } from './ficheOcr';
+import { readAiThenOcr } from './documentReading';
 import { API_BASE_URL } from './apiBase';
 
 async function request(path, accessToken, options = {}) {
@@ -33,10 +33,10 @@ export const createRistourne = (token, values) => request('/api/ristournes', tok
 export const updateRistourne = (token, number, values) => request(path(number), token, { method: 'PUT', body: JSON.stringify(values) });
 export const deleteRistourne = (token, number) => request(path(number), token, { method: 'DELETE' });
 
-// Reads a company document (PDF or image) by OCR in the browser, then the server finds every ristourne in its text and
-// checks each one against the database. Nothing is saved.
-export async function extractRistournes(token, file, onProgress) {
-  const text = await readDocumentText(file, onProgress);
-  if (!text.trim()) throw new Error('aucun texte n’a pu être lu : vérifiez la qualité du document.');
-  return request('/api/ristournes/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) });
-}
+// Reads a company document (PDF or image): the AI first, OCR in the browser when it is unavailable; the server finds
+// every ristourne and checks each one against the database. Nothing is saved.
+export const extractRistournes = (token, file, onProgress) => readAiThenOcr(file, onProgress, {
+  ai: (payload) => request('/api/ristournes/extract', token, { method: 'POST', body: JSON.stringify(payload) }),
+  fromText: (text) => request('/api/ristournes/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) }),
+  isEmpty: (document) => !document.lignes?.length,
+});

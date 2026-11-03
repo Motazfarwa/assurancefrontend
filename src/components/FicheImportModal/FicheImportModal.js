@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { checkValue, isPdf, scanFiche } from '../../services/ficheOcr';
+import { checkValue, isPdf, scanFiche, scanFicheWithAI } from '../../services/ficheOcr';
 import './FicheImportModal.css';
 
 const GROUPS = [
@@ -33,7 +33,8 @@ function buildPatches(rows) {
   return { client, policy };
 }
 
-export default function FicheImportModal({ file, onClose, onApply }) {
+export default function FicheImportModal({ file, accessToken, onClose, onApply }) {
+  const [method, setMethod] = useState('ai'); // ai, then ocr if the AI could not read the document
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('scanning');
   const [error, setError] = useState('');
@@ -46,10 +47,21 @@ export default function FicheImportModal({ file, onClose, onApply }) {
 
   useEffect(() => {
     let active = true;
-    // OCR in the browser (French + Arabic, every page of a PDF): no AI, no outside service.
-    scanFiche(file, (value) => { if (active) setProgress(value); })
+    let reported = false; // the OCR reports its own progress; the AI reading gets an estimate
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (active && !reported) setProgress(0.92 * (1 - Math.exp(-(Date.now() - started) / 12000)));
+    }, 250);
+    // The AI reads printed and handwritten documents; when it is unavailable (Google busy, quota, network) the
+    // document is read by OCR in the browser instead, so the import always gives a result.
+    scanFicheWithAI(file, accessToken)
+      .catch(() => {
+        if (active) setMethod('ocr');
+        return scanFiche(file, (value) => { reported = true; if (active) setProgress(value); });
+      })
       .then((result) => {
         if (!active) return;
+        setMethod(result.source === 'ai' ? 'ai' : 'ocr');
         setText(result.text);
         setRows(result.fields.map((field) => ({ ...field, use: Boolean(field.value) && !field.warning })));
         setStatus('done');
@@ -58,9 +70,10 @@ export default function FicheImportModal({ file, onClose, onApply }) {
         if (!active) return;
         setError(err?.message || 'La lecture du document a échoué.');
         setStatus('error');
-      });
-    return () => { active = false; };
-  }, [file]);
+      })
+      .finally(() => clearInterval(timer));
+    return () => { active = false; clearInterval(timer); };
+  }, [file, accessToken]);
 
   function change(key, value) {
     setRows((current) => current.map((row) => (row.key === key
@@ -92,12 +105,12 @@ export default function FicheImportModal({ file, onClose, onApply }) {
               <div className="fiche-progress" role="status">
                 <strong>Lecture du document… {Math.round(progress * 100)} %</strong>
                 <div><i style={{ width: `${Math.max(4, progress * 100)}%` }} /></div>
-                <small>Lecture du texte (français et arabe) dans le navigateur, page par page.</small>
+                <small>{method === 'ai' ? 'Analyse du document par l’IA (texte imprimé et manuscrit)…' : 'IA indisponible : lecture du texte par OCR dans le navigateur…'}</small>
               </div>
             )}
             {status === 'error' && <p className="fiche-error" role="alert">{error}</p>}
             {status === 'done' && <>
-              <p className="fiche-hint">Lu par OCR. Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
+              <p className="fiche-hint">{method === 'ai' ? 'Lu par l’IA. ' : 'Lu par OCR (IA indisponible) : le texte manuscrit peut manquer. '}Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
               {GROUPS.map((group) => (
                 <fieldset key={group.id}>
                   <legend>{group.label}</legend>
