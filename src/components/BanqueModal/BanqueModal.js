@@ -5,6 +5,7 @@ import { listCompanies } from '../../services/companyApi';
 import { showToast } from '../../services/toast';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
+import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import './BanqueModal.css';
 
 // What an account is for (TBanque.Type_Dep), as on the legacy screen.
@@ -29,7 +30,8 @@ export default function BanqueModal({ moduleId = '740', onClose }) {
   const [mode, setMode] = useState('view'); // view | create | edit
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  const [importFile, setImportFile] = useState(null); // the document being read in the import window
+  const scanning = Boolean(importFile);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [preview, setPreview] = useState(false);
@@ -88,37 +90,40 @@ export default function BanqueModal({ moduleId = '740', onClose }) {
     finally { setSaving(false); }
   }
 
-  // Importer: reads a RIB / relevé and fills the sheet. A RIB already known opens that account; otherwise the
-  // values go into the account being added or modified (a new one when only viewing).
-  async function importFile(file) {
-    setScanning(true); setError(''); setNotice('');
-    try {
-      const { fields = {}, source } = await extractBanque(accessToken, file);
-      const account = fields.rib || fields.numero_compte || '';
-      const known = digits(account).length >= 8 && banques.find((item) => {
-        const own = digits(item.num_compte_b);
-        return own.length >= 8 && (digits(account).includes(own) || own.includes(digits(account)));
-      });
-      if (known && mode !== 'edit') {
-        show(known);
-        setNotice(`Ce compte existe déjà : ${known.code_banque} (${known.nom_banque}).`);
-        return;
-      }
-      const bankName = String(fields.banque || '').toUpperCase().replace(/\s+BANK$/, '').trim();
-      const tail = digits(account).slice(-4);
-      const values = {};
-      if (account) values.num_compte_b = account.slice(0, 20);
-      if (bankName && (mode !== 'edit' || !bank.nom_banque)) values.nom_banque = `${bankName}${tail ? ` ${tail}` : ''}`.slice(0, 50);
-      if (fields.solde && !Number.isNaN(Number(fields.solde)) && mode !== 'edit') values.credit_ini = String(Number(fields.solde));
-      const date = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(fields.date || '');
-      if (date && mode !== 'edit') values.date_ini = `${date[3]}-${date[2]}-${date[1]}`;
-      if (mode === 'view') startCreate({ code_banque: `${bankName}${tail ? ` ${tail}` : ''}`.slice(0, 15), ...values });
-      else setBank((current) => ({ ...current, ...values }));
-      const read = [fields.banque && `banque ${fields.banque}`, account && `compte ${account}`, fields.titulaire && `titulaire ${fields.titulaire}`, fields.solde && `solde ${fields.solde}`].filter(Boolean);
-      setNotice(read.length ? `Document lu (${source === 'ai' ? 'IA' : 'OCR'}) : ${read.join(' · ')}. Vérifiez les champs avant d’enregistrer.` : 'Aucune information bancaire lisible dans ce document.');
-    } catch (scanError) { setError(`Lecture du document impossible : ${scanError.message}`); }
-    finally { setScanning(false); }
+  // Importer (once the import window has read the RIB / relevé): fills the sheet. A RIB already known opens that
+  // account; otherwise the values go into the account being added or modified (a new one when only viewing).
+  function applyImport({ fields = {}, source }) {
+    setImportFile(null); setError(''); setNotice('');
+    const account = fields.rib || fields.numero_compte || '';
+    const known = digits(account).length >= 8 && banques.find((item) => {
+      const own = digits(item.num_compte_b);
+      return own.length >= 8 && (digits(account).includes(own) || own.includes(digits(account)));
+    });
+    if (known && mode !== 'edit') {
+      show(known);
+      setNotice(`Ce compte existe déjà : ${known.code_banque} (${known.nom_banque}).`);
+      return;
+    }
+    const bankName = String(fields.banque || '').toUpperCase().replace(/\s+BANK$/, '').trim();
+    const tail = digits(account).slice(-4);
+    const values = {};
+    if (account) values.num_compte_b = account.slice(0, 20);
+    if (bankName && (mode !== 'edit' || !bank.nom_banque)) values.nom_banque = `${bankName}${tail ? ` ${tail}` : ''}`.slice(0, 50);
+    if (fields.solde && !Number.isNaN(Number(fields.solde)) && mode !== 'edit') values.credit_ini = String(Number(fields.solde));
+    const date = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(fields.date || '');
+    if (date && mode !== 'edit') values.date_ini = `${date[3]}-${date[2]}-${date[1]}`;
+    if (mode === 'view') startCreate({ code_banque: `${bankName}${tail ? ` ${tail}` : ''}`.slice(0, 15), ...values });
+    else setBank((current) => ({ ...current, ...values }));
+    const read = [fields.banque && `banque ${fields.banque}`, account && `compte ${account}`, fields.titulaire && `titulaire ${fields.titulaire}`, fields.solde && `solde ${fields.solde}`].filter(Boolean);
+    setNotice(read.length ? `Document lu (${source === 'ai' ? 'IA' : 'OCR'}) : ${read.join(' · ')}. Vérifiez les champs avant d’enregistrer.` : 'Aucune information bancaire lisible dans ce document.');
   }
+
+  // What the import window shows once the RIB / relevé is read.
+  const summarizeImport = ({ fields = {} }) => ({
+    rows: [['Banque', fields.banque], ['RIB', fields.rib], ['N° de compte', fields.numero_compte], ['Titulaire', fields.titulaire], ['Agence', fields.agence], ['Solde', fields.solde], ['Date', fields.date]]
+      .filter(([, value]) => value),
+    empty: 'Aucune information bancaire lisible dans ce document.',
+  });
 
   function print() {
     const rows = listed.map((item) => `<tr><td>${escapeHtml(item.code_banque)}</td><td>${escapeHtml(item.nom_banque)}</td><td>${escapeHtml(item.num_compte_b)}</td><td>${escapeHtml(typeLabel(item.type_dep))}${item.type_dep === 'T' ? ` · ${escapeHtml(companyName(item.code_compagnie))}` : ''}</td><td class="n">${dt(item.credit_ini)}</td><td>${frDate(item.date_ini)}</td><td class="n">${dt(item.debit)}</td><td class="n">${dt(item.credit)}</td><td>${item.archive ? 'Archivé' : ''}</td></tr>`).join('');
@@ -146,7 +151,7 @@ export default function BanqueModal({ moduleId = '740', onClose }) {
           </>}
           <button type="button" className="expert-cancel" onClick={() => setPreview(true)} disabled={saving}>Aperçu</button>
           <button type="button" className="expert-cancel bnk-import" onClick={() => fileRef.current?.click()} disabled={saving || scanning} title="Scanner un RIB, une attestation ou un relevé bancaire (image ou PDF) pour remplir la fiche">{scanning ? 'Lecture…' : '⬆ Importer un document'}</button>
-          <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) importFile(file); }} />
+          <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setImportFile(file); }} />
           <button type="button" className="expert-cancel" onClick={onClose}>Fermer</button>
           <span className="catalog-count">{banques.filter((item) => !item.archive).length} compte(s) actif(s)</span>
         </div>
@@ -207,5 +212,6 @@ export default function BanqueModal({ moduleId = '740', onClose }) {
         <footer><span>{listed.length} compte(s) · cliquez une ligne pour l’ouvrir</span><span className="bnk-list-actions"><button type="button" className="expert-submit" onClick={print}>Imprimer</button><button type="button" className="expert-cancel" onClick={() => setPreview(false)}>Fermer</button></span></footer>
       </section>
     </div>}
+    {importFile && <DocumentImportDialog file={importFile} kicker={`PARAMÉTRAGE · MODULE ${moduleId} · IMPORT`} title="Importer un RIB / relevé bancaire" read={() => extractBanque(accessToken, importFile)} summarize={summarizeImport} applyLabel="Appliquer à la fiche banque" onApply={applyImport} onClose={() => setImportFile(null)} />}
   </div>;
 }

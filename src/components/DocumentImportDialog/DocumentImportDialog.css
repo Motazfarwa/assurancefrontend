@@ -1,0 +1,10 @@
+/* Shared import window (styles of FicheImportModal), above the module that opened it */
+.doc-import-backdrop { z-index: 3000; }
+.doc-import-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 4px 0 0; }
+.doc-import-values > div { min-width: 0; }
+.doc-import-values dt { color: #6a8089; font-size: 11px; font-weight: 700; }
+.doc-import-values dd { margin: 2px 0 0; color: #1f3644; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.doc-import-values i { color: #93a3aa; font-weight: 500; }
+.doc-import-warnings { margin: 0; padding: 10px 14px 10px 30px; border: 1px solid #f0d6a8; border-radius: 9px; background: #fff8ec; color: #7a5212; font-size: 12px; }
+.doc-import-warnings li + li { margin-top: 4px; }
+@media (max-width: 760px) { .doc-import-values { grid-template-columns: 1fr; } }

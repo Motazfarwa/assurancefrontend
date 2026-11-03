@@ -7,6 +7,7 @@ import {
 import { listAccounts } from '../../services/chequeApi';
 import { showToast } from '../../services/toast';
 import SinistreSuivi from './SinistreSuivi';
+import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import './SinistreModal.css';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -205,7 +206,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [dirty, setDirty] = useState(false);
   const [tried, setTried] = useState(false); // a save was attempted: required fields are highlighted
   const [busy, setBusy] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  const [importFile, setImportFile] = useState(null); // the constat / déclaration being read in the import window
+  const scanning = Boolean(importFile);
   const [message, setMessage] = useState(null); // { kind: 'error' | 'info', text }
   // Module 620 opens on a new claim ("Lister" shows the list); from a client file it opens on that client's claims.
   const [list, setList] = useState(() => (mode === 'manage' && clientCode ? newList(clientCode) : null));
@@ -418,26 +420,38 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     } catch { /* policies unavailable: the name alone is shown */ }
   }
 
-  async function importFile(event) {
+  function chooseImport(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
-    setScanning(true); setMessage(null);
-    try {
-      const result = await extractSinistre(accessToken, file);
-      const patch = Object.fromEntries(Object.entries(result.sinistre || {}).filter(([key]) => key !== 'Num_Sinistre_Agence').map(([key, value]) => [
-        key, key === 'Date_Sinistre' ? String(value).slice(0, 16) : String(value),
-      ]));
-      if (!Object.keys(patch).length) { fail('Aucune information lisible dans ce document : saisissez le dossier à la main.'); return; }
-      change(patch);
-      const kindLabel = result.fields?.type_document === 'constat' ? 'Constat' : result.fields?.type_document === 'declaration' ? 'Déclaration' : 'Document';
-      info(`${kindLabel} lu (${result.source === 'ai' ? 'IA' : 'OCR'}) · ${result.police ? `véhicule ${result.vehicule_assure} = votre assuré (police ${result.police.num_int})` : 'aucune police de l’agence reconnue'} · vérifiez puis enregistrez.`);
-    } catch (requestError) {
-      fail(`Lecture du document impossible : ${requestError.message}`);
-    } finally {
-      setScanning(false);
-    }
+    if (file) { setMessage(null); setImportFile(file); }
   }
+
+  // The fields of the claim read from the document (its number is never taken: it is the agency's own).
+  const importPatch = (result) => Object.fromEntries(Object.entries(result.sinistre || {}).filter(([key]) => key !== 'Num_Sinistre_Agence').map(([key, value]) => [
+    key, key === 'Date_Sinistre' ? String(value).slice(0, 16) : String(value),
+  ]));
+
+  // Once the import window has read the constat / déclaration: the claim form is filled.
+  function applyImport(result) {
+    setImportFile(null);
+    const patch = importPatch(result);
+    if (!Object.keys(patch).length) { fail('Aucune information lisible dans ce document : saisissez le dossier à la main.'); return; }
+    change(patch);
+    const kindLabel = result.fields?.type_document === 'constat' ? 'Constat' : result.fields?.type_document === 'declaration' ? 'Déclaration' : 'Document';
+    info(`${kindLabel} lu (${result.source === 'ai' ? 'IA' : 'OCR'}) · ${result.police ? `véhicule ${result.vehicule_assure} = votre assuré (police ${result.police.num_int})` : 'aucune police de l’agence reconnue'} · vérifiez puis enregistrez.`);
+  }
+
+  const summarizeImport = (result) => {
+    const patch = importPatch(result);
+    const rows = Object.entries(patch).filter(([, value]) => value !== '' && value !== 'null')
+      .map(([key, value]) => [key.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase()), key === 'Date_Sinistre' ? value.replace('T', ' ') : value]);
+    const kind = result.fields?.type_document === 'constat' ? 'Constat amiable' : result.fields?.type_document === 'declaration' ? 'Déclaration de sinistre' : 'Document';
+    return {
+      rows: rows.length ? [['Type de document', kind], ['Police de l’agence', result.police ? `${result.police.num_int} (véhicule ${result.vehicule_assure})` : 'Aucune reconnue'], ...rows] : [],
+      empty: 'Aucune information lisible dans ce document : saisissez le dossier à la main.',
+      note: result.source === 'ai' ? 'Lu par l’IA.' : 'Lecture OCR simple : vérifiez chaque valeur.',
+    };
+  };
 
   const problem = () => {
     if (!form.Date_Sinistre) return 'La date du sinistre est obligatoire.';
@@ -597,9 +611,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         <header className="snr-header">
           <div><span>SINISTRES · MODULE {moduleId}</span><h2 id="snr-title">{mode === 'new' ? 'Déclarer un sinistre' : 'Gestion des sinistres'}</h2></div>
           <div className="snr-header-actions">
-            <input ref={fileInput} type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" hidden onChange={importFile} />
+            <input ref={fileInput} type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" hidden onChange={chooseImport} />
             <button type="button" className="snr-import" onClick={() => fileInput.current?.click()} disabled={scanning || busy} title="Scanner un constat amiable ou une déclaration (image ou PDF) pour remplir le dossier">
-              {scanning ? 'Lecture…' : 'Importer'}
+              Importer
             </button>
             <button type="button" className="snr-close" onClick={close} aria-label="Fermer">×</button>
           </div>
@@ -791,6 +805,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           </section>
         </div>
       )}
+      {importFile && <DocumentImportDialog file={importFile} kicker={`SINISTRES · MODULE ${moduleId} · IMPORT`} title="Importer un constat / une déclaration" read={() => extractSinistre(accessToken, importFile)} summarize={summarizeImport} applyLabel="Appliquer au dossier" onApply={applyImport} onClose={() => setImportFile(null)} />}
     </div>
   );
 }

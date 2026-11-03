@@ -31,3 +31,10 @@
 
 .notif-item.is-clickable { cursor: pointer; }
 .notif-item.is-clickable:hover, .notif-item.is-clickable:focus-visible { background: #eef7f5; outline: none; }
+
+/* Phone: the panel spans the screen under the top bar instead of hanging off the bell */
+@media (max-width: 760px) {
+  .notif-panel { position: fixed; top: 64px; right: 12px; left: 12px; width: auto; max-height: calc(100dvh - 80px); display: flex; flex-direction: column; }
+  .notif-list { max-height: none; flex: 1; }
+  .notif-bell { width: 40px; height: 40px; }
+}

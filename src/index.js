@@ -5,6 +5,8 @@ import App from './App';
 import { AuthProvider } from './auth/AuthContext';
 import { ClientProvider } from './contexts/ClientContext';
 import reportWebVitals from './reportWebVitals';
+// Phones: every window full screen, tables scrolling in their box (after all the screens' styles, imported by App).
+import './styles/responsive.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

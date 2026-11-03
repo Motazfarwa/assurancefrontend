@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { hasPermission, ROLES } from '../../auth/permissions';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
@@ -38,6 +38,16 @@ export default function ModulesWorkspace() {
   const [allowedModules, setAllowedModules] = useState(null); // set by the admin in Access users; null: every module
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false); // phone: the actions menu (☰)
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (event) => { if (!menuRef.current?.contains(event.target)) setMenuOpen(false); };
+    const onKey = (event) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
   const [activeCategory, setActiveCategory] = useState('production');
   const [search, setSearch] = useState('');
   const [selectedModule, setSelectedModule] = useState(null);
@@ -188,7 +198,21 @@ export default function ModulesWorkspace() {
         <header className="workspace-topbar">
           <a className="workspace-brand" href="/workspace"><span className="workspace-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>ESPACE PROFESSIONNEL</small></span></a>
           <div className="workspace-company"><div><strong>Assurance Jemmali</strong></div><SyncStatus /></div>
-          <div className="workspace-user"><ZoomControl /><NotificationBell onOpenHistory={() => setShowHistory(true)} /><span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span><span className="workspace-user-copy"><strong>{user.name}</strong><small>{user.role ? (user.role === ROLES.ADMIN ? 'Administrateur' : 'Membre') : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>{user.isAdmin && <><button type="button" className="workspace-logout" onClick={() => navigate('/admin/users')}>Utilisateurs</button><button type="button" className="workspace-logout" onClick={() => setShowAccessModal(true)}>Access users</button><button type="button" className="workspace-logout" onClick={() => setShowHistory(true)}>Historique</button></>}<button type="button" className="workspace-logout" onClick={logout}>Quitter <span aria-hidden="true">↗</span></button></div>
+          <div className="workspace-user" ref={menuRef}>
+            <ZoomControl />
+            <NotificationBell onOpenHistory={() => setShowHistory(true)} />
+            <span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span>
+            <span className="workspace-user-copy"><strong>{user.name}</strong><small>{user.role ? (user.role === ROLES.ADMIN ? 'Administrateur' : 'Membre') : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>
+            {/* On a phone the actions are in a menu (☰); on a larger screen they are buttons in the bar */}
+            <button type="button" className="workspace-menu-toggle" aria-expanded={menuOpen} aria-controls="workspace-actions" aria-label="Menu" onClick={() => setMenuOpen((open) => !open)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">{menuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}</svg>
+            </button>
+            <div id="workspace-actions" className={`workspace-actions${menuOpen ? ' is-open' : ''}`} onClick={(event) => { if (event.target.closest('button')) setMenuOpen(false); }}>
+              <span className="workspace-actions-user"><strong>{user.name}</strong><small>{user.isAdmin ? 'Administrateur' : user.lieu ? `Agence ${user.lieu}` : 'Compte authentifie'}</small></span>
+              {user.isAdmin && <><button type="button" className="workspace-logout" onClick={() => navigate('/admin/users')}>Utilisateurs</button><button type="button" className="workspace-logout" onClick={() => setShowAccessModal(true)}>Access users</button><button type="button" className="workspace-logout" onClick={() => setShowHistory(true)}>Historique</button></>}
+              <button type="button" className="workspace-logout" onClick={logout}>Quitter <span aria-hidden="true">↗</span></button>
+            </div>
+          </div>
         </header>
 
         <fieldset className="nature-selector">

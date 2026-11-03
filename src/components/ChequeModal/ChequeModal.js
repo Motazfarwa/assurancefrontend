@@ -4,6 +4,7 @@ import { createPiece, deletePiece, getClientOverview, getPiece, listAccounts, li
 import { listClients, normalizeClientRecord, rankClients } from '../../services/clientApi';
 import { spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
+import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import './ChequeModal.css';
 
 const TYPES = [['T', 'Traite'], ['C', 'Chèque'], ['V', 'Virement'], ['E', 'Espèce'], ['B', 'Carte bancaire']];
@@ -39,7 +40,7 @@ export default function ChequeModal({ onClose }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [list, setList] = useState(null);
-  const [scanning, setScanning] = useState(null); // null, or progress 0..1 while a document is read
+  const [importFile, setImportFile] = useState(null); // the document being read in the import window
   const pendingImport = useRef(null); // quittances read from a document, spread once the client is loaded
   const [nameQuery, setNameQuery] = useState(null); // text typed in "Nom client", null while it shows the loaded client
   const [allClients, setAllClients] = useState(null); // loaded the first time a name is typed
@@ -233,39 +234,32 @@ export default function ChequeModal({ onClose }) {
     }
   }
 
-  async function importFile(event) {
+  function chooseImport(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
-    setBusy(true);
-    setScanning(0);
-    setError('');
-    setNotice('');
-    try {
-      const { values, found } = await scanPayment(file, { accessToken, banks, onProgress: setScanning });
-      if (!found.length) { setNotice('Aucune information lisible : renseignez les champs à la main.'); return; }
-      setForm((current) => ({
-        ...current,
-        typep: TYPE_CODES[values.typeReglement] || current.typep,
-        nump: values.nump || current.nump,
-        montant: values.montant ? String(Number(values.montant)) : current.montant,
-        datep: values.echeance || current.datep,
-        code_banque: values.code_banque || current.code_banque,
-        a_verser: values.aVerser ?? current.a_verser,
-        en_instance: values.enInstance ?? current.en_instance,
-      }));
-      setEditing(false);
-      const request = { numbers: values.quittances, montant: values.montant || form.montant };
-      // A new client code reloads the client: its unpaid quittances are paid once they are loaded.
-      if (values.code && values.code !== code.trim()) pendingImport.current = request;
-      else if (client) setAlloc(importedAlloc(quittances, request));
-      if (values.code) setCode(values.code);
-    } catch (requestError) {
-      setError(`Lecture du document impossible : ${requestError.message}`);
-    } finally {
-      setBusy(false);
-      setScanning(null);
-    }
+    if (file) { setError(''); setNotice(''); setImportFile(file); }
+  }
+
+  // Once the import window has read the cheque / traite / bordereau: the piece and its quittances are filled.
+  function applyImport({ values, found }) {
+    setImportFile(null);
+    if (!found.length) { setNotice('Aucune information lisible : renseignez les champs à la main.'); return; }
+    setForm((current) => ({
+      ...current,
+      typep: TYPE_CODES[values.typeReglement] || current.typep,
+      nump: values.nump || current.nump,
+      montant: values.montant ? String(Number(values.montant)) : current.montant,
+      datep: values.echeance || current.datep,
+      code_banque: values.code_banque || current.code_banque,
+      a_verser: values.aVerser ?? current.a_verser,
+      en_instance: values.enInstance ?? current.en_instance,
+    }));
+    setEditing(false);
+    const request = { numbers: values.quittances, montant: values.montant || form.montant };
+    // A new client code reloads the client: its unpaid quittances are paid once they are loaded.
+    if (values.code && values.code !== code.trim()) pendingImport.current = request;
+    else if (client) setAlloc(importedAlloc(quittances, request));
+    if (values.code) setCode(values.code);
   }
 
   return (
@@ -282,8 +276,8 @@ export default function ChequeModal({ onClose }) {
           <button type="button" className="chq-tool" disabled={busy || !editing} onClick={removePiece}>Supprimer</button>
           <button type="button" className="chq-tool" disabled={busy} onClick={openList}>Lister</button>
           <span className="chq-spacer" />
-          <input ref={importInput} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={importFile} />
-          <button type="button" className="chq-import" disabled={busy} onClick={() => importInput.current?.click()} title="Scanner une image ou un PDF pour remplir le formulaire">{scanning === null ? 'Importer' : `Lecture… ${Math.round(scanning * 100)}%`}</button>
+          <input ref={importInput} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={chooseImport} />
+          <button type="button" className="chq-import" disabled={busy} onClick={() => importInput.current?.click()} title="Scanner une image ou un PDF pour remplir le formulaire">Importer</button>
           <button type="button" className="chq-tool" onClick={onClose}>Fermer</button>
         </div>
 
@@ -425,6 +419,7 @@ export default function ChequeModal({ onClose }) {
           </section>
         </div>
       )}
+      {importFile && <DocumentImportDialog file={importFile} kicker="RECOUVREMENT · PIÈCES · IMPORT" title="Importer une pièce (chèque, traite, bordereau)" read={(onProgress) => scanPayment(importFile, { accessToken, banks, onProgress })} summarize={({ found }) => ({ rows: found.map((item) => [item.label, item.value]), empty: "Aucune information lisible : renseignez les champs à la main." })} applyLabel="Appliquer à la pièce" onApply={applyImport} onClose={() => setImportFile(null)} />}
     </div>
   );
 }

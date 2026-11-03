@@ -1,0 +1,74 @@
+/* ==========================================================================================================
+   Phones and small tablets, for every window of the application.
+   Loaded after all the screens' own styles (see index.js), so these rules apply everywhere. On a large screen
+   nothing here applies.
+   ========================================================================================================== */
+
+@media (max-width: 640px) {
+  /* Every window takes the whole screen: no margins, no rounded corners, the height of the visible screen. */
+  .admin-users-backdrop, .bd-backdrop, .chq-backdrop, .client-list-backdrop, .client-records-backdrop, .cmp-list-backdrop,
+  .doc-import-backdrop, .expert-modal-backdrop, .fiche-backdrop, .his-detail-backdrop, .jrn-sheet-backdrop,
+  .module-modal-backdrop, .rct-backdrop, .snr-backdrop, .client-page-modal {
+    align-items: stretch !important;
+    justify-items: stretch !important;
+    place-items: stretch !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+  .acc-modal, .bd-dialog, .bnk-modal, .branch-modal, .catalog-modal, .chq-dialog, .client-list-dialog, .client-polices-dialog,
+  .client-records-dialog, .client-window-modal, .document-modal, .eti-modal, .expert-modal, .fiche-dialog, .frg-modal,
+  .his-modal, .his-detail, .jrn-modal, .module-modal, .police-dialog, .police-modal, .policy-detail-dialog, .rct-dialog,
+  .rst-modal, .snr-dialog, .unpaid-clients-dialog, .unpaid-modal, .admin-users-dialog {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  /* The content scrolls inside the window, the header and the buttons stay. */
+  .catalog-modal, .rst-modal, .bnk-modal, .his-modal, .acc-modal, .client-records-dialog, .fiche-dialog, .his-detail { display: flex; flex-direction: column; }
+  .catalog-modal > form, .catalog-body, .client-records-table-wrap, .his-table-wrap, .fiche-body, .his-detail-body, .policy-detail-grid { flex: 1 1 auto; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Headers and footers: titles keep room, buttons wrap instead of going off the screen. */
+  .expert-modal-header, .module-modal-header, .client-records-dialog > header, .fiche-dialog > header, .his-detail > header { gap: 10px !important; padding: 12px 14px !important; }
+  /* Title on the left, × on the right, on one line (the brand block is left out on a phone). */
+  .expert-modal-header { display: flex !important; align-items: center !important; justify-content: space-between !important; }
+  .expert-modal-header .expert-brand { display: none !important; }
+  .expert-modal-header .expert-title { order: 0; min-width: 0; text-align: left !important; }
+  .expert-modal-header .expert-close { order: 1; flex: none; }
+  /* Toolbars: the buttons side by side, wrapping, rather than one per line. */
+  .catalog-toolbar { flex-direction: row !important; flex-wrap: wrap !important; align-items: center !important; gap: 8px !important; padding: 12px 14px !important; }
+  .catalog-toolbar > button { flex: 1 1 auto; min-height: 40px; }
+  .catalog-toolbar > .catalog-count { flex-basis: 100%; text-align: left; }
+  .expert-modal-header h2, .module-modal-header h2, .client-records-dialog > header h2, .fiche-dialog > header h2 { font-size: 17px !important; }
+  .client-records-dialog > footer, .fiche-dialog > footer, .his-footer, .his-detail > footer { flex-wrap: wrap; gap: 8px; padding: 10px 14px !important; }
+  .fiche-dialog > footer > div, .his-footer > div { flex: 1 1 100%; flex-wrap: wrap; }
+  .fiche-dialog > footer > div > button, .his-footer > div > button { flex: 1 1 0; }
+  .rst-toolbar, .snr-toolbar, .pf-toolbar, .client-records-filters, .his-filters { flex-wrap: wrap; }
+
+  /* Tables: they keep their columns and scroll sideways inside their box (never the whole page). */
+  [class*="table-wrap"], .his-table-wrap, .snr-table-wrap, .rst-search-list, .pf-receipts-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* Fields: one column of comfortable fields; 16px text so the phone does not zoom in when typing. */
+  .rst-grid, .his-filters, .client-edit-form, .doc-import-values, .policy-detail-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+  .his-filters .his-search, .rst-grid .rst-full, .rst-grid .rst-wide { grid-column: 1 / -1 !important; }
+  .client-records-filters label { flex: 1 1 140px; }
+  .client-records-filters input { width: 100% !important; }
+  input[type="text"], input[type="search"], input[type="number"], input[type="email"], input[type="tel"], input[type="password"],
+  input[type="date"], input[type="datetime-local"], input:not([type]), select, textarea { font-size: 16px !important; }
+  button { touch-action: manipulation; }
+
+  /* Import window: the document on top, what was read under it. */
+  .fiche-body { grid-template-columns: 1fr !important; padding: 12px 14px !important; }
+  .fiche-preview { max-height: 34vh; }
+  .fiche-preview iframe { min-height: 30vh !important; }
+}
+
+@media (max-width: 380px) {
+  .rst-grid, .his-filters, .client-edit-form, .doc-import-values, .policy-detail-grid { grid-template-columns: 1fr !important; }
+}

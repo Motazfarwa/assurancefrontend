@@ -48,3 +48,4 @@
 .rst-import-table .rst-line-action button { min-height: 28px; padding: 0 12px; font: inherit; font-size: 10px; font-weight: 650; }
 .rst-import-table .rst-warning-row td { padding-top: 0; border-top: 0; background: #fffdf7; color: #9a6514; font-size: 10px; }
 .rst-ok { color: #1c7a5e; font-size: 10px; font-weight: 700; }
+.rst-import-table .rst-columns-row td { padding-top: 0; border-top: 0; color: #4f6672; font-size: 10px; }

@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { createRistourne, deleteRistourne, extractRistournes, getRistourne, getRistournePolicy, searchRistournes, updateRistourne } from '../../services/ristourneApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
+import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import './RistourneModal.css';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -37,7 +38,7 @@ export default function RistourneModal({ moduleId, onClose }) {
   const [search, setSearch] = useState(null); // { q, items, loading }
   const [imported, setImported] = useState(null); // the document read: { compagnie, type_document, date_document, source, lignes }
   const [showImport, setShowImport] = useState(false);
-  const [reading, setReading] = useState(false);
+  const [importFile, setImportFile] = useState(null); // the document being read in the import window
   const [importLine, setImportLine] = useState(null); // index of the imported line in the form
   const [savedLines, setSavedLines] = useState([]);
   const [lineWarnings, setLineWarnings] = useState([]);
@@ -59,15 +60,30 @@ export default function RistourneModal({ moduleId, onClose }) {
     setCurrent(item); setForm(toForm(item)); setPolicy(item); setMode('view'); setImportLine(null); setLineWarnings([]);
   }
 
-  async function importFile(file) {
-    setBusy(true); setReading(true); setError(''); setNotice('');
-    try {
-      const document = await extractRistournes(accessToken, file);
-      if (!document.lignes?.length) { setError('Aucune ristourne trouvée dans ce document.'); return; }
-      setImported({ ...document, fileName: file.name }); setSavedLines([]); setShowImport(true);
-    } catch (importError) { setError(importError.message); }
-    finally { setBusy(false); setReading(false); }
+  // Once the import window has read the document: the list of its ristournes, to load one by one into the form.
+  function applyImport(document) {
+    setImportFile(null); setError(''); setNotice('');
+    setImported({ ...document, fileName: importFile?.name }); setSavedLines([]); setShowImport(true);
   }
+
+  const summarizeImport = (document) => {
+    const lines = document.lignes || [];
+    const rows = [['Compagnie', document.compagnie], ['Document', document.type_document], ['Date du document', formatDate(document.date_document)], ['Ristournes lues', String(lines.length)]];
+    lines.forEach((line, index) => {
+      const prefix = lines.length > 1 ? `Ligne ${index + 1} · ` : '';
+      rows.push([`${prefix}N° ristourne`, line.num_ristourne], [`${prefix}Police`, [line.num_police, line.policy?.nom_client && `→ ${line.policy.nom_client}`].filter(Boolean).join(' ')],
+        [`${prefix}Période`, [formatDate(line.date_du), formatDate(line.date_au)].filter(Boolean).join(' → ')],
+        [`${prefix}Nette / Décom. / Détaxe`, [line.nette, line.decommission, line.detaxe].map((value) => (value == null ? '—' : fmt(value))).join(' / ')],
+        [`${prefix}Totale`, line.totale == null ? '' : fmt(line.totale)]);
+      if (line.colonnes?.length) rows.push([`${prefix}Colonnes du document`, line.colonnes.map((column) => `${column.libelle} ${fmt(column.valeur)}`).join(' · ')]);
+    });
+    return {
+      rows: lines.length ? rows.filter(([, value]) => value !== undefined) : [],
+      empty: 'Aucune ristourne trouvée dans ce document.',
+      note: document.source === 'ocr' ? 'Lecture OCR simple (service IA indisponible) : vérifiez chaque valeur.' : 'Lu par l’IA. « Appliquer » ouvre la liste des ristournes : chargez-les une à une, vérifiez puis enregistrez.',
+      warnings: [...new Set(lines.flatMap((line) => line.warnings || []))],
+    };
+  };
 
   // Puts one line of the document in the form as a new ristourne; the user checks it, then saves it.
   function loadLine(line, index) {
@@ -176,10 +192,10 @@ export default function RistourneModal({ moduleId, onClose }) {
             <button type="button" className="expert-cancel" onClick={() => { setMode('edit'); setNotice(''); }} disabled={busy || !current || locked}>Modifier</button>
             <button type="button" className="catalog-delete" onClick={remove} disabled={busy || !current || locked}>Supprimer</button>
             <button type="button" className="expert-cancel" onClick={() => runSearch('')} disabled={busy}>Chercher</button>
-            <button type="button" className="expert-cancel rst-import" onClick={() => fileRef.current?.click()} disabled={busy} title="PDF ou image (JPG, PNG) d’un avis ou bordereau de ristourne">{reading ? 'Lecture du document…' : '⬆ Importer un document'}</button>
+            <button type="button" className="expert-cancel rst-import" onClick={() => fileRef.current?.click()} disabled={busy} title="PDF ou image (JPG, PNG) d’un avis ou bordereau de ristourne">⬆ Importer un document</button>
             {imported && <button type="button" className="expert-cancel" onClick={() => setShowImport(true)} disabled={busy}>Lignes importées ({savedLines.length}/{imported.lignes.length})</button>}
           </>}
-          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) importFile(file); }} />
+          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setImportFile(file); }} />
           {locked && !editing && <span className="rst-lock">Comptabilisée le {formatDate(current.date_comptabilise)} : non modifiable</span>}
         </div>
 
@@ -270,6 +286,7 @@ export default function RistourneModal({ moduleId, onClose }) {
                     : line.exists ? <button type="button" className="expert-cancel" onClick={() => { setShowImport(false); open(line.num_ristourne); }}>Ouvrir l’existante</button>
                     : <button type="button" className="expert-submit" onClick={() => loadLine(line, index)}>Charger</button>}</td>
                 </tr>
+                {line.colonnes?.length > 0 && !saved && <tr className="rst-columns-row"><td /><td colSpan={10}>Colonnes du document : {line.colonnes.map((column) => `${column.libelle} ${fmt(column.valeur)}`).join(' · ')}{line.immatriculation ? ` · Immatriculation ${line.immatriculation}` : ''}</td></tr>}
                 {line.warnings?.length > 0 && !saved && <tr className="rst-warning-row"><td /><td colSpan={10}>{line.warnings.join(' · ')}</td></tr>}
               </Fragment>;
             })}</tbody>
@@ -277,5 +294,6 @@ export default function RistourneModal({ moduleId, onClose }) {
         </div>
       </div>}
     </section>
+    {importFile && <DocumentImportDialog file={importFile} kicker={`PRODUCTION · MODULE ${moduleId} · IMPORT`} title="Importer un document de ristourne" read={() => extractRistournes(accessToken, importFile)} summarize={summarizeImport} applyLabel="Voir les ristournes lues" onApply={applyImport} onClose={() => setImportFile(null)} />}
   </div>;
 }
