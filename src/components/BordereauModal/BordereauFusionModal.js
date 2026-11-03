@@ -5,6 +5,10 @@ import { cancelFusion, fuseBordereau, getConfrontation, monthToPeriode, nextMont
 import { money, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
+// Companies whose bordereaux are not merged here (by name, spaces and case ignored).
+const NOT_FUSED = new Set(['STAR', 'MAE', 'SALIM', 'EL AMANA TAKAFUL', 'EUROP ASSISTANCE', 'EUROPE ASSISTANCE']);
+const fusable = (company) => isOfferedCompany(company) && !NOT_FUSED.has(String(company?.nom_compagnie || '').trim().replace(/\s+/g, ' ').toUpperCase());
+
 export default function BordereauFusionModal({ onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
@@ -18,7 +22,7 @@ export default function BordereauFusionModal({ onClose }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((rows) => { if (active) setCompanies((Array.isArray(rows) ? rows : rows.items || []).filter(isOfferedCompany)); })
+      .then((rows) => { if (active) setCompanies((Array.isArray(rows) ? rows : rows.items || []).filter(fusable)); })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);

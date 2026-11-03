@@ -1,4 +1,4 @@
-import { fileToBase64, isPdf, toJpegBase64 } from './ficheOcr';
+import { readDocumentText } from './ficheOcr';
 
 import { API_BASE_URL } from './apiBase';
 
@@ -47,9 +47,10 @@ const followUp = (kind) => ({
 export const sinistreEtapes = followUp('etapes');
 export const sinistreAppels = followUp('appels');
 
-// Sends a scanned constat amiable / déclaration (JPG, PNG or PDF) to be read.
-export async function extractSinistre(token, file) {
-  const pdf = isPdf(file);
-  const image = pdf ? await fileToBase64(file) : await toJpegBase64(file, 2200, 0.9);
-  return request('/api/sinistres/extract', token, { method: 'POST', body: JSON.stringify({ image_base64: image, media_type: pdf ? 'application/pdf' : 'image/jpeg' }) });
+// Reads a scanned constat amiable / déclaration (JPG, PNG or PDF) by OCR in the browser; the server finds the claim's
+// values in its text and recognises the agency's policy.
+export async function extractSinistre(token, file, onProgress) {
+  const text = await readDocumentText(file, onProgress);
+  if (!text.trim()) throw new Error('aucun texte n’a pu être lu : vérifiez la qualité du document.');
+  return request('/api/sinistres/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) });
 }

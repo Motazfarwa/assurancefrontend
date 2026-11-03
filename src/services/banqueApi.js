@@ -1,4 +1,4 @@
-import { fileToBase64, isPdf, toJpegBase64 } from './ficheOcr';
+import { readDocumentText } from './ficheOcr';
 import { API_BASE_URL } from './apiBase';
 
 async function request(path, accessToken, options = {}) {
@@ -29,9 +29,10 @@ export const createBanque = (token, values) => request('/api/banques', token, { 
 export const updateBanque = (token, code, values) => request(`/api/banques/${encodeURIComponent(code)}`, token, { method: 'PUT', body: JSON.stringify(values) });
 export const deleteBanque = (token, code) => request(`/api/banques/${encodeURIComponent(code)}`, token, { method: 'DELETE' });
 
-// Sends a scanned RIB / attestation / relevé bancaire (JPG, PNG or PDF) to be read.
-export async function extractBanque(token, file) {
-  const pdf = isPdf(file);
-  const image = pdf ? await fileToBase64(file) : await toJpegBase64(file, 2200, 0.9);
-  return request('/api/banques/extract', token, { method: 'POST', body: JSON.stringify({ image_base64: image, media_type: pdf ? 'application/pdf' : 'image/jpeg' }) });
+// Reads a scanned RIB / attestation / relevé bancaire (JPG, PNG or PDF) by OCR in the browser; the server finds the
+// bank, the RIB, the holder… in its text.
+export async function extractBanque(token, file, onProgress) {
+  const text = await readDocumentText(file, onProgress);
+  if (!text.trim()) throw new Error('aucun texte n’a pu être lu : vérifiez la qualité du document.');
+  return request('/api/banques/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) });
 }

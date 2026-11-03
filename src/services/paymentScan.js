@@ -1,9 +1,8 @@
 // Full reading of a payment document (cheque, bill of exchange, transfer slip, receipt) from an image or a
-// PDF, shared by "Gestion des chèques" and "Recette technique". Two readings run together and are merged:
-// the server's cheque reader (AI) and the whole text of the document (PDF text layer / OCR of every page).
-import { extractCheque } from './chequeApi';
+// PDF, shared by "Gestion des chèques" and "Recette technique": the whole text of the document read by OCR in the
+// browser (PDF text layer / OCR of every page), no AI.
 import { searchClients } from './clientApi';
-import { isPdf, scanFiche, scanFicheWithServerOcr, toIsoDate } from './ficheOcr';
+import { isPdf, readDocumentText, toIsoDate } from './ficheOcr';
 import { pdfReadings } from './pdfText';
 
 const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -127,17 +126,9 @@ export function extractPaymentAll(texts, banks = []) {
 }
 
 // Whole text of the document: every PDF page locally (two readings); for images the server OCR, else the in-browser OCR.
-async function readTexts(file, accessToken, onProgress) {
-  if (isPdf(file)) {
-    const readings = await pdfReadings(file, onProgress).catch(() => []);
-    if (readings.some((text) => text.trim())) return readings;
-    return [(await scanFicheWithServerOcr(file, accessToken)).text];
-  }
-  try {
-    return [(await scanFicheWithServerOcr(file, accessToken)).text];
-  } catch {
-    return [(await scanFiche(file, onProgress)).text];
-  }
+async function readTexts(file, onProgress) {
+  if (isPdf(file)) return pdfReadings(file, onProgress); // both readings of the pages: reading order and row by row
+  return [await readDocumentText(file, onProgress)];
 }
 
 // No client code on the document: look the client up by the name written on it.
@@ -149,33 +140,13 @@ async function findClientCode(accessToken, name) {
   return pick?.clientCode || '';
 }
 
-const AI_TYPES = { traite: 'Traite', cheque: 'Chèque', chèque: 'Chèque', virement: 'Virement' };
-
 // Scans the document and returns { values, found, text }: `values` uses the Recette field names,
 // `found` lists every value read ({ key, label, value }) for display.
 export async function scanPayment(file, { accessToken, banks = [], onProgress } = {}) {
-  const [ai, texts] = await Promise.all([
-    extractCheque(accessToken, file).catch(() => null),
-    readTexts(file, accessToken, onProgress).catch(() => []),
-  ]);
-  if (!ai && !texts.some((text) => text.trim())) throw new Error('aucun texte n’a pu être lu (vérifiez la qualité du document).');
+  const texts = await readTexts(file, onProgress).catch(() => []);
+  if (!texts.some((text) => text.trim())) throw new Error('aucun texte n’a pu être lu (vérifiez la qualité du document).');
 
   const values = extractPaymentAll(texts, banks);
-  const fields = ai?.fields || {};
-  // The cheque reader knows the layout of a cheque: its values win over the plain text, except the bank
-  // when the document gives its code.
-  if (fields.numero) values.nump = String(fields.numero).replace(/\s/g, '');
-  const aiAmount = fields.montant ? toAmount(fields.montant) : 0;
-  if (aiAmount > 0) values.montant = aiAmount.toFixed(3);
-  if (fields.date_echeance && toIsoDate(fields.date_echeance)) values.echeance = toIsoDate(fields.date_echeance);
-  if (fields.type && AI_TYPES[String(fields.type).toLowerCase()]) values.typeReglement = AI_TYPES[String(fields.type).toLowerCase()];
-  if (fields.tireur && !values.tireur) values.tireur = clean(fields.tireur);
-  if (fields.banque && !values.code_banque) {
-    const name = String(fields.banque).trim();
-    const bank = banks.find((item) => item.nom_banque && item.nom_banque.trim().length >= 3 && (nameWord(item.nom_banque.trim()).test(name) || item.nom_banque.trim().toLowerCase() === name.toLowerCase()));
-    if (bank) values.code_banque = bank.code_banque;
-    else if (!values.banqueLue) values.banqueLue = name;
-  }
   if (!values.code && values.nomClient && accessToken) {
     const code = await findClientCode(accessToken, values.nomClient);
     if (code) values.code = code;
@@ -188,6 +159,5 @@ export async function scanPayment(file, { accessToken, banks = [], onProgress } 
     return value;
   };
   const found = Object.keys(PAYMENT_LABELS).filter((key) => values[key]).map((key) => ({ key, label: PAYMENT_LABELS[key], value: shown(key, values[key]) }));
-  const text = [ai ? `Lecture chèque : ${JSON.stringify(fields)}` : '', ...texts.slice(0, 1)].filter(Boolean).join('\n\n');
-  return { values, found, text };
+  return { values, found, text: texts[0] || '' };
 }

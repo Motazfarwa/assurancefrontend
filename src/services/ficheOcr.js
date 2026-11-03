@@ -397,6 +397,27 @@ export async function scanFiche(file, onProgress) {
   return mergeReadings(texts, 'ocr');
 }
 
+// The text of a document read by OCR in the browser (no AI, no outside service): a PDF page by page (its text
+// layer, or OCR of scanned pages), an image in one French + Arabic pass on the enhanced picture. Progress 0..1.
+export async function readDocumentText(file, onProgress) {
+  if (isPdf(file)) {
+    const [ordered, rows] = await pdfReadings(file, onProgress);
+    return ordered === rows ? ordered : `${rows}\n\n${ordered}`;
+  }
+  const { createWorker } = await import('tesseract.js');
+  const worker = await createWorker(['fra', 'ara'], 1, {
+    ...TESSERACT_PATHS,
+    logger: (message) => { if (message.status === 'recognizing text' && onProgress) onProgress(message.progress); },
+  });
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: '4', preserve_interword_spaces: '1' });
+    const { data } = await worker.recognize(await enhanceImage(file));
+    return data.text || '';
+  } finally {
+    await worker.terminate();
+  }
+}
+
 // Each reading is parsed on its own and the first non-empty value wins, so one bad pass cannot hide a good one.
 function mergeReadings(texts, source) {
   const readings = texts.map((text) => extractFields(text));

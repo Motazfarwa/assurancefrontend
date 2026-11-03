@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { checkValue, completeReading, isPdf, scanFiche, scanFicheWithAI, scanFicheWithServerOcr } from '../../services/ficheOcr';
+import { checkValue, isPdf, scanFiche } from '../../services/ficheOcr';
 import './FicheImportModal.css';
 
 const GROUPS = [
@@ -33,9 +33,7 @@ function buildPatches(rows) {
   return { client, policy };
 }
 
-export default function FicheImportModal({ file, accessToken, onClose, onApply }) {
-  const [source, setSource] = useState('');
-  const [aiNotice, setAiNotice] = useState('');
+export default function FicheImportModal({ file, onClose, onApply }) {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('scanning');
   const [error, setError] = useState('');
@@ -48,24 +46,10 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
 
   useEffect(() => {
     let active = true;
-    const onProgress = (value) => { if (active) setProgress(value); };
-    scanFicheWithAI(file, accessToken)
-      .then(async (aiResult) => {
-        // Whole scan: what the AI missed is looked for in the full text of the document.
-        if (aiResult.fields.every((field) => field.value)) return aiResult;
-        const full = await (isPdf(file) ? scanFiche(file, onProgress) : scanFicheWithServerOcr(file, accessToken)).catch(() => null);
-        return full ? completeReading(aiResult, full) : aiResult;
-      }, (aiError) => {
-        // No server AI configured is a normal setup: use the free server OCR, then the in-browser one.
-        if (active && !/non configur|jeton/i.test(aiError.message)) setAiNotice(`Lecture IA indisponible (${aiError.message}).`);
-        return scanFicheWithServerOcr(file, accessToken).catch((ocrError) => {
-          if (active && !/jeton/i.test(ocrError.message)) setAiNotice((notice) => `${notice ? `${notice} ` : ''}OCR serveur indisponible (${ocrError.message}). Lecture locale utilisée.`);
-          return scanFiche(file, onProgress);
-        });
-      })
+    // OCR in the browser (French + Arabic, every page of a PDF): no AI, no outside service.
+    scanFiche(file, (value) => { if (active) setProgress(value); })
       .then((result) => {
         if (!active) return;
-        setSource(result.source);
         setText(result.text);
         setRows(result.fields.map((field) => ({ ...field, use: Boolean(field.value) && !field.warning })));
         setStatus('done');
@@ -76,7 +60,7 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
         setStatus('error');
       });
     return () => { active = false; };
-  }, [file, accessToken]);
+  }, [file]);
 
   function change(key, value) {
     setRows((current) => current.map((row) => (row.key === key
@@ -108,13 +92,12 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
               <div className="fiche-progress" role="status">
                 <strong>Lecture du document… {Math.round(progress * 100)} %</strong>
                 <div><i style={{ width: `${Math.max(4, progress * 100)}%` }} /></div>
-                <small>Lecture du texte (français et arabe) en plusieurs passes. Cela peut prendre une à deux minutes.</small>
+                <small>Lecture du texte (français et arabe) dans le navigateur, page par page.</small>
               </div>
             )}
             {status === 'error' && <p className="fiche-error" role="alert">{error}</p>}
             {status === 'done' && <>
-              {aiNotice && <p className="fiche-error" role="status">{aiNotice}</p>}
-              <p className="fiche-hint">{source === 'ai' ? 'Lu par l’IA. ' : ''}Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
+              <p className="fiche-hint">Lu par OCR. Vérifiez et corrigez les informations détectées, puis cochez celles à appliquer. Les valeurs suspectes sont signalées.</p>
               {GROUPS.map((group) => (
                 <fieldset key={group.id}>
                   <legend>{group.label}</legend>

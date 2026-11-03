@@ -805,7 +805,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           </section>
         </div>
       )}
-      {importFile && <DocumentImportDialog file={importFile} kicker={`SINISTRES · MODULE ${moduleId} · IMPORT`} title="Importer un constat / une déclaration" read={() => extractSinistre(accessToken, importFile)} summarize={summarizeImport} applyLabel="Appliquer au dossier" onApply={applyImport} onClose={() => setImportFile(null)} />}
+      {importFile && <DocumentImportDialog file={importFile} kicker={`SINISTRES · MODULE ${moduleId} · IMPORT`} title="Importer un constat / une déclaration" read={(onProgress) => extractSinistre(accessToken, importFile, onProgress)} summarize={summarizeImport} applyLabel="Appliquer au dossier" onApply={applyImport} onClose={() => setImportFile(null)} />}
     </div>
   );
 }

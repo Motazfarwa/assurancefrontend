@@ -212,6 +212,6 @@ export default function BanqueModal({ moduleId = '740', onClose }) {
         <footer><span>{listed.length} compte(s) · cliquez une ligne pour l’ouvrir</span><span className="bnk-list-actions"><button type="button" className="expert-submit" onClick={print}>Imprimer</button><button type="button" className="expert-cancel" onClick={() => setPreview(false)}>Fermer</button></span></footer>
       </section>
     </div>}
-    {importFile && <DocumentImportDialog file={importFile} kicker={`PARAMÉTRAGE · MODULE ${moduleId} · IMPORT`} title="Importer un RIB / relevé bancaire" read={() => extractBanque(accessToken, importFile)} summarize={summarizeImport} applyLabel="Appliquer à la fiche banque" onApply={applyImport} onClose={() => setImportFile(null)} />}
+    {importFile && <DocumentImportDialog file={importFile} kicker={`PARAMÉTRAGE · MODULE ${moduleId} · IMPORT`} title="Importer un RIB / relevé bancaire" read={(onProgress) => extractBanque(accessToken, importFile, onProgress)} summarize={summarizeImport} applyLabel="Appliquer à la fiche banque" onApply={applyImport} onClose={() => setImportFile(null)} />}
   </div>;
 }

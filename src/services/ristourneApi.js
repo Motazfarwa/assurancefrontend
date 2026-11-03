@@ -1,4 +1,4 @@
-import { fileToBase64, isPdf, scanFiche, toJpegBase64 } from './ficheOcr';
+import { readDocumentText } from './ficheOcr';
 import { API_BASE_URL } from './apiBase';
 
 async function request(path, accessToken, options = {}) {
@@ -33,21 +33,10 @@ export const createRistourne = (token, values) => request('/api/ristournes', tok
 export const updateRistourne = (token, number, values) => request(path(number), token, { method: 'PUT', body: JSON.stringify(values) });
 export const deleteRistourne = (token, number) => request(path(number), token, { method: 'DELETE' });
 
-// Reads a company document (PDF or image): every ristourne line, each checked against the database. Nothing is saved.
-// The server reads it with its AI service; when that fails (no answer, quota…) or finds nothing, the document is read
-// here in the browser (OCR) and its text is analysed by the server, so the import still gives the ristourne.
+// Reads a company document (PDF or image) by OCR in the browser, then the server finds every ristourne in its text and
+// checks each one against the database. Nothing is saved.
 export async function extractRistournes(token, file, onProgress) {
-  const pdf = isPdf(file);
-  let serverProblem = '';
-  try {
-    const image = pdf ? await fileToBase64(file) : await toJpegBase64(file, 2600, 0.92);
-    const document = await request('/api/ristournes/extract', token, { method: 'POST', body: JSON.stringify({ image_base64: image, media_type: pdf ? 'application/pdf' : 'image/jpeg' }) });
-    if (document.lignes?.length) return document;
-    serverProblem = 'aucune ristourne trouvée par la lecture du serveur';
-  } catch (error) {
-    serverProblem = error.message;
-  }
-  const { text } = await scanFiche(file, onProgress);
-  const document = await request('/api/ristournes/extract-text', token, { method: 'POST', body: JSON.stringify({ text: String(text || '').slice(0, 300000) }) });
-  return { ...document, serverProblem };
+  const text = await readDocumentText(file, onProgress);
+  if (!text.trim()) throw new Error('aucun texte n’a pu être lu : vérifiez la qualité du document.');
+  return request('/api/ristournes/extract-text', token, { method: 'POST', body: JSON.stringify({ text: text.slice(0, 300000) }) });
 }
