@@ -15,7 +15,7 @@ const round3 = (value) => Math.round(Number(value || 0) * 1000) / 1000;
 
 const blank = () => ({
   num_ristourne: '', num_police: '', date_du: today(), date_au: today(), date_saisie: today(),
-  nette: '', decommission: '', detaxe: '', observation: '', informations: '',
+  nette: '', decommission: '', detaxe: '', totale: '', observation: '', informations: '',
 });
 const toForm = (item) => ({
   num_ristourne: item.num_ristourne || '', num_police: item.num_police || item.num_int || '',
@@ -92,6 +92,7 @@ export default function RistourneModal({ moduleId, onClose }) {
       ...blank(), num_ristourne: line.num_ristourne || '', num_police: line.num_police || '',
       date_du: line.date_du || '', date_au: line.date_au || '',
       nette: line.nette ?? '', decommission: line.decommission ?? '', detaxe: line.detaxe ?? '',
+      totale: line.totale ?? '', // the Prime Totale printed on the quittance
       observation: (line.motif || '').slice(0, 50),
     });
     setPolicy(line.policy || (line.candidates?.length ? { candidates: line.candidates } : null));
@@ -146,6 +147,7 @@ export default function RistourneModal({ moduleId, onClose }) {
       num_int: policy.num_int,
       date_du: form.date_du || null, date_au: form.date_au || null, date_saisie: form.date_saisie || null,
       nette: round3(form.nette), decommission: round3(form.decommission), detaxe: round3(form.detaxe),
+      totale: form.totale === '' || form.totale == null ? null : round3(form.totale),
     };
     setBusy(true); setError(''); setNotice('');
     try {
@@ -172,7 +174,8 @@ export default function RistourneModal({ moduleId, onClose }) {
     catch (searchError) { if (id === searchId.current) setSearch({ q, items: [], loading: false, error: searchError.message }); }
   }
 
-  const totale = editing ? round3(Number(form.nette || 0) + Number(form.detaxe || 0)) : current?.totale;
+  // Ristourne totale: the Prime Totale of the imported quittance, else nette + détaxe.
+  const totale = editing ? (form.totale !== '' && form.totale != null ? round3(form.totale) : round3(Number(form.nette || 0) + Number(form.detaxe || 0))) : current?.totale;
   const paid = current ? round3(Number(current.totale || 0) - Number(current.solde || 0)) : 0;
   const solde = editing ? round3(totale - paid) : current?.solde;
   const locked = Boolean(current?.comptabilise);

@@ -57,7 +57,7 @@ export default function BordereauFusionModal({ onClose }) {
     setLoading(true);
     setError('');
     try {
-      await fuseBordereau(accessToken, bordereau.id_bordereau, !clean);
+      await fuseBordereau(accessToken, bordereau, !clean);
       setNotice('Bordereau fusionné.');
       setResult(await getConfrontation(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc, periode }));
     } catch (requestError) {
@@ -72,7 +72,7 @@ export default function BordereauFusionModal({ onClose }) {
     setLoading(true);
     setError('');
     try {
-      await cancelFusion(accessToken, result.bordereau.id_bordereau);
+      await cancelFusion(accessToken, result.bordereau);
       setNotice('Fusion annulée.');
       setResult(await getConfrontation(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc, periode }));
     } catch (requestError) {
@@ -114,7 +114,7 @@ export default function BordereauFusionModal({ onClose }) {
         {result && (
           <div className="bd-report">
             <p className="bd-report-meta">
-              <span>Bordereau n° {result.bordereau.id_bordereau} · {result.bordereau.nom_compagnie} · {result.bordereau.tc === 'T' ? 'Terme' : 'Comptant'} {result.bordereau.periode}</span>
+              <span>{result.bordereau.id_bordereau ? `Bordereau n° ${result.bordereau.id_bordereau}` : `Bordereau (TBordereau) · ${result.bordereau.nb_lignes} ligne(s)`} · {result.bordereau.nom_compagnie} · {result.bordereau.tc === 'T' ? 'Terme' : 'Comptant'} {result.bordereau.periode}</span>
               <span className={fused ? 'is-ok' : 'is-warn'}>
                 {fused ? `Fusionné le ${shortDate(result.bordereau.date_fusion)}${result.bordereau.fusion_par ? ` par ${result.bordereau.fusion_par}` : ''}` : 'N\'est pas encore fusionné'}
               </span>

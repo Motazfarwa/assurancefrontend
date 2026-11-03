@@ -45,5 +45,11 @@ export const nextMonth = () => {
   return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
 };
 
-export const fuseBordereau = (token, id, forcer = false) => request(`/api/bordereaux/${id}/fusion`, token, { method: 'POST', body: JSON.stringify({ forcer }) });
-export const cancelFusion = (token, id) => request(`/api/bordereaux/${id}/fusion`, token, { method: 'DELETE' });
+// A bordereau of TBordereau (the agency's bordereaux) is fused by company, T/C and period; one imported in the
+// application (TBordereauCie) by its number.
+export const fuseBordereau = (token, bordereau, forcer = false) => (bordereau.source === 'TBordereau'
+  ? request('/api/bordereaux/fusion-periode', token, { method: 'POST', body: JSON.stringify({ code_compagnie: bordereau.code_compagnie, tc: bordereau.tc, periode: bordereau.periode, forcer }) })
+  : request(`/api/bordereaux/${bordereau.id_bordereau}/fusion`, token, { method: 'POST', body: JSON.stringify({ forcer }) }));
+export const cancelFusion = (token, bordereau) => (bordereau.source === 'TBordereau'
+  ? request(`/api/bordereaux/fusion-periode?${query({ code_compagnie: bordereau.code_compagnie, tc: bordereau.tc, periode: bordereau.periode })}`, token, { method: 'DELETE' })
+  : request(`/api/bordereaux/${bordereau.id_bordereau}/fusion`, token, { method: 'DELETE' }));
