@@ -85,6 +85,15 @@ export default function DocumentImportDialog({ file, kicker, title, read, summar
                 </fieldset>
               )}
               {summary.warnings?.length > 0 && <ul className="doc-import-warnings">{summary.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
+              {/* Every labelled value read on the document, besides those that fill the form (nothing read is lost) */}
+              {result?.infos?.length > 0 && (
+                <fieldset>
+                  <legend>Autres informations lues sur le document ({result.infos.length})</legend>
+                  <dl className="doc-import-values">
+                    {result.infos.map((info, index) => <div key={`${info.libelle}-${index}`}><dt>{info.libelle}</dt><dd>{info.valeur}</dd></div>)}
+                  </dl>
+                </fieldset>
+              )}
             </>}
           </div>
         </div>

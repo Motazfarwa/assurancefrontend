@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './apiBase';
+import { enhanceImage, recognizePage } from './imageTools';
 import { TESSERACT_PATHS } from './ocrAssets';
 // In-browser OCR of a client file (fiche client), French and Arabic, and extraction of the
 // client / policy / receipt fields. Everything is returned to the caller to be reviewed before use.
@@ -327,54 +328,20 @@ function readLayout(lines, text) {
   return result;
 }
 
-// Runs OCR (French + Arabic) on an image file. Progress is reported as 0..1.
-// Phone photos read much better once enlarged, turned to grey and stretched to full contrast.
-async function enhanceImage(file, targetSide = 2600) {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const scale = targetSide / Math.max(bitmap.width, bitmap.height);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  context.imageSmoothingQuality = 'high';
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  if (bitmap.close) bitmap.close();
-
-  const image = context.getImageData(0, 0, canvas.width, canvas.height);
-  const { data } = image;
-  const histogram = new Uint32Array(256);
-  for (let i = 0; i < data.length; i += 4) {
-    const grey = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-    data[i] = grey;
-    histogram[grey] += 1;
-  }
-  const pixels = data.length / 4;
-  let low = 0;
-  let high = 255;
-  for (let sum = 0; low < 255 && sum + histogram[low] < pixels * 0.02; low += 1) sum += histogram[low];
-  for (let sum = 0; high > 0 && sum + histogram[high] < pixels * 0.02; high -= 1) sum += histogram[high];
-  const range = Math.max(1, high - low);
-  for (let i = 0; i < data.length; i += 4) {
-    const value = Math.max(0, Math.min(255, ((data[i] - low) * 255) / range));
-    data[i] = value;
-    data[i + 1] = value;
-    data[i + 2] = value;
-  }
-  context.putImageData(image, 0, 0);
-  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-}
-
 // Runs OCR on an image file (French first, then French + Arabic) and merges the readings.
 // A PDF is read page by page (text layer, or OCR of scanned pages). Progress is reported as 0..1.
+// Phone photos read much better once enlarged, turned to grey and stretched to full contrast; the black-and-white
+// version (psm 11, scattered text) catches the values written in the boxes of a form.
 export async function scanFiche(file, onProgress) {
   if (isPdf(file)) return mergeReadings(await pdfReadings(file, onProgress), 'pdf');
   const { createWorker } = await import('tesseract.js');
-  const passes = [
-    { langs: ['fra'], pageMode: '4', enhanced: true },
-    { langs: ['fra'], pageMode: '6', enhanced: true },
-    { langs: ['fra', 'ara'], pageMode: '3', enhanced: false },
-  ];
   const enhanced = await enhanceImage(file);
+  const binary = await enhanceImage(file, { binarize: true });
+  const passes = [
+    { langs: ['fra'], pageMode: '6', image: enhanced },
+    { langs: ['fra'], pageMode: '11', image: binary },
+    { langs: ['fra', 'ara'], pageMode: '3', image: enhanced },
+  ];
   const texts = [];
 
   for (let index = 0; index < passes.length; index += 1) {
@@ -386,8 +353,8 @@ export async function scanFiche(file, onProgress) {
       },
     });
     try {
-      await worker.setParameters({ tessedit_pageseg_mode: pass.pageMode, preserve_interword_spaces: '1' });
-      const { data } = await worker.recognize(pass.enhanced ? enhanced : file);
+      await worker.setParameters({ tessedit_pageseg_mode: pass.pageMode, preserve_interword_spaces: '1', user_defined_dpi: '300' });
+      const { data } = await worker.recognize(pass.image);
       texts.push(data.text || '');
     } finally {
       await worker.terminate();
@@ -398,21 +365,21 @@ export async function scanFiche(file, onProgress) {
 }
 
 // The text of a document read by OCR in the browser (no AI, no outside service): a PDF page by page (its text
-// layer, or OCR of scanned pages), an image in one French + Arabic pass on the enhanced picture. Progress 0..1.
+// layer, or OCR of scanned pages), an image in two French + Arabic passes merged (see recognizePage). Progress 0..1.
 export async function readDocumentText(file, onProgress) {
   if (isPdf(file)) {
     const [ordered, rows] = await pdfReadings(file, onProgress);
     return ordered === rows ? ordered : `${rows}\n\n${ordered}`;
   }
   const { createWorker } = await import('tesseract.js');
+  let pass = 0;
+  let passes = 2;
   const worker = await createWorker(['fra', 'ara'], 1, {
     ...TESSERACT_PATHS,
-    logger: (message) => { if (message.status === 'recognizing text' && onProgress) onProgress(message.progress); },
+    logger: (message) => { if (message.status === 'recognizing text' && onProgress) onProgress((pass + message.progress) / passes); },
   });
   try {
-    await worker.setParameters({ tessedit_pageseg_mode: '4', preserve_interword_spaces: '1' });
-    const { data } = await worker.recognize(await enhanceImage(file));
-    return data.text || '';
+    return await recognizePage(worker, file, (index, total) => { pass = index; passes = total; });
   } finally {
     await worker.terminate();
   }

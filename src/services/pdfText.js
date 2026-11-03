@@ -1,6 +1,7 @@
 // Reads every page of a PDF in the browser: the text layer when the PDF has one, OCR of the rendered page
 // otherwise (scanned PDFs). Lines keep wide gaps as 3 spaces so table cells can still be told apart.
 
+import { recognizePage } from './imageTools';
 import { TESSERACT_PATHS } from './ocrAssets';
 
 async function openPdf(file) {
@@ -47,8 +48,10 @@ function streamText(items) {
   return text.split('\n').map((line) => line.replace(/\s{2,}/g, ' ').trim()).filter(Boolean).join('\n');
 }
 
-async function renderPage(page, scale = 2.5) {
-  const viewport = page.getViewport({ scale });
+// A scanned page rendered at about 300 DPI (scale 4 of the PDF's 72 DPI), at most 4200 px on its longer side.
+async function renderPage(page, scale = 4) {
+  const base = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: Math.min(scale, 4200 / Math.max(base.width, base.height)) });
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(viewport.width);
   canvas.height = Math.round(viewport.height);
@@ -80,18 +83,21 @@ export async function pdfReadings(file, onProgress) {
   if (scanned.length) {
     const { createWorker } = await import('tesseract.js');
     let current = 0;
+    let pass = 0;
+    let passes = 2;
     const worker = await createWorker(['fra', 'ara'], 1, {
       ...TESSERACT_PATHS,
       logger: (message) => {
-        if (message.status === 'recognizing text' && onProgress) onProgress(0.2 + ((current + message.progress) / scanned.length) * 0.8);
+        if (message.status === 'recognizing text' && onProgress) onProgress(0.2 + ((current + (pass + message.progress) / passes) / scanned.length) * 0.8);
       },
     });
     try {
-      await worker.setParameters({ tessedit_pageseg_mode: '4', preserve_interword_spaces: '1' });
+      // Each scanned page: the block reading and the scattered-text reading (boxes of a form), merged.
+      const onPass = (index, total) => { pass = index; passes = total; };
       for (current = 0; current < scanned.length; current += 1) {
-        const { data } = await worker.recognize(scanned[current].image);
-        pages[scanned[current].index] = data.text || '';
-        rows[scanned[current].index] = data.text || '';
+        const text = await recognizePage(worker, scanned[current].image, onPass);
+        pages[scanned[current].index] = text;
+        rows[scanned[current].index] = text;
       }
     } finally {
       await worker.terminate();
