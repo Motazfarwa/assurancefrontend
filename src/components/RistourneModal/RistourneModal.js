@@ -41,7 +41,6 @@ export default function RistourneModal({ moduleId, onClose }) {
   const [importFile, setImportFile] = useState(null); // the document being read in the import window
   const [importLine, setImportLine] = useState(null); // index of the imported line in the form
   const [savedLines, setSavedLines] = useState([]);
-  const [lineWarnings, setLineWarnings] = useState([]);
   const fileRef = useRef(null);
   const numberRef = useRef(null);
   const searchId = useRef(0);
@@ -57,7 +56,7 @@ export default function RistourneModal({ moduleId, onClose }) {
   });
 
   function show(item) {
-    setCurrent(item); setForm(toForm(item)); setPolicy(item); setMode('view'); setImportLine(null); setLineWarnings([]);
+    setCurrent(item); setForm(toForm(item)); setPolicy(item); setMode('view'); setImportLine(null);
   }
 
   // Once the import window has read the document: the list of its ristournes, to load one by one into the form.
@@ -81,7 +80,6 @@ export default function RistourneModal({ moduleId, onClose }) {
       rows: lines.length ? rows.filter(([, value]) => value !== undefined) : [],
       empty: 'Aucune ristourne trouvée dans ce document.',
       note: `Lu par OCR${document.engine === 'serveur' ? ' (texte imprimé et manuscrit)' : ' dans le navigateur'}. « Voir les ristournes lues » ouvre la liste : vérifiez chaque montant avec le document, puis enregistrez.`,
-      warnings: [...new Set(lines.flatMap((line) => line.warnings || []))],
     };
   };
 
@@ -96,12 +94,12 @@ export default function RistourneModal({ moduleId, onClose }) {
       observation: (line.motif || '').slice(0, 50),
     });
     setPolicy(line.policy || (line.candidates?.length ? { candidates: line.candidates } : null));
-    setMode('new'); setImportLine(index); setLineWarnings(line.warnings || []); setShowImport(false); setError('');
+    setMode('new'); setImportLine(index); setShowImport(false); setError('');
     setNotice(`Ligne ${index + 1} du document chargée : vérifiez chaque champ avec le document, puis Enregistrer.`);
   }
 
   function reset(message = '') {
-    setCurrent(null); setForm(blank()); setPolicy(null); setMode('view'); setNotice(message); setImportLine(null); setLineWarnings([]);
+    setCurrent(null); setForm(blank()); setPolicy(null); setMode('view'); setNotice(message); setImportLine(null);
   }
 
   async function open(number) {
@@ -228,7 +226,6 @@ export default function RistourneModal({ moduleId, onClose }) {
             </label>}
           </div>
         </div>
-        {editing && lineWarnings.length > 0 && <div className="rst-warnings" role="note"><strong>À vérifier sur le document :</strong><ul>{lineWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
 
         <div className="catalog-section">
           <div className="rst-grid">
@@ -279,7 +276,7 @@ export default function RistourneModal({ moduleId, onClose }) {
             <tbody>{imported.lignes.map((line, index) => {
               const saved = savedLines.includes(index);
               return <Fragment key={index}>
-                <tr className={saved ? 'is-saved' : line.warnings?.length ? 'has-warning' : ''}>
+                <tr className={saved ? 'is-saved' : undefined}>
                   <td>{index + 1}</td><td>{line.num_ristourne || '—'}</td><td>{line.num_police || '—'}</td>
                   <td>{line.client || '—'}{line.policy && <small className="rst-db"> → {line.policy.nom_client} ({line.policy.nom_compagnie || line.policy.code_compagnie})</small>}</td>
                   <td>{formatDate(line.date_du) || '—'}</td><td>{formatDate(line.date_au) || '—'}</td>
@@ -290,7 +287,6 @@ export default function RistourneModal({ moduleId, onClose }) {
                     : <button type="button" className="expert-submit" onClick={() => loadLine(line, index)}>Charger</button>}</td>
                 </tr>
                 {line.colonnes?.length > 0 && !saved && <tr className="rst-columns-row"><td /><td colSpan={10}>Colonnes du document : {line.colonnes.map((column) => `${column.libelle} ${fmt(column.valeur)}`).join(' · ')}{line.immatriculation ? ` · Immatriculation ${line.immatriculation}` : ''}</td></tr>}
-                {line.warnings?.length > 0 && !saved && <tr className="rst-warning-row"><td /><td colSpan={10}>{line.warnings.join(' · ')}</td></tr>}
               </Fragment>;
             })}</tbody>
           </table>
