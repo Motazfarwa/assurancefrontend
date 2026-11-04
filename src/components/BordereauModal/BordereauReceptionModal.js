@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { isOfferedCompany, listCompanies } from '../../services/companyApi';
+import { isBordereauCompany, isOfferedCompany, listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
 import { deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
@@ -29,7 +29,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
   const [companies, setCompanies] = useState([]);
-  const [form, setForm] = useState({ code_compagnie: '', tc, month: kind.month(), date_reception: today() });
+  const [form, setForm] = useState({ code_compagnie: '', tc, month: kind.month(), annee: String(new Date().getFullYear()), date_reception: today() });
   const [clients, setClients] = useState({}); // num_police -> { code_client, nom_client } from the agency's policies
   const requestedClients = useRef(new Set());
   const [lines, setLines] = useState([]);
@@ -46,6 +46,8 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const periode = monthToPeriode(form.month);
+  const companyCodes = companies.map((company) => company.code_compagnie).join(',');
+  const annee = /^\d{4}$/.test(form.annee) ? form.annee : '';
   const companyName = companies.find((company) => String(company.code_compagnie) === String(form.code_compagnie))?.nom_compagnie || '';
   // Lines with the client filled from the agency's policy when the file does not give it.
   const shownLines = useMemo(() => lines.map((line) => {
@@ -70,15 +72,15 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(isOfferedCompany)); })
+      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(kind.quittances ? isBordereauCompany : isOfferedCompany)); })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
-  }, [accessToken]);
+  }, [accessToken, kind.quittances]);
 
   // Company / type / period -> the bordereau already stored for them, if any.
   useEffect(() => {
     if (skipLoad.current) { skipLoad.current = false; return undefined; } // the form was just filled from the imported file
-    if (!kind.quittances && (!form.code_compagnie || !periode)) return undefined;
+    if (kind.quittances ? !companyCodes : !form.code_compagnie || !periode) return undefined;
     let active = true;
     setBusy(true);
     setError('');
@@ -88,7 +90,10 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     stored
       .then(async (result) => {
         // Comptant: without a bordereau imported for the period, the quittances of TQuittance are shown.
-        const quittances = !result && kind.quittances ? await listQuittances(accessToken, { tc: form.tc, periode, code_compagnie: form.code_compagnie }) : null;
+        // Without a period: those of the year chosen (current year by default); without a company: those of the companies listed.
+        const quittances = !result && kind.quittances
+          ? await listQuittances(accessToken, { tc: form.tc, periode, annee: periode ? '' : annee, code_compagnie: form.code_compagnie, compagnies: form.code_compagnie ? '' : companyCodes })
+          : null;
         if (!active) return;
         setLines(result ? result.lignes.map(fromApi) : (quittances || []).map(fromApi));
         setFromQuittances(Boolean(quittances));
@@ -99,12 +104,12 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
         setSelected(-1);
         if (result?.bordereau.date_reception) setForm((current) => ({ ...current, date_reception: String(result.bordereau.date_reception).slice(0, 10) }));
         setNotice(result ? `Bordereau enregistré : ${result.lignes.length} ligne(s).`
-          : quittances ? `${quittances.length} quittance(s) comptant ${periode ? `de la période ${periode}` : 'sans période'}${form.code_compagnie ? '' : ' (toutes compagnies)'}.` : '');
+          : quittances ? `${quittances.length} quittance(s) comptant ${periode ? `de la période ${periode}` : `sans période${annee ? `, échéance ${annee}` : ''}`}${form.code_compagnie ? '' : ' (toutes compagnies)'}.` : '');
       })
       .catch((requestError) => { if (active) setError(requestError.message); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [accessToken, form.code_compagnie, form.tc, periode, kind.quittances]);
+  }, [accessToken, form.code_compagnie, form.tc, periode, annee, companyCodes, kind.quittances]);
 
   function changeForm(patch) {
     if (dirty && lines.length && ('code_compagnie' in patch || 'tc' in patch || 'month' in patch)
@@ -291,6 +296,9 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
               {kind.quittances && form.month && <button type="button" className="bd-tool" title="Quittances sans période" onClick={() => changeForm({ month: '' })}>Sans période</button>}
             </span>
           </label>
+          {kind.quittances && !form.month && (
+            <label>Année échéance<input className="bd-year" type="number" min="1990" max="2100" value={form.annee} onChange={(event) => changeForm({ annee: event.target.value })} /></label>
+          )}
           <div className="bd-total"><span>Total</span><strong>{money(total)}</strong></div>
           <div className="bd-total" title="Prime totale moins les commissions"><span>Solde</span><strong>{money(solde)}</strong></div>
           <div className="bd-total"><span>Lignes</span><strong>{lines.length}</strong></div>
