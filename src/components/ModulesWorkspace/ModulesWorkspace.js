@@ -262,7 +262,7 @@ export default function ModulesWorkspace() {
               {filteredModules.map((module) => <button type="button" className={`module-row ${activeModuleId === module.id ? 'is-selected' : ''}`} key={`${module.category}-${module.id}`} onClick={() => openModule(module)} title={`${module.id} · ${module.title}\n${module.description}`}><span className="module-row-code">{module.id}</span><span className="module-row-info"><strong>{module.title}</strong><small>{activeCategory === 'all' ? `${MODULE_CATEGORIES.find((category) => category.id === module.category)?.label} · ` : ''}{module.description}</small></span><span className="module-row-action" aria-hidden="true">↗</span></button>)}
               {!filteredModules.length && <div className="module-list-empty"><span>⌕</span><strong>Aucun programme trouve</strong><small>Modifiez votre recherche ou choisissez une autre nature.</small></div>}
             </div>
-            <div className="module-browser-footer"><span>Selectionnez une ligne pour ouvrir le formulaire du programme.</span><span>{filteredModules.length} resultats</span></div>
+            <div className="module-browser-footer"><span /><span>{filteredModules.length} resultats</span></div>
           </section>
         </div>
         <footer className="workspace-footer"><span>© 2026 Assurance Jemmali</span><span>Interface de gestion · Les acces dependent de votre profil</span></footer>
