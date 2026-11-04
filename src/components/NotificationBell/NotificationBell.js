@@ -24,8 +24,8 @@ export default function NotificationBell({ onOpenHistory }) {
 
   const load = useCallback(() => {
     if (!accessToken) return Promise.resolve();
-    return listNotifications(accessToken).then((body) => { setData(body); setError(''); }).catch((loadError) => setError(loadError.message));
-  }, [accessToken]);
+    return listNotifications(accessToken, user.isAdmin ? 100 : 30).then((body) => { setData(body); setError(''); }).catch((loadError) => setError(loadError.message));
+  }, [accessToken, user.isAdmin]);
 
   useEffect(() => {
     load();

@@ -206,3 +206,32 @@
 .snr-table th .snr-sort:hover span, .snr-table th .snr-sort.is-active span { color: #187d78; }
 .snr-table th .snr-sort.is-active { color: #14695f; }
 .snr-table th .snr-sort:focus-visible { outline: 2px solid #63b9a9; outline-offset: 2px; border-radius: 3px; }
+
+/* Sort menu of the claims list: only on a phone (on a computer the column headers sort) */
+.snr-mobile-sort { display: none; }
+
+/* Phone: the filters wrap (both dates fully visible) and each claim is a card with full dates */
+@media (max-width: 640px) {
+  .snr-list header { align-items: stretch; }
+  .snr-list header > .snr-date-filter { display: flex; flex: 1 1 100%; flex-wrap: wrap; white-space: normal; }
+  .snr-list header > .snr-date-filter .snr-filter-check-inline { flex: 1 1 100%; font-size: 13px; }
+  .snr-list header > .snr-date-filter .snr-filter-check-inline input { width: 18px; height: 18px; }
+  .snr-list header > .snr-date-filter input:not([type="checkbox"]), .snr-list header > .snr-date-filter select { flex: 1 1 0; min-width: 0; max-width: none; height: 38px; font-size: 14px; }
+  .snr-list header > .snr-date-filter input.snr-client-code { flex: 0 1 90px; }
+  .snr-mobile-sort { display: flex; flex: 1 1 100%; align-items: center; gap: 6px; color: #587079; font-size: 11.5px; font-weight: 650; }
+  .snr-mobile-sort select { flex: 1 1 0; min-width: 0; height: 38px; padding: 3px 8px; border: 1px solid #d3dfe5; border-radius: 7px; background: #fff; font: inherit; font-size: 14px; color: #173247; }
+  .snr-list header > input { height: 38px; font-size: 14px; }
+
+  .snr-table-wrap:has(.snr-claims) { overflow-x: hidden; }
+  .snr-table.snr-claims { min-width: 0; table-layout: auto; }
+  .snr-table.snr-claims thead { display: none; }
+  .snr-table.snr-claims, .snr-table.snr-claims tbody { display: block; width: 100%; }
+  .snr-table.snr-claims tr { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 8px 6px; padding: 8px 10px; border: 1px solid #dbe3e6; border-radius: 9px; }
+  .snr-table.snr-claims td { display: block; min-width: 0; padding: 2px 0 !important; border: 0; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; text-align: left !important; font-size: 13px; }
+  .snr-table.snr-claims td::before { content: attr(data-label); display: block; color: #6a7f89; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+  .snr-table.snr-claims td:empty { display: none; }
+  .snr-table.snr-claims td[data-label="N° sinistre"] { font-weight: 750; }
+  .snr-table.snr-claims td[data-label="Date sinistre"] { font-weight: 650; white-space: nowrap !important; }
+  .snr-table.snr-claims td[data-label="Nom client"], .snr-table.snr-claims td[data-label="Observation"], .snr-table.snr-claims td[data-label="Expert"] { grid-column: 1 / -1; }
+  .snr-claims-group h4 { position: static; width: auto; }
+}

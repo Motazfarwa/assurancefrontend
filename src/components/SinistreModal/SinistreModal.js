@@ -855,6 +855,16 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 <span>Jusqu’au</span>
                 <input type="date" value={list.dateMax} min={list.dateMin} onChange={(event) => { const dateMax = event.target.value; if (dateMax) setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
               </div>
+              {/* Phone: the list shows cards (no column headers), so the order is chosen here */}
+              <label className="snr-mobile-sort">
+                <span>Trier par</span>
+                <select value={`${claimSort.key}:${claimSort.dir}`} onChange={(event) => { const [key, dir] = event.target.value.split(':'); setClaimSort({ key, dir }); }}>
+                  {CLAIM_COLUMNS.flatMap(([key, label, kind]) => [
+                    <option key={`${key}:asc`} value={`${key}:asc`}>{label} {kind === 'date' ? '(anciens d’abord)' : kind === 'number' ? '(croissant)' : '(A → Z)'}</option>,
+                    <option key={`${key}:desc`} value={`${key}:desc`}>{label} {kind === 'date' ? '(récents d’abord)' : kind === 'number' ? '(décroissant)' : '(Z → A)'}</option>,
+                  ])}
+                </select>
+              </label>
               <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, code ou nom client, police, immatriculation, tiers, expert…" />
               <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
             </header>
@@ -876,9 +886,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                       <tbody>
                         {sortClaims(group.rows, claimSort).map((row) => (
                           <tr key={row.Num_Sinistre_Agence} className={`is-clickable${redReason(row, list) ? ' is-overdue' : ''}`} title={redReason(row, list) || undefined} onClick={() => open(row.Num_Sinistre_Agence)}>
-                            <td>{row.Num_Sinistre_Agence}</td><td>{shortDate(row.Date_Sinistre)}</td><td>{row.Code_Client}</td><td title={row.nom_client || ''}>{row.nom_client}</td>
-                            <td>{row.Num_Int}</td><td>{row.Num_Imat}</td><td>{row.Type_Sinistre}</td><td title={row.nom_expert || ''}>{row.nom_expert || ''}</td><td className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
-                            <td className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
+                            <td data-label="N° sinistre">{row.Num_Sinistre_Agence}</td><td data-label="Date sinistre">{shortDate(row.Date_Sinistre)}</td><td data-label="Client">{row.Code_Client}</td><td data-label="Nom client" title={row.nom_client || ''}>{row.nom_client}</td>
+                            <td data-label="N° police">{row.Num_Int}</td><td data-label="Immat.">{row.Num_Imat}</td><td data-label="Type">{row.Type_Sinistre}</td><td data-label="Expert" title={row.nom_expert || ''}>{row.nom_expert || ''}</td><td data-label="Observation" className="snr-risque" title={row.Risque || ''}>{row.Risque}</td>
+                            <td data-label="Devis" className="is-number">{row.Montant_Devis ? money(row.Montant_Devis) : ''}</td><td data-label="Réglé" className="is-number">{row.Montant_Reglement ? money(row.Montant_Reglement) : ''}</td>
                           </tr>
                         ))}
                       </tbody>

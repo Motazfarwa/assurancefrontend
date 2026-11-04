@@ -26,6 +26,9 @@
 .notif-move-3 { background: #e8f0fb; color: #2c5d9b; }
 .notif-move-4 { background: #fdecec; color: #a74545; }
 .notif-move-7 { background: #fdf0e3; color: #a2621d; }
+.notif-move-1 { background: #eef1f3; color: #4f6470; }
+.notif-move-5 { background: #f2ecf9; color: #6b4a9a; }
+.notif-move-6 { background: #fbeef4; color: #9a3f68; }
 .notif-all { display: block; width: 100%; padding: 11px; border: 0; border-top: 1px solid #edf1f3; background: #fafcfc; color: #1d7a6b; font-size: 12px; font-weight: 700; cursor: pointer; }
 .notif-all:hover { background: #eef7f5; }
 
