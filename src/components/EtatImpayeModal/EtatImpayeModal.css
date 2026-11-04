@@ -75,10 +75,40 @@
 .eti-preview-limit { margin: 10px auto 0; padding: 6px 12px; border-radius: 6px; background: #fff8ec; }
 .eti-preview .eti-report { width: min(100% - 32px, 1000px); margin: 20px auto 40px; gap: 22px; }
 .eti-preview .eti-page { min-height: 60vh; padding: 36px 40px; border: 0; border-radius: 2px; box-shadow: 0 6px 22px rgba(0, 0, 0, .28); }
+.eti-preview-actions { display: flex; align-items: center; gap: 10px; }
+.eti-page { min-width: 0; }
 @media (max-width: 640px) {
-  .eti-preview-bar { padding: 8px 10px; }
+  /* Bar: back, print and close on one line, the summary under them */
+  .eti-preview-bar { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 8px 10px; }
+  .eti-preview-bar > .expert-cancel { justify-self: start; }
+  .eti-preview-title { grid-column: 1 / -1; grid-row: 2; }
+  .eti-preview-title strong { font-size: 13px; }
+  .eti-preview-title span { font-size: 10.5px; }
+  .eti-preview-actions .expert-close { width: 34px; height: 34px; }
   .eti-preview .eti-report { width: calc(100% - 16px); margin-top: 10px; }
-  .eti-preview .eti-page { padding: 16px 10px; }
+  .eti-preview .eti-page { min-height: 0; padding: 14px 10px; }
+  .eti-letterhead h3 { justify-self: stretch; text-align: center; }
+  .eti-head-side { justify-items: start; }
+  .eti-summary { width: 100%; }
+
+  /* Table -> one card per quittance: label on the left, value on the right */
+  .eti-scroll { overflow: visible; }
+  .eti-table { min-width: 0; font-size: 11px; }
+  .eti-table thead { display: none; }
+  .eti-table, .eti-table tbody, .eti-table tfoot, .eti-table tr, .eti-table td { display: block; width: auto; }
+  .eti-table tbody tr:not(.eti-client):not(.eti-subtotal) { display: grid; grid-template-columns: 1fr 1fr; margin: 6px 0; border: 1px solid #dbe3e6; border-radius: 8px; background: #fff; }
+  .eti-table td { border: 0; padding: 5px 9px; white-space: normal !important; text-align: left !important; }
+  .eti-table td[data-label]::before { content: attr(data-label); display: block; color: #6a7f89; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+  .eti-table td[data-label="N° Police"] { grid-column: 1 / -1; border-bottom: 1px solid #edf1f2; font-weight: 750; }
+  .eti-table td[data-label="Observation"], .eti-table td[data-label="Risque"], .eti-table td[data-label="Pièce(s)"] { grid-column: 1 / -1; }
+  .eti-table td[data-label]:empty { display: none; }
+  .eti-client td { margin-top: 12px; padding: 8px 9px; border: 0; border-top: 2px solid #b9c7cd; }
+  .eti-subtotal, .eti-grand { display: flex !important; justify-content: space-between; border-radius: 6px; background: #f8fbfa; }
+  .eti-grand { background: #eef5f3; }
+  .eti-subtotal td, .eti-grand td { background: none; }
+  .eti-subtotal td:empty, .eti-grand td:empty { display: none; }
+  .eti-grand { margin-top: 10px; border-top: 2px solid #1b2f3c; }
+  .eti-grand td { border-top: 0; }
 }
 
 /* Imprimer: only the sheets go to paper, one mémoire per page */

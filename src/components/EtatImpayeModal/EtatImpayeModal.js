@@ -202,9 +202,9 @@ function StatementPage({ title, rows, sans, summary }) {
       {clients.map((client) => <tbody key={client.code_client}>
         <tr className="eti-client"><td colSpan={sans ? 7 : 8}>Code client : <b>{client.code_client}</b><span>Nom client : <b>{client.nom_client || '—'}</b></span></td></tr>
         {client.rows.map((row) => <tr key={row.num_quittance}>
-          <td>{row.num_int}</td><td>{termOf(row)}</td><td>{formatDate(row.echeance)}</td>
-          <td className="eti-num">{money.format(amount(row.montant_quittance))}</td><td className="eti-num">{money.format(amount(row.solde))}</td>
-          <td>{row.num_quittance}</td>{!sans && <td>{row.pieces}</td>}<td>{row.observation}</td>
+          <td data-label="N° Police">{row.num_int}</td><td data-label="TC">{termOf(row)}</td><td data-label="Échéance">{formatDate(row.echeance)}</td>
+          <td data-label="Prime" className="eti-num">{money.format(amount(row.montant_quittance))}</td><td data-label="Solde" className="eti-num">{money.format(amount(row.solde))}</td>
+          <td data-label="N° quittance">{row.num_quittance}</td>{!sans && <td data-label="Pièce(s)">{row.pieces}</td>}<td data-label="Observation">{row.observation}</td>
         </tr>)}
         <tr className="eti-subtotal"><td colSpan={4}>Total client</td><td className="eti-num">{money.format(total(client.rows))}</td><td colSpan={span} /></tr>
       </tbody>)}
@@ -228,8 +228,10 @@ function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose
       <button type="button" className="expert-cancel" onClick={onBack}>← Retour aux critères</button>
       <div className="eti-preview-title"><strong>{detail ? 'Mémoire de règlement' : 'Etat des impayées'}</strong>
         <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} (${money.format(total(groups[0].rows))} TND) · autres : ${groups[1].rows.length} (${money.format(total(groups[1].rows))} TND) · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
-      <button type="button" className="expert-submit" onClick={() => window.print()}>Imprimer</button>
-      <button type="button" className="expert-close" onClick={onClose} aria-label="Fermer">×</button>
+      <div className="eti-preview-actions">
+        <button type="button" className="expert-submit" onClick={() => window.print()}>Imprimer</button>
+        <button type="button" className="expert-close" onClick={onClose} aria-label="Fermer">×</button>
+      </div>
     </header>
     {limit > 0 && items.length >= limit && <p className="eti-limit eti-preview-limit">Résultats limités à {limit} quittances : précisez les critères.</p>}
     <div className="eti-report">
@@ -249,9 +251,9 @@ function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose
             <div className="eti-scroll"><table className="eti-table">
               <thead><tr><th>N° Police</th><th>TC</th><th>Échéance</th><th className="eti-num">Prime</th><th className="eti-num">Solde</th><th>Risque</th><th>Observation</th></tr></thead>
               <tbody>{rows.map((row) => <tr key={row.num_quittance}>
-                <td>{row.num_int}</td><td>{termOf(row)}</td><td>{formatDate(row.echeance)}</td>
-                <td className="eti-num">{money.format(amount(row.montant_quittance))}</td><td className="eti-num">{money.format(amount(row.solde))}</td>
-                <td>{row.risque}</td><td>{row.observation}</td>
+                <td data-label="N° Police">{row.num_int}</td><td data-label="TC">{termOf(row)}</td><td data-label="Échéance">{formatDate(row.echeance)}</td>
+                <td data-label="Prime" className="eti-num">{money.format(amount(row.montant_quittance))}</td><td data-label="Solde" className="eti-num">{money.format(amount(row.solde))}</td>
+                <td data-label="Risque">{row.risque}</td><td data-label="Observation">{row.observation}</td>
               </tr>)}</tbody>
               <tfoot><tr className="eti-subtotal"><td colSpan={4}>Total compagnie</td><td className="eti-num">{money.format(total(rows))}</td><td colSpan={2} /></tr></tfoot>
             </table></div>
