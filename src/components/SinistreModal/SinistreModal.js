@@ -40,33 +40,25 @@ function toForm(record) {
   return form;
 }
 
-// Claims list filters: not closed ("Cloture" false, ticked at first) and, once "Entre deux dates" is ticked, the claims
-// between two dates, at first 01/01/2020 to 02/01/2025 (both editable, each on its own); those claims are shown in red.
-// Without "Entre deux dates", the list shows the claims of the last OVERDUE_MONTHS months (recent: true).
+// Claims list filters: not closed ("Cloture" false, ticked at first), all dates. The two dates go from 01/01/2020 to the
+// day OVERDUE_MONTHS months before today (04/11/2026 -> 04/01/2025, moving every day); the claims between them are red
+// (not closed ones, or all of them once "Entre deux dates" is ticked, which also limits the list to those dates).
 const STATUS_FILTERS = [['nonCloture', 'non_cloture', 'Non clôturés']];
 const LIST_START = '2020-01-01';
-const LIST_END = '2025-01-02';
-// Months counted by calendar month: in November 2026, a claim of January 2025 is 22 months old.
 const OVERDUE_MONTHS = 22;
-// First day of the month "months" months before the current one (November 2026, 22 -> 01/01/2025).
+// The same day "months" months before today (a day missing in that month gives its last day: 31/12 -> 30/02 -> 28/02).
 function monthsAgo(months) {
   const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth() - months, 1)).toISOString().slice(0, 10);
+  const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth() - months, Math.min(now.getDate(), lastDay))).toISOString().slice(0, 10);
 }
-// A claim not closed that has reached OVERDUE_MONTHS months (its month is OVERDUE_MONTHS or more months ago) is red.
-function isOverdue(row) {
-  if (row.Cloture || !row.Date_Sinistre) return false;
-  return String(row.Date_Sinistre).slice(0, 10) < monthsAgo(OVERDUE_MONTHS - 1);
-}
-// With "Entre deux dates" ticked, a claim that happened between the two dates (both included) is red.
+// A claim that happened between the two dates (both included).
 function inRange(row, list) {
   const day = String(row.Date_Sinistre || '').slice(0, 10);
   return Boolean(day) && day >= list.dateMin && day <= list.dateMax;
 }
-const redReason = (row, list) => {
-  if (list.byDate) return inRange(row, list) ? `Sinistre survenu entre le ${shortDate(list.dateMin)} et le ${shortDate(list.dateMax)}` : '';
-  return isOverdue(row) ? `Non clôturé depuis plus de ${OVERDUE_MONTHS} mois` : '';
-};
+const redReason = (row, list) => (inRange(row, list) && (list.byDate || !row.Cloture)
+  ? `Sinistre${row.Cloture ? '' : ' non clôturé'} survenu entre le ${shortDate(list.dateMin)} et le ${shortDate(list.dateMax)}` : '');
 // The values read on a constat / déclaration (server field names), with their labels in the import window.
 const VEHICLE_LABELS = [
   ['compagnie', 'Compagnie'], ['num_police', 'N° police'], ['agence', 'Agence'], ['attestation', 'Attestation'],
@@ -195,7 +187,7 @@ function SinistreNumberPicker({ accessToken, value, ignored, missing, onChange, 
 
 // Opened from a client file, the list starts on that client's claims, closed ones included, all dates.
 const newList = (clientCode = '') => ({
-  q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: LIST_END, recent: !clientCode,
+  q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: monthsAgo(OVERDUE_MONTHS),
   typeSinistre: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
@@ -299,7 +291,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   // Claims list: search as you type (the expert's name too), filtered by status, type and date.
   const listKey = list ? JSON.stringify([
-    list.q, list.codeClient.trim(), list.nomClient.trim(), list.nonCloture, list.byDate ? list.dateMin : list.recent ? monthsAgo(OVERDUE_MONTHS) : '', list.byDate ? list.dateMax : '', list.typeSinistre,
+    list.q, list.codeClient.trim(), list.nomClient.trim(), list.nonCloture, list.byDate ? list.dateMin : '', list.byDate ? list.dateMax : '', list.typeSinistre,
   ]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
@@ -821,9 +813,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
               <div className="snr-date-filter">
                 <label className="snr-filter-check-inline"><input type="checkbox" checked={list.byDate} onChange={(event) => { const byDate = event.target.checked; setList((value) => ({ ...value, byDate, items: null })); }} /> Entre deux dates</label>
                 <span>Du</span>
-                <input type="date" value={list.dateMin} disabled={!list.byDate} onChange={(event) => { const dateMin = event.target.value; if (dateMin) setList((value) => ({ ...value, dateMin, items: null })); }} aria-label="Sinistres survenus à partir du" />
+                <input type="date" value={list.dateMin} onChange={(event) => { const dateMin = event.target.value; if (dateMin) setList((value) => ({ ...value, dateMin, items: null })); }} aria-label="Sinistres survenus à partir du" />
                 <span>Jusqu’au</span>
-                <input type="date" value={list.dateMax} min={list.dateMin} disabled={!list.byDate} onChange={(event) => { const dateMax = event.target.value; if (dateMax) setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
+                <input type="date" value={list.dateMax} min={list.dateMin} onChange={(event) => { const dateMax = event.target.value; if (dateMax) setList((value) => ({ ...value, dateMax, items: null })); }} aria-label="Sinistres survenus jusqu’au" />
               </div>
               <input autoFocus value={list.q} onChange={(event) => setList((value) => ({ ...value, q: event.target.value }))} placeholder="N° sinistre, code ou nom client, police, immatriculation, tiers, expert…" />
               <button type="button" className="snr-close" onClick={() => setList(null)} aria-label="Fermer">×</button>
@@ -856,7 +848,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                   </section>
                 ))}
             </div>
-            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · {list.byDate ? `sinistres du ${shortDate(list.dateMin)} au ${shortDate(list.dateMax)}` : list.recent ? `sinistres depuis le ${shortDate(monthsAgo(OVERDUE_MONTHS))} (${OVERDUE_MONTHS} derniers mois) · en rouge : ${OVERDUE_MONTHS} mois atteints` : 'toutes les dates'} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.items ? `${list.items.length} dossier(s) affiché(s) sur ${list.total}` : ''} · {list.byDate ? `sinistres du ${shortDate(list.dateMin)} au ${shortDate(list.dateMax)}` : `toutes les dates · en rouge : non clôturés du ${shortDate(list.dateMin)} au ${shortDate(list.dateMax)}`} · cliquez une ligne pour l’ouvrir · Échap pour fermer</span><button type="button" className="snr-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}
