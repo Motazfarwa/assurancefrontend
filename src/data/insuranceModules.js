@@ -11,6 +11,7 @@ export const MODULE_CATEGORIES = [
 export const INSURANCE_MODULES = [
   { id: '100', category: 'production', title: 'Gestion des clients', description: 'Creer et mettre a jour les dossiers clients.', permission: P.USERS_MANAGE, form: 'client' },
   { id: '110', category: 'production', title: 'Gestion des polices', description: 'Consulter et administrer les contrats.', permission: P.POLICIES_VIEW_ALL, form: 'policy' },
+  { id: '130', category: 'production', title: 'Operations journalieres (production)', description: 'Polices ou quittances ajoutees, modifiees ou supprimees entre deux dates (production).', permission: P.REPORTS_VIEW, form: 'operations-journalieres' },
 
   { id: '530', category: 'production', title: 'Reception terme', description: 'Importer le bordereau terme (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-reception' },
   { id: '535', category: 'production', title: 'Reception comptant', description: 'Importer le bordereau comptant (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-comptant' },
@@ -26,6 +27,7 @@ export const INSURANCE_MODULES = [
   { id: '580', category: 'accounting', title: 'Journal d’encaissement', description: 'Choisir les quittances encaissees d’une compagnie, les comptabiliser et imprimer la feuille de caisse.', permission: P.REPORTS_VIEW, form: 'journal-encaissement' },
   { id: '585', category: 'accounting', title: 'Journal de depense', description: 'Comptabiliser les sinistres et ristournes payes d’une compagnie et imprimer la feuille de depense.', permission: P.REPORTS_VIEW, form: 'journal-depense' },
   { id: '590', category: 'accounting', title: 'Feuille de caisse', description: 'Recettes et depenses comptabilisees d’une compagnie a une date : JEQ, sinistres, ristournes, commission.', permission: P.REPORTS_VIEW, form: 'feuille-caisse' },
+  { id: '131', category: 'accounting', title: 'Operations journalieres (financieres)', description: 'Etat financier des operations d’une periode : technique (reglements clients, sinistres, ristournes) ou divers.', permission: P.REPORTS_VIEW, form: 'operations-financieres' },
   { id: '595', category: 'collections', title: 'Etat des moins percus & trop percus', description: 'Restes de quittances abandonnes (moins percus) ou montants payes en trop par les clients sur une periode.', permission: P.REPORTS_VIEW, form: 'etat-percus' },
 
   { id: '340', category: 'collections', title: 'Etat des impayes', description: 'Quittances impayees avec ou sans piece en instance, global par client ou memoire de reglement.', permission: P.REPORTS_VIEW, form: 'etat-impaye' },

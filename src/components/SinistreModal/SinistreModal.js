@@ -40,6 +40,13 @@ function toForm(record) {
   return form;
 }
 
+// Police flotte: a registration compared without spaces; a vehicle covered on the claim's day (entered, not gone).
+const plateKey = (value) => String(value || '').replace(/\s/g, '').toUpperCase();
+function coveredOn(vehicle, when) {
+  const day = String(when || '').slice(0, 10);
+  if (!day) return vehicle.actif !== false;
+  return (!vehicle.effet || String(vehicle.effet).slice(0, 10) <= day) && (!vehicle.date_re || String(vehicle.date_re).slice(0, 10) > day);
+}
 // Claims list filters: not closed ("Cloture" false, ticked at first), all dates. The two dates go from 01/01/2020 to the
 // day OVERDUE_MONTHS months before today (04/11/2026 -> 04/01/2025, moving every day); the claims between them are red
 // (not closed ones, or all of them once "Entre deux dates" is ticked, which also limits the list to those dates).
@@ -248,6 +255,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [list, setList] = useState(() => (mode === 'manage' && clientCode ? newList(clientCode) : null));
   const [claimSort, setClaimSort] = useState({ key: 'Date_Sinistre', dir: 'asc' }); // the oldest claims first
   const [clientPolicies, setClientPolicies] = useState([]); // the typed client's policies, proposed in "N° police"
+  const [fleetVehicles, setFleetVehicles] = useState([]); // police flotte: its vehicles, one of them is the claim's
   const [tab, setTab] = useState('sinistre'); // 'sinistre' | 'suivi' (steps, calls and letters of a stored claim)
   // Ticking "Réglé" asks for the settlement (piece, date, agency account): kept here and stored in TRegCli with the claim.
   const [reglement, setReglement] = useState(null);
@@ -394,6 +402,27 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       restore();
       if (!quiet) fail(requestError.message);
     }
+  }
+
+  // Police flotte: the vehicles of the policy typed (also for a claim opened), to choose the one of the claim.
+  useEffect(() => {
+    const number = form.Num_Int.trim();
+    if (number.replace(/\D/g, '').length < 5) { setFleetVehicles([]); return undefined; }
+    let active = true;
+    const timer = setTimeout(() => {
+      findClaimPolicy(accessToken, { numero: number })
+        .then((policy) => { if (active) setFleetVehicles(policy.num_int === number ? policy.vehicules_flotte || [] : []); })
+        .catch(() => { if (active) setFleetVehicles([]); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [accessToken, form.Num_Int]);
+
+  // The vehicle chosen gives the claim its registration and its client (the vehicle's, not the souscripteur's).
+  function chooseFleetVehicle(ordre) {
+    const vehicle = fleetVehicles.find((item) => item.ordre === ordre);
+    if (!vehicle) return;
+    change({ Num_Imat: (vehicle.num_imat || '').slice(0, 12), Code_Client: vehicle.code_client || '', nom_client: vehicle.nom_client || '', Risque: (vehicle.risque || formRef.current.Risque || '').slice(0, 50) });
+    if (!coveredOn(vehicle, formRef.current.Date_Sinistre)) info(`${vehicle.num_imat} n’était pas dans la flotte à la date du sinistre : l’enregistrement sera refusé.`);
   }
 
   // N° police or immatriculation: the insured's policy fills the client, company, branch and risk.
@@ -702,6 +731,15 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             <legend>Assuré et police</legend>
             {input('N° police', 'Num_Int', { maxLength: 15, onBlur: () => fillFromPolicy(), onType: () => fillFromPolicy({ quiet: true }), list: 'snr-client-policies', placeholder: 'Recherche auto', required: true })}
             {input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => { if (!form.Code_Client) fillFromPolicy({ plate: true }); }, onType: () => { if (!formRef.current.Code_Client) fillFromPolicy({ plate: true, quiet: true }); }, placeholder: '209 TU 2222' })}
+            {fleetVehicles.length > 0 && <label className="snr-span-6 snr-fleet">
+              <span>Véhicule de la flotte<i> *</i></span>
+              <select value={fleetVehicles.find((vehicle) => plateKey(vehicle.num_imat) === plateKey(form.Num_Imat))?.ordre || ''} onChange={(event) => chooseFleetVehicle(event.target.value)}>
+                <option value="">— Choisir le véhicule sinistré —</option>
+                {fleetVehicles.map((vehicle) => <option key={vehicle.ordre} value={vehicle.ordre}>
+                  {[vehicle.num_imat, vehicle.marque, `${vehicle.code_client} ${vehicle.nom_client || ''}`.trim()].filter(Boolean).join(' · ')}{coveredOn(vehicle, form.Date_Sinistre) ? '' : ' (hors flotte à cette date)'}
+                </option>)}
+              </select>
+            </label>}
             <datalist id="snr-client-policies">{clientPolicies.map((row) => <option key={row.num_int || row.num_police} value={row.num_int || row.num_police}>{[row.num_police, row.num_imat, row.nom_branche, row.etat].filter(Boolean).join(' · ')}</option>)}</datalist>
             {input('Code client', 'Code_Client', { span: 2, maxLength: 8, onType: fillFromClient })}
             {input('Nom client', 'nom_client', { span: 4, maxLength: 255 })}

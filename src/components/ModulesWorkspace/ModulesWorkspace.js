@@ -23,6 +23,7 @@ import ChequeInstanceModal from '../ChequeInstanceModal/ChequeInstanceModal';
 import JournalModal from '../JournalModal/JournalModal';
 import FeuilleCaisseModal from '../JournalModal/FeuilleCaisse';
 import EtatPercusModal from '../JournalModal/EtatPercus';
+import OperationsJournalieresModal from '../JournalModal/OperationsJournalieres';
 import RistourneModal from '../RistourneModal/RistourneModal';
 import FraisGenerauxModal from '../FraisGenerauxModal/FraisGenerauxModal';
 import RecetteModal from '../RecetteModal/RecetteModal';
@@ -65,6 +66,7 @@ export default function ModulesWorkspace() {
   const [journalModule, setJournalModule] = useState(null);
   const [feuilleCaisseModule, setFeuilleCaisseModule] = useState(null);
   const [percusModule, setPercusModule] = useState(null);
+  const [operationsModule, setOperationsModule] = useState(null);
   const [ristourneModule, setRistourneModule] = useState(null);
   const [fraisModule, setFraisModule] = useState(null);
   const [showRecetteModal, setShowRecetteModal] = useState(false);
@@ -136,6 +138,11 @@ export default function ModulesWorkspace() {
     if (module.form === 'ristournes') {
       setActiveModuleId(module.id);
       setRistourneModule(module);
+      return;
+    }
+    if (module.form === 'operations-journalieres' || module.form === 'operations-financieres') {
+      setActiveModuleId(module.id);
+      setOperationsModule(module);
       return;
     }
     if (module.form === 'etat-percus') {
@@ -278,6 +285,7 @@ export default function ModulesWorkspace() {
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
       {feuilleCaisseModule && <FeuilleCaisseModal moduleId={feuilleCaisseModule.id} onClose={() => setFeuilleCaisseModule(null)} />}
       {percusModule && <EtatPercusModal moduleId={percusModule.id} onClose={() => setPercusModule(null)} />}
+      {operationsModule && <OperationsJournalieresModal key={operationsModule.id} moduleId={operationsModule.id} familyKey={operationsModule.form === 'operations-financieres' ? 'financier' : 'production'} onClose={() => setOperationsModule(null)} />}
       {ristourneModule && <RistourneModal moduleId={ristourneModule.id} onClose={() => setRistourneModule(null)} />}
       {fraisModule && <FraisGenerauxModal moduleId={fraisModule.id} onClose={() => setFraisModule(null)} />}
       {journalModule && <JournalModal key={journalModule.id} kind={journalModule.form === 'journal-depense' ? 'depense' : 'encaissement'} moduleId={journalModule.id} onClose={() => setJournalModule(null)} />}

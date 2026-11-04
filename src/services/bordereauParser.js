@@ -196,3 +196,6 @@ export const scaleMillimes = (lines) => lines.map((line) => ({
   commission: line.commission == null ? null : line.commission / 1000,
   prime_total: line.prime_total == null ? null : line.prime_total / 1000,
 }));
+
+// Rows of the first sheet of an Excel (.xlsx / .xls) or CSV file, as arrays of plain values (also used for fleet lists).
+export { readRows as readSpreadsheetRows };

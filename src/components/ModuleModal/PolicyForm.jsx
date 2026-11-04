@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { API_BASE_URL as API_URL } from "../../services/apiBase";
 import { isOfferedCompany } from "../../services/companyApi";
 import { listClients, normalizeClientRecord, rankClients } from "../../services/clientApi";
+import FlotteDialog from "../FlotteDialog/FlotteDialog";
 
 // A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
 // month only, "dd/mm" as the policy table stores it) on the same day.
@@ -44,6 +45,7 @@ const initialValues = {
     hors_taxe: false,
     tous_risque: false,
     participation: false,
+    flotte: false, // fleet contract: its vehicles are entered after saving (Véhicules de la flotte)
 
     // Revalorisation and "Dommages cumulés" (screen + their own payload: no policy table columns)
     revalorisation: false,
@@ -94,7 +96,7 @@ const POLICE_FIELDS = [
     "duree", "effet", "heure_effet", "echeance",
     "expiration", "etat", "date_mvt", "risque",
     "hors_taxe", "tous_risque", "participation",
-    "num_imat", "obser", "franchise", "neuf", "venale"
+    "num_imat", "obser", "franchise", "neuf", "venale", "flotte"
 ];
 
 const GARANTIES = [
@@ -212,6 +214,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const [step, setStep] = useState(1);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [fleetNumInt, setFleetNumInt] = useState(""); // fleet contract saved
+    const [fleetOpen, setFleetOpen] = useState(false); // its "Véhicules de la flotte" window
 
     useEffect(() => {
         if (onStepChange) onStepChange(step);
@@ -486,6 +490,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             }
             setSaved(true);
             setMessage(`Police ${result.num_police} enregistrée. Quittance : ${result.num_quittance}`);
+            if (values.flotte && result.num_int) { setFleetNumInt(String(result.num_int)); setFleetOpen(true); }
             if (onSaved) onSaved(result);
         } catch (err) {
             setError(
@@ -855,6 +860,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 <div className="pf-check-row">
                     {check("Hors taxe", "hors_taxe")}
                     {check("Bonification", "participation")}
+                    {check("Police flotte", "flotte")}
                     {check("Revalorisation", "revalorisation")}
                     {values.revalorisation && (
                         <>
@@ -1062,7 +1068,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             )}
 
             {error && <div className="pf-error">{error}</div>}
-            {message && <div className="pf-success">{message}</div>}
+            {message && <div className="pf-success">{message}{saved && values.flotte && fleetNumInt && <> · <button type="button" className="pf-link-button" onClick={() => setFleetOpen(true)}>Véhicules de la flotte</button></>}</div>}
+            {fleetNumInt && fleetOpen && <FlotteDialog key={fleetNumInt} numInt={fleetNumInt} onClose={() => setFleetOpen(false)} />}
 
             {loading && <div className="pf-success">Recherche en cours…</div>}
             {isCreate && !saved && loadedExisting && step === 1 && (

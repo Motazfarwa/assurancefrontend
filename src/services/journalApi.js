@@ -33,5 +33,9 @@ export const getExpensesJournal = (token, params) => request(`/api/journaux/depe
 export const postExpenses = (token, payload) => request('/api/journaux/depense/comptabiliser', token, { method: 'POST', body: JSON.stringify(payload) });
 // Etat des moins perçus (type moins) or trop perçus (type trop) of the client settlements between two dates.
 export const getReceivedGaps = (token, params) => request(`/api/journaux/percus?${query(params)}`, token);
+// Opérations journalières (production): the policies or quittances added, modified or deleted between two dates.
+export const getDailyProduction = (token, params) => request(`/api/journaux/production?${query(params)}`, token);
+// Opérations journalières (financières): technique (client payments, claims and rebates paid) or divers, between two dates.
+export const getDailyFinancial = (token, params) => request(`/api/journaux/financier?${query(params)}`, token);
 // Feuille de caisse of a company over a period (no dates: every day): the JEQ of each journal day and the claims and rebates.
 export const getCashSheet = (token, params) => request(`/api/journaux/feuille?${query(params)}`, token);

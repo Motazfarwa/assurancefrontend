@@ -359,3 +359,6 @@
   /* not enough room for every column: the table scrolls inside its box again */
   .client-records-dialog.is-policies .client-records-table-wrap { overflow-x: auto; }
 }
+
+/* Rechercher looks like Modifier: green text with the green line under it */
+.client-view-tabs button:not(.client-new-button) { border-bottom-color: #278477; color: #1c756a; }

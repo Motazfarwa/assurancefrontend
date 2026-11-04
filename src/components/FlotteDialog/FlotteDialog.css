@@ -1,0 +1,73 @@
+/* Véhicules de la flotte: built on the client-records-* dialog styles */
+.flt-backdrop { z-index: 1200; }
+.flt-nested { z-index: 1300; }
+.flt-dialog { width: min(100%, 1180px); max-height: min(90vh, 860px); }
+.flt-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 20px 0; }
+.flt-summary > div { display: grid; gap: 2px; min-width: 130px; padding: 8px 14px; border: 1px solid #cfe0dc; border-radius: 9px; background: #f1f8f6; }
+.flt-summary strong { color: #187d78; font-size: 16px; font-variant-numeric: tabular-nums; }
+.flt-summary span { color: #587079; font-size: 10px; font-weight: 650; }
+.flt-hint { margin: 0; color: #8a6116; font-size: 11px; }
+.flt-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px; }
+.flt-toolbar .client-records-status { margin-left: 0; }
+.flt-toolbar .client-primary-button { min-height: 34px; padding: 0 16px; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.flt-notice { margin: 0 20px 8px; padding: 8px 12px; border-radius: 8px; background: #edf8f4; color: #1d6f5f; font-size: 12px; }
+.flt-error { margin: 0 20px 8px; padding: 8px 12px; }
+.flt-table td { vertical-align: middle; }
+.flt-table td small.flt-tag { margin-left: 6px; padding: 1px 6px; border-radius: 10px; background: #e7f2ef; color: #2d6b63; font-size: 9px; font-weight: 700; }
+.flt-table .is-number { text-align: right; font-variant-numeric: tabular-nums; }
+.flt-table .flt-garantie { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.flt-table tr.is-exited td { color: #8a979d; }
+.flt-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.flt-status.is-active { background: #e3f4ee; color: #1d7a5f; }
+.flt-status.is-out { background: #f6ece9; color: #9a4b3c; }
+
+/* Vehicle and exit forms */
+.flt-form { width: min(100%, 860px); }
+.flt-exit { width: min(100%, 520px); }
+.flt-form-body { overflow: auto; padding: 16px 20px; }
+.flt-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 14px; }
+.flt-grid label, .flt-client label { display: grid; gap: 5px; min-width: 0; color: #566d78; font-size: 10px; font-weight: 700; }
+.flt-grid .is-wide { grid-column: 1 / -1; }
+.flt-grid input, .flt-grid select, .flt-client input { box-sizing: border-box; width: 100%; height: 36px; padding: 0 10px; border: 1px solid #d9e2e5; border-radius: 7px; background: #fff; color: #294553; font: inherit; font-size: 12px; font-weight: 500; }
+.flt-grid input:focus, .flt-grid select:focus, .flt-client input:focus { border-color: #63b9a9; outline: 2px solid rgba(99, 185, 169, .18); }
+.flt-client { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 0 0 14px; padding: 10px 14px 12px; border: 1px solid #dce6e8; border-radius: 9px; }
+.flt-client legend { padding: 0 6px; color: #2d6b63; font-size: 11px; font-weight: 750; }
+.flt-client label { width: 140px; }
+.flt-client-name { margin: 0 0 9px; color: #1f3644; font-size: 13px; font-weight: 650; }
+.flt-client-name.is-error { color: #a04439; }
+.flt-client-name small { color: #6b8089; font-weight: 500; }
+.flt-form-body .flt-error { margin: 12px 0 0; }
+
+@media (max-width: 640px) {
+  .flt-summary, .flt-toolbar { padding-right: 12px; padding-left: 12px; }
+  .flt-summary > div { flex: 1 1 40%; min-width: 0; }
+  .flt-toolbar .client-primary-button { width: 100%; }
+  .flt-grid { grid-template-columns: 1fr 1fr; }
+  .flt-form-body { padding: 12px; }
+  .flt-client label { width: 100%; }
+}
+
+/* Toolbar actions, avenants, estimates, import */
+.flt-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.flt-actions button { min-height: 34px; padding: 0 14px; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.flt-avenant { display: grid; gap: 8px; margin: 14px 0 0; padding: 10px 14px 12px; border: 1px solid #dce6e8; border-radius: 9px; }
+.flt-avenant legend { padding: 0 6px; color: #2d6b63; font-size: 11px; font-weight: 750; }
+.flt-check { display: flex; align-items: center; gap: 8px; color: #294553; font-size: 12px; font-weight: 600; }
+.flt-check input { accent-color: #208477; }
+.flt-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #566d78; font-size: 11px; font-weight: 700; }
+.flt-inline input { height: 34px; padding: 0 10px; border: 1px solid #d9e2e5; border-radius: 7px; color: #294553; font: inherit; font-size: 12px; }
+.flt-estimate { margin: 0; padding: 8px 12px; border-radius: 8px; background: #f4f7f8; color: #294553; font-size: 12px; }
+.flt-estimate.is-due { background: #edf8f4; }
+.flt-estimate.is-back { background: #fbf2ee; }
+.flt-estimate b { font-variant-numeric: tabular-nums; }
+.flt-replace { margin-bottom: 14px; }
+.flt-negative { color: #9a4b3c; }
+.flt-link { padding: 0; border: 0; background: none; color: #187d78; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.flt-import { width: min(100%, 980px); max-height: min(90vh, 820px); }
+.flt-import .flt-toolbar { align-items: flex-end; }
+.flt-import .flt-hint { flex: 1 1 320px; }
+
+@media (max-width: 640px) {
+  .flt-actions { width: 100%; margin-left: 0; }
+  .flt-actions button { flex: 1; }
+}

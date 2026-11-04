@@ -5,6 +5,7 @@ import { navigate } from '../../navigation';
 import { listClientRecords, searchRecords, updateClientRecord } from '../../services/clientRecordsApi';
 import { getClientByCode, nationalityLabel } from '../../services/clientApi';
 import { downloadClientExcel } from '../../services/clientExcelExport';
+import FlotteDialog from '../../components/FlotteDialog/FlotteDialog';
 import '../ClientManagement/ClientManagementPage.css';
 
 function Detail({ label, value }) {
@@ -62,6 +63,16 @@ function policyStatus(policy) {
   if (etat === 'AN') return policy.expiration && String(policy.expiration).slice(0, 10) < new Date().toISOString().slice(0, 10) ? 'Expirée' : 'En vigueur';
   if (['SS', 'RE', 'RV'].includes(etat)) return 'Suspendue / résiliée';
   return '';
+}
+// Fleet contracts and vehicles of a fleet are told apart in the Risque column (the policy's own risque is kept apart).
+const isFleet = (policy) => String(policy.flotte || '').trim().toUpperCase() === 'O' || Number(policy.nb_vehicules || 0) > 0;
+function withFleet(policy) {
+  const risque = policy.risque_police ?? policy.risque;
+  const own = String(risque || '').trim();
+  if (policy.vehicules_client) return { ...policy, risque_police: risque, risque: `Véhicule de flotte · ${policy.vehicules_client}` };
+  if (!isFleet(policy)) return policy;
+  const count = Number(policy.nb_vehicules || 0);
+  return { ...policy, risque_police: risque, risque: `Flotte · ${count} véhicule${count > 1 ? 's' : ''}${own ? ` — ${own}` : ''}` };
 }
 const POLICY_DETAILS = [
   ['num_police', 'N° police'], ['num_int', 'N° dossier'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
@@ -176,6 +187,7 @@ export default function ClientPreviewPage() {
   const [claimsState, setClaimsState] = useState({ loading: false, error: '', records: [] });
   const [policyFilters, setPolicyFilters] = useState({ code_client: '', nom_client: '', num_police: '', statut: 'vigueur' });
   const [detailPolicy, setDetailPolicy] = useState(null);
+  const [fleetPolicy, setFleetPolicy] = useState(null); // policy whose "Véhicules de la flotte" is open
   const [receiptFilters, setReceiptFilters] = useState({ code_client: '', nom_client: '', num_quittance: '', date_saisie: '' });
   const [receiptsScoped, setReceiptsScoped] = useState(true); // until a filter is edited, only the opened policy's receipts
   const [editing, setEditing] = useState(null);
@@ -187,7 +199,7 @@ export default function ClientPreviewPage() {
   async function loadPolicies(filters = policyFilters) {
     setPoliciesState((current) => ({ ...current, loading: true, error: '' }));
     try {
-      const records = await searchRecords(accessToken, 'policies', filters);
+      const records = (await searchRecords(accessToken, 'policies', filters)).map(withFleet);
       setPoliciesState({ loading: false, error: '', records });
       return records;
     } catch (error) {
@@ -242,6 +254,12 @@ export default function ClientPreviewPage() {
     setReceiptsScoped(true);
     setReceiptsState({ loading: true, error: '', records: [] });
     setReceiptsPolicy(policy);
+  }
+
+  // After a change in the fleet: the list and the detail window show the new count of vehicles.
+  async function fleetChanged() {
+    const records = await loadPolicies();
+    setDetailPolicy((current) => (current ? records.find((item) => String(item.num_int).trim() === String(current.num_int).trim()) || current : current));
   }
 
   async function saveEdit(changes) {
@@ -330,8 +348,9 @@ export default function ClientPreviewPage() {
         <DetailSection title="Informations du dossier"><Detail label="Type client" value={client.clientType} /><Detail label="Exonéré" value={client.taxExempt ? 'Oui' : 'Non'} /><Detail label="Observation" value={client.notes} /></DetailSection>
       </article>
       {policiesOpen && <RecordsDialog kicker="DOSSIER CLIENT · MODULE 110" title="Polices du client" className="is-policies" columns={POLICY_COLUMNS} {...policiesState} filters={[{ key: 'num_police', label: 'N° police', value: policyFilters.num_police, placeholder: 'Ex : 0522…' }, { key: 'nom_client', label: 'Nom client', value: policyFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'code_client', label: 'Code client', value: policyFilters.code_client, placeholder: 'Tous les clients', maxLength: 8 }]} onFilterChange={(key, value) => setPolicyFilters((current) => ({ ...current, [key]: value }))} statusTabs={{ options: POLICY_STATUSES, value: policyFilters.statut, onChange: (statut) => setPolicyFilters((current) => ({ ...current, statut })) }} onRowClick={setDetailPolicy} onClose={() => { setPoliciesOpen(false); setDetailPolicy(null); }} actions={(policy) => <><button type="button" onClick={() => showReceipts(policy)}>Quittances</button><button type="button" onClick={() => showClaims(policy)}>Sinistres</button></>} />}
-      {detailPolicy && <PolicyDetailDialog policy={detailPolicy} onClose={() => setDetailPolicy(null)} actions={<><button type="button" onClick={() => showReceipts(detailPolicy)}>Quittances</button><button type="button" onClick={() => showClaims(detailPolicy)}>Sinistres</button>{canEdit(detailPolicy) && <button type="button" className="is-primary" onClick={() => setEditing({ kind: 'policies', record: detailPolicy })}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}</>} />}
+      {detailPolicy && <PolicyDetailDialog policy={detailPolicy} onClose={() => setDetailPolicy(null)} actions={<><button type="button" onClick={() => showReceipts(detailPolicy)}>Quittances</button><button type="button" onClick={() => showClaims(detailPolicy)}>Sinistres</button><button type="button" onClick={() => setFleetPolicy(detailPolicy)}>{isFleet(detailPolicy) || detailPolicy.vehicules_client ? `Véhicules de la flotte${detailPolicy.nb_vehicules ? ` (${detailPolicy.nb_vehicules})` : ''}` : 'Gérer en flotte'}</button>{canEdit(detailPolicy) && <button type="button" className="is-primary" onClick={() => setEditing({ kind: 'policies', record: { ...detailPolicy, risque: detailPolicy.risque_police ?? detailPolicy.risque } })}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}</>} />}
       {claimsPolicy && <RecordsDialog nested kicker={`POLICE ${claimsPolicy.num_police || claimsPolicy.num_int} · SINISTRES`} title="Sinistres de la police" columns={CLAIM_COLUMNS} {...claimsState} onClose={() => setClaimsPolicy(null)} />}
+      {fleetPolicy && <FlotteDialog numInt={fleetPolicy.num_int} onChanged={fleetChanged} onClose={() => setFleetPolicy(null)} />}
       {receiptsPolicy && <RecordsDialog nested wide kicker="MODULE 130" title="Quittances de la police" subtitle={<>N° police : <b>{receiptsPolicy.num_police || receiptsPolicy.num_int}</b></>} columns={RECEIPT_COLUMNS} {...receiptsState} filters={[{ key: 'code_client', label: 'Code client', value: receiptFilters.code_client, placeholder: 'Tous', maxLength: 8 }, { key: 'nom_client', label: 'Nom client', value: receiptFilters.nom_client, placeholder: 'Nom ou prénom' }, { key: 'num_quittance', label: 'N° quittance', value: receiptFilters.num_quittance, placeholder: 'Ex : 2026…' }, { key: 'date_saisie', label: 'Date saisie', value: receiptFilters.date_saisie, type: 'date' }]} onFilterChange={(key, value) => { setReceiptsScoped(false); setReceiptFilters((current) => ({ ...current, [key]: value })); }} onClose={() => setReceiptsPolicy(null)} actions={(receipt) => canEdit(receipt) && <button type="button" onClick={() => setEditing({ kind: 'receipts', record: receipt })}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>} />}
       {editing && <EditRecordDialog key={editing.record.num_quittance || editing.record.num_int} kicker={editing.kind === 'policies' ? 'MODULE 110' : 'MODULE 130'} title={editing.kind === 'policies' ? `Modifier la police ${editing.record.num_police || editing.record.num_int}` : `Modifier la quittance ${editing.record.num_quittance}`} fields={editFields(editing.kind === 'policies' ? POLICY_FIELDS : RECEIPT_FIELDS)} record={editing.record} onSave={saveEdit} onClose={() => setEditing(null)} />}
     </main>
