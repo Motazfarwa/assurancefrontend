@@ -2,14 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { isOfferedCompany, listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
-import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, monthToPeriode, nextMonth, saveBordereau } from '../../services/bordereauApi';
+import { deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
-// Terme: the head office's file for the coming due month. Comptant: the receipts issued in the month.
+// Terme: the head office's file for the coming due month. Comptant: the quittances of TQuittance (tc 'C'), by default
+// those without a period, then those of the month chosen.
 const KINDS = {
   T: { module: '530', title: 'Réception terme', label: 'Terme', importLabel: 'Importer Terme', month: nextMonth },
-  C: { module: '535', title: 'Réception comptant', label: 'Comptant', importLabel: 'Importer Comptant', month: currentMonth },
+  C: { module: '535', title: 'Réception comptant', label: 'Comptant', importLabel: 'Importer Comptant', month: () => '', quittances: true },
 };
 const today = () => new Date().toISOString().slice(0, 10);
 const cleanNumber = (value) => String(value ?? '').trim().replace(/\.0+$/, '');
@@ -33,6 +34,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const requestedClients = useRef(new Set());
   const [lines, setLines] = useState([]);
   const [savedId, setSavedId] = useState(null);
+  const [fromQuittances, setFromQuittances] = useState(false); // the lines are the quittances of TQuittance
   const [fichier, setFichier] = useState('');
   const [imported, setImported] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -76,27 +78,33 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   // Company / type / period -> the bordereau already stored for them, if any.
   useEffect(() => {
     if (skipLoad.current) { skipLoad.current = false; return undefined; } // the form was just filled from the imported file
-    if (!form.code_compagnie || !periode) return undefined;
+    if (!kind.quittances && (!form.code_compagnie || !periode)) return undefined;
     let active = true;
     setBusy(true);
     setError('');
-    listBordereaux(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc, periode })
-      .then((found) => (found[0] ? getBordereau(accessToken, found[0].id_bordereau) : null))
-      .then((result) => {
+    const stored = form.code_compagnie && periode
+      ? listBordereaux(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc, periode }).then((found) => (found[0] ? getBordereau(accessToken, found[0].id_bordereau) : null))
+      : Promise.resolve(null);
+    stored
+      .then(async (result) => {
+        // Comptant: without a bordereau imported for the period, the quittances of TQuittance are shown.
+        const quittances = !result && kind.quittances ? await listQuittances(accessToken, { tc: form.tc, periode, code_compagnie: form.code_compagnie }) : null;
         if (!active) return;
-        setLines(result ? result.lignes.map(fromApi) : []);
+        setLines(result ? result.lignes.map(fromApi) : (quittances || []).map(fromApi));
+        setFromQuittances(Boolean(quittances));
         setSavedId(result ? result.bordereau.id_bordereau : null);
         setFichier(result?.bordereau.fichier || '');
         setImported(null);
         setDirty(false);
         setSelected(-1);
         if (result?.bordereau.date_reception) setForm((current) => ({ ...current, date_reception: String(result.bordereau.date_reception).slice(0, 10) }));
-        setNotice(result ? `Bordereau enregistré : ${result.lignes.length} ligne(s).` : '');
+        setNotice(result ? `Bordereau enregistré : ${result.lignes.length} ligne(s).`
+          : quittances ? `${quittances.length} quittance(s) comptant ${periode ? `de la période ${periode}` : 'sans période'}${form.code_compagnie ? '' : ' (toutes compagnies)'}.` : '');
       })
       .catch((requestError) => { if (active) setError(requestError.message); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [accessToken, form.code_compagnie, form.tc, periode]);
+  }, [accessToken, form.code_compagnie, form.tc, periode, kind.quittances]);
 
   function changeForm(patch) {
     if (dirty && lines.length && ('code_compagnie' in patch || 'tc' in patch || 'month' in patch)
@@ -136,6 +144,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       setMillimes(scale);
       setImported(info);
       setLines(parsedLines);
+      setFromQuittances(false);
       setFichier(file.name);
       setDirty(true);
       setSelected(-1);
@@ -181,6 +190,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       const stored = await getBordereau(accessToken, result.id_bordereau);
       setLines(stored.lignes.map(fromApi));
       setSavedId(result.id_bordereau);
+      setFromQuittances(false);
       setDirty(false);
       setNotice(`Bordereau enregistré : ${result.nb_lignes} ligne(s). Vous pouvez lancer la confrontation.`);
     } catch (saveError) {
@@ -261,7 +271,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           <span className="bd-spacer" />
           <input ref={fileInput} type="file" accept=".xls,.xlsx,.csv,.txt" hidden onChange={chooseFile} />
           <button type="button" className="bd-import" onClick={() => fileInput.current?.click()} disabled={busy}>{kind.importLabel}</button>
-          <button type="button" className="bd-save" onClick={save} disabled={busy || !lines.length}>{busy ? 'Patientez…' : dirty ? 'Enregistrer le bordereau' : 'Enregistré'}</button>
+          <button type="button" className="bd-save" onClick={save} disabled={busy || !lines.length || (fromQuittances && !dirty)}>{busy ? 'Patientez…' : dirty ? 'Enregistrer le bordereau' : fromQuittances ? 'Quittances' : 'Enregistré'}</button>
         </div>
 
         <div className="bd-form">
@@ -275,7 +285,12 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           <label>TC
             <select value={form.tc} disabled><option value={form.tc}>{kind.label}</option></select>
           </label>
-          <label>Période<input type="month" value={form.month} onChange={(event) => changeForm({ month: event.target.value })} /></label>
+          <label>Période
+            <span className="bd-period">
+              <input type="month" value={form.month} onChange={(event) => changeForm({ month: event.target.value })} />
+              {kind.quittances && form.month && <button type="button" className="bd-tool" title="Quittances sans période" onClick={() => changeForm({ month: '' })}>Sans période</button>}
+            </span>
+          </label>
           <div className="bd-total"><span>Total</span><strong>{money(total)}</strong></div>
           <div className="bd-total" title="Prime totale moins les commissions"><span>Solde</span><strong>{money(solde)}</strong></div>
           <div className="bd-total"><span>Lignes</span><strong>{lines.length}</strong></div>
@@ -306,7 +321,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
             <thead><tr><th>N°</th>{GRID.map(([key, label]) => <th key={key}>{label}</th>)}</tr></thead>
             <tbody>
               {lines.length === 0 ? (
-                <tr><td colSpan={GRID.length + 1} className="bd-empty">{form.code_compagnie ? `Aucun bordereau pour cette période : cliquez sur « ${kind.importLabel} » et choisissez le fichier Excel reçu du siège.` : 'Choisissez la compagnie et la période, puis importez le fichier du siège.'}</td></tr>
+                <tr><td colSpan={GRID.length + 1} className="bd-empty">{kind.quittances ? `Aucune quittance comptant ${periode ? `pour la période ${periode}` : 'sans période'}.` : form.code_compagnie ? `Aucun bordereau pour cette période : cliquez sur « ${kind.importLabel} » et choisissez le fichier Excel reçu du siège.` : 'Choisissez la compagnie et la période, puis importez le fichier du siège.'}</td></tr>
               ) : shownLines.map((line, index) => (
                 <tr key={`${line.id_ligne || 'new'}-${index}`} className={selected === index ? 'is-selected' : undefined} onClick={() => setSelected(index)} onDoubleClick={() => { setSelected(index); editLine(index); }}>
                   <td>{index + 1}</td>

@@ -30,6 +30,8 @@ export const saveBordereau = (token, payload) => request('/api/bordereaux', toke
 export const deleteBordereau = (token, id) => request(`/api/bordereaux/${id}`, token, { method: 'DELETE' });
 // Policy numbers (num_int) -> { code_client, nom_client } of the agency's policies.
 export const getBordereauClients = (token, numeros) => request('/api/bordereaux/clients', token, { method: 'POST', body: JSON.stringify({ numeros }) });
+// Quittances of TQuittance of a type and period (empty period: the quittances without one).
+export const listQuittances = (token, { tc, periode, code_compagnie }) => request(`/api/bordereaux/quittances?${query({ tc, code_compagnie })}&periode=${encodeURIComponent(periode || '')}`, token);
 export const getConfrontation =(token, params) => request(`/api/bordereaux/confrontation?${query(params)}`, token);
 
 // "2026-11" (month input) <-> "11/2026" (period stored with the bordereau)
