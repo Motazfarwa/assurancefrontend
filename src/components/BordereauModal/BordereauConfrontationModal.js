@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { isOfferedCompany, listCompanies } from '../../services/companyApi';
+import { isBordereauCompany, listCompanies } from '../../services/companyApi';
 import { getConfrontation, monthToPeriode, nextMonth } from '../../services/bordereauApi';
 import { exportReportExcel, money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
@@ -72,7 +72,7 @@ export default function BordereauConfrontationModal({ onClose }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((rows) => { if (active) setCompanies((Array.isArray(rows) ? rows : rows.items || []).filter(isOfferedCompany)); })
+      .then((rows) => { if (active) setCompanies((Array.isArray(rows) ? rows : rows.items || []).filter(isBordereauCompany)); }) // without STAR, MAE, SALIM, EUROP ASSISTANCE, EL AMANA TAKAFUL
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);

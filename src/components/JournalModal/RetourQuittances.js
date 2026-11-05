@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { listCompanies } from '../../services/companyApi';
+import { isBordereauCompany, listCompanies } from '../../services/companyApi';
 import { listReturns, setReturn } from '../../services/journalApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -36,7 +36,8 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((result) => { if (active) setCompanies(Array.isArray(result) ? result : result.items || []); })
+      // Without STAR, MAE, SALIM, EUROP ASSISTANCE and EL AMANA TAKAFUL, as in Réception comptant.
+      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(isBordereauCompany)); })
       .catch((requestError) => { if (active) setState((current) => ({ ...current, error: requestError.message })); });
     return () => { active = false; };
   }, [accessToken]);
