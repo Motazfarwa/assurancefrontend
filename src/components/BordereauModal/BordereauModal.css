@@ -44,6 +44,12 @@
 .bd-grid tbody tr { cursor: default; }
 .bd-grid tbody tr:hover { background: #f4faf8; }
 .bd-grid tr.is-selected { background: #173247 !important; color: #fff; }
+.bd-grid tr.is-validated:not(.is-selected) { background: #e8f5ef; }
+.bd-grid .bd-valider { width: 90px; text-align: center; }
+.bd-grid td.bd-valider label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.bd-grid td.bd-valider input { width: 17px; height: 17px; margin: 0; accent-color: #208477; cursor: pointer; }
+.bd-grid td.bd-valider small { color: #1d6f5f; font-size: 11px; font-weight: 700; }
+.bd-grid tr.is-selected td.bd-valider small { color: #bfe8dc; }
 .bd-grid tr.is-gap { background: #fff8ec; }
 .bd-grid tr.is-unknown { background: #fff1f0; }
 .bd-grid tr.is-total { background: #eef4f6; font-weight: 800; }
