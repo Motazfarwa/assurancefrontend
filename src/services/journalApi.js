@@ -37,5 +37,13 @@ export const getReceivedGaps = (token, params) => request(`/api/journaux/percus?
 export const getDailyProduction = (token, params) => request(`/api/journaux/production?${query(params)}`, token);
 // Opérations journalières (financières): technique (client payments, claims and rebates paid) or divers, between two dates.
 export const getDailyFinancial = (token, params) => request(`/api/journaux/financier?${query(params)}`, token);
+// Etat des comptes client: per client, primes, ristournes, sinistres, règlements and commissions (filters: dates, company,
+// client, police, état tous | comptabilise | instance | ristourne).
+export const getClientAccounts = (token, params) => request(`/api/journaux/comptes-clients?${query(params)}`, token);
+// Etat de la recette technique: the client payments between two dates, one line per quittance paid.
+export const getRecetteTechnique = (token, params) => request(`/api/journaux/recette?${query(params)}`, token);
+// Retour: the quittances of a company, type and period, and their return to the company (retour true / false).
+export const listReturns = (token, params) => request(`/api/journaux/retours?${query(params)}`, token);
+export const setReturn = (token, payload) => request('/api/journaux/retours/quittance', token, { method: 'PUT', body: JSON.stringify(payload) });
 // Feuille de caisse of a company over a period (no dates: every day): the JEQ of each journal day and the claims and rebates.
 export const getCashSheet = (token, params) => request(`/api/journaux/feuille?${query(params)}`, token);

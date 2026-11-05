@@ -9,8 +9,9 @@ import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import './BanqueModal.css';
 
 // What an account is for (TBanque.Type_Dep), as on the legacy screen.
-const TYPES = [['T', 'Technique'], ['D', 'Frais Généraux (W. JEMMALI)'], ['F', 'Frais Généraux (M. JEMMALI)']];
-const typeLabel = (code) => (TYPES.find(([value]) => value === code) || [])[1] || code || '';
+// The M. JEMMALI frais généraux (F) are no longer offered; the old accounts of that type keep their label.
+const TYPES = [['T', 'Technique'], ['D', 'Frais Généraux (W. JEMMALI)']];
+const typeLabel = (code) => (code === 'F' ? 'Frais Généraux (M. JEMMALI)' : (TYPES.find(([value]) => value === code) || [])[1] || code || '');
 const today = () => new Date().toISOString().slice(0, 10);
 const blank = () => ({ code_banque: '', nom_banque: '', num_compte_b: '', credit_ini: '0', date_ini: today(), debit: 0, credit: 0, date_maj: '', type_dep: 'T', code_compagnie: '', archive: false });
 const day = (value) => (value ? String(value).slice(0, 10) : '');
@@ -186,7 +187,6 @@ export default function BanqueModal({ moduleId = '740', onClose }) {
                 {companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.nom_compagnie}</option>)}
               </select>}
             </label>)}
-            <label className="catalog-check bnk-archive"><input type="checkbox" checked={Boolean(bank.archive)} disabled={!editing} onChange={(event) => change('archive', event.target.checked)} />Compte archivé (n’est plus proposé)</label>
           </div>
         </div>
 

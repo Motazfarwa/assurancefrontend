@@ -94,8 +94,9 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       date_debut: filters.dates ? filters.date_debut : '',
       // In relance the échéance is also at least as old as the shorter delay, dates ticked or not.
       date_fin: relance && (!filters.dates || filters.date_fin > overdue) ? overdue : filters.dates ? filters.date_fin : '',
-      // Particulier, except in mise en demeure: its "Autres" group holds the sociétés too.
-      type_client: filters.typed && !relance ? filters.type_client : '',
+      // Particulier, except in mise en demeure (its "Autres" group holds the sociétés too) and when one client is asked
+      // for by code or name: a société's impayés are then shown too.
+      type_client: filters.typed && !relance && !filters.code_client.trim() && !filters.nom_client.trim() ? filters.type_client : '',
       code_compagnie: filters.compagnie ? filters.code_compagnie : '',
     };
   };

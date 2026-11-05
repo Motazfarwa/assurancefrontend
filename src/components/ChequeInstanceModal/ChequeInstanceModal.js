@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listAccounts, listPiecesToPayIn, payInPiece } from '../../services/chequeApi';
+import RecetteEtatDialog from '../JournalModal/EtatRecette';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
@@ -24,6 +25,7 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState(null); // the piece being paid in: { row, compte, saving, error }
   const [notice, setNotice] = useState('');
+  const [printing, setPrinting] = useState(false); // the "Choix d'impression" of the recette is open
 
   useEffect(() => {
     let active = true;
@@ -33,12 +35,15 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
     return () => { active = false; };
   }, [accessToken]);
 
-  // Escape closes the account choice first, then the module.
+  // Escape closes the account choice or the choix d'impression first, then the module.
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') { if (pending) { if (!pending.saving) setPending(null); } else onClose(); } };
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return;
+      if (pending) { if (!pending.saving) setPending(null); } else if (printing) setPrinting(false); else onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pending, onClose]);
+  }, [pending, printing, onClose]);
 
   const shown = useMemo(() => {
     const day = today();
@@ -69,7 +74,7 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
     }
   }
 
-  return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
+  return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending && !printing) onClose(); }}>
     <section className="unpaid-modal" role="dialog" aria-modal="true" aria-labelledby="cheque-instance-title">
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>RECOUVREMENT · MODULE {moduleId}</span><h2 id="cheque-instance-title">Recette Technique</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
@@ -84,6 +89,7 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
           </fieldset>
           <label className="acompte-field"><span>{SEARCH_FIELDS[field]}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={field === 'echeance' ? 'jj/mm/aaaa' : 'Rechercher…'} /></label>
           <button type="button" className="expert-cancel" onClick={() => { setSearch(''); setEcheance('tous'); }} disabled={!search && echeance === 'tous'}>Effacer</button>
+          <button type="button" className="expert-submit cqi-etat" onClick={() => setPrinting(true)}>Imprimer la recette</button>
         </div>
 
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
@@ -133,5 +139,6 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
         </footer>
       </section>
     </div>}
+    {printing && <RecetteEtatDialog onClose={() => setPrinting(false)} />}
   </div>;
 }

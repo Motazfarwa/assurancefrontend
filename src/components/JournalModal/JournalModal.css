@@ -70,6 +70,23 @@
 /* Feuille de caisse: "Entre deux dates" */
 .jrn-dates { margin-top: 12px; }
 
+/* Etat des comptes client, état de la recette technique */
+.jrn-accounts-table { min-width: 760px; margin-top: 14px; }
+.jrn-recette-table { min-width: 980px; margin-top: 14px; }
+.jrn-sheet-table tr.jrn-group td { padding-top: 8px; border-left: 0; border-right: 0; font-weight: 700; }
+.jrn-sheet-table tr.jrn-subtotal td { font-style: italic; text-align: right; }
+.cqi-etat { min-height: 35px; margin-left: auto; padding: 0 14px; font: inherit; font-size: 10px; font-weight: 650; }
+.jrn-recette-popup { width: min(520px, 100%); }
+.jrn-recette-grid { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; }
+.jrn-recette-fields { display: grid; gap: 10px; }
+.jrn-recette-fields input, .jrn-recette-fields select { box-sizing: border-box; width: 100%; height: 35px; }
+.jrn-recette-choice { display: grid; gap: 6px; }
+@media (max-width: 520px) { .jrn-recette-grid { grid-template-columns: 1fr; } }
+
+/* Retour des quittances */
+.jrn-return-table tr.is-returned { background: #fbf1ec; }
+.jrn-return-table td.cqi-verser small { display: block; color: #9a4b3c; font-size: 9px; white-space: nowrap; }
+
 /* Feuille de caisse, "Détails": the company's summary sheet */
 .jrn-details { width: min(560px, 100%); margin: 0 auto; }
 .jrn-details-head { display: grid; justify-items: center; gap: 4px; margin-bottom: 14px; font-size: 11px; }
