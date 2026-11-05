@@ -76,9 +76,11 @@ const FAMILIES = {
 
 // The printable état of the kind chosen between two dates.
 function OperationsSheet({ family, type, debut, fin, onClose }) {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [state, setState] = useState({ loading: true, error: '', data: null });
   const kind = family.kinds[type];
+  // Total recette / total dépense: shown to the administrator only.
+  const showTotals = family.totals && Boolean(user?.isAdmin);
 
   useEffect(() => {
     let active = true;
@@ -106,7 +108,7 @@ function OperationsSheet({ family, type, debut, fin, onClose }) {
             {!items.length && <tr><td colSpan={span} className="jrn-sheet-state">Aucune opération sur la période.</td></tr>}
           </tbody>
           <tfoot>
-            {family.totals ? <>
+            {showTotals ? <>
               <tr><td colSpan={span}>Total recette : {fmt(state.data.total_recette)}</td></tr>
               <tr><td colSpan={span}>Total dépense : {fmt(state.data.total_depense)}</td></tr>
             </> : <tr><td colSpan={span}>{items.length} opération(s)</td></tr>}
