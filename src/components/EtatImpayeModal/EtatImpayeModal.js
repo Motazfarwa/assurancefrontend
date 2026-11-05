@@ -224,7 +224,8 @@ function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose
   }, [onBack]);
   const pages = detail ? clients.length : 1;
 
-  return <div className="eti-preview" role="dialog" aria-modal="true" aria-label={detail ? 'Mémoire de règlement' : 'Etat des impayées'}>
+  // "Sans pièce" is printed on a red background, so it is never taken for the "Avec pièce" état.
+  return <div className={`eti-preview${sans ? ' is-sans' : ''}`} role="dialog" aria-modal="true" aria-label={detail ? 'Mémoire de règlement' : 'Etat des impayées'}>
     <header className="eti-preview-bar">
       <button type="button" className="expert-cancel" onClick={onBack}>← Retour aux critères</button>
       <div className="eti-preview-title"><strong>{detail ? 'Mémoire de règlement' : 'Etat des impayées'}</strong>
