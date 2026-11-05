@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { isBordereauCompany, isOfferedCompany, listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
-import { deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau, setQuittancePeriode } from '../../services/bordereauApi';
+import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau, setQuittancePeriode } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
@@ -10,7 +10,8 @@ import './BordereauModal.css';
 // a period; the month chosen is the period a quittance gets when it is ticked « Valider ».
 const KINDS = {
   T: { module: '530', title: 'Réception terme', label: 'Terme', importLabel: 'Importer Terme', month: nextMonth },
-  C: { module: '535', title: 'Réception comptant', label: 'Comptant', importLabel: 'Importer Comptant', month: () => '', quittances: true },
+  // Comptant: the période de validation is the current month by default.
+  C: { module: '535', title: 'Réception comptant', label: 'Comptant', importLabel: 'Importer Comptant', month: currentMonth, quittances: true },
 };
 const today = () => new Date().toISOString().slice(0, 10);
 const cleanNumber = (value) => String(value ?? '').trim().replace(/\.0+$/, '');
