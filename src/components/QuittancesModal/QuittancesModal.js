@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { searchRecords, updateClientRecord } from '../../services/clientRecordsApi';
-import { listCompanies } from '../../services/companyApi';
+import { isBordereauCompany, listCompanies } from '../../services/companyApi';
 import { EditRecordDialog, RECEIPT_FIELDS, RecordsDialog } from '../../pages/ClientPreview/ClientPreviewPage';
 
 const COLUMNS = [
@@ -34,7 +34,8 @@ export default function QuittancesModal({ moduleId, onClose }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((result) => { if (active) setCompanies(Array.isArray(result) ? result : result.items || []); })
+      // Without STAR, MAE, SALIM, EUROP ASSISTANCE and EL AMANA TAKAFUL, as in Réception comptant.
+      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(isBordereauCompany)); })
       .catch(() => {});
     return () => { active = false; };
   }, [accessToken]);

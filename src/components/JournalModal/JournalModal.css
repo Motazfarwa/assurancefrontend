@@ -99,3 +99,25 @@
 .jrn-detail-result { display: flex; justify-content: space-between; width: 80%; margin: 8px 0 0; padding: 6px 6px 0; border-top: 1px solid #333; font-size: 11px; }
 .jrn-detail-box { padding: 1px 16px; border: 1.5px solid #111; }
 .jrn-details h4 { margin: 22px 0 0 6px; font-size: 11px; }
+
+/* Feuille de caisse, "Détails" on an A4 page of its own tab, with the ± 1 DT correction of the solde / montant à déclarer */
+.jrn-a4 { box-sizing: border-box; width: 210mm; max-width: 100%; min-height: 297mm; margin: 0 auto; padding: 16mm 14mm; overflow: visible; }
+.jrn-a4 .jrn-details { width: 100%; max-width: 150mm; }
+.jrn-a4-tools { display: flex; justify-content: center; gap: 8px; margin: 0 auto 12px; }
+.jrn-a4-tools button { min-height: 36px; padding: 0 16px; font: inherit; font-size: 11px; font-weight: 650; }
+.jrn-a4-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; box-sizing: border-box; width: 210mm; max-width: 100%; margin: 0 auto 12px; padding: 14px 16px; border: 1px solid #cfe0dc; border-radius: 10px; background: #fff; }
+.jrn-a4-edit .acompte-field small { color: #71838d; font-weight: 500; }
+.jrn-a4-edit input { box-sizing: border-box; width: 100%; height: 35px; }
+.jrn-a4-edit input.is-invalid { border-color: #c0392b; background: #fdf0ee; }
+.jrn-a4-remark, .jrn-a4-edit-actions { grid-column: 1 / -1; }
+.jrn-a4-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.jrn-a4-edit-actions button { min-height: 36px; padding: 0 16px; }
+.jrn-a4-error, .jrn-a4-note { box-sizing: border-box; width: 210mm; max-width: 100%; margin: 0 auto 12px; }
+.jrn-a4-note { padding: 8px 12px; border-radius: 8px; background: #fff6e6; color: #8a6116; font-size: 11px; }
+.jrn-detail-remark { width: 80%; margin: 18px 0 0 6px; font-size: 11px; }
+.jrn-detail-remark small { display: block; margin-top: 3px; color: #555; font-size: 9.5px; }
+@media (max-width: 640px) { .jrn-a4 { min-height: 0; padding: 18px 12px; } .jrn-a4-edit { grid-template-columns: 1fr; } }
+@media print {
+  @page jrnA4 { size: A4; margin: 0; }
+  .jrn-a4 { page: jrnA4; width: 210mm; min-height: 0; padding: 16mm 14mm; }
+}

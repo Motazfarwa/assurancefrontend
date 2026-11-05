@@ -47,3 +47,6 @@ export const listReturns = (token, params) => request(`/api/journaux/retours?${q
 export const setReturn = (token, payload) => request('/api/journaux/retours/quittance', token, { method: 'PUT', body: JSON.stringify(payload) });
 // Feuille de caisse of a company over a period (no dates: every day): the JEQ of each journal day and the claims and rebates.
 export const getCashSheet = (token, params) => request(`/api/journaux/feuille?${query(params)}`, token);
+// The solde and montant à déclarer kept for the feuille of a company on a day (± 1 DT of the computed ones, with a remarque).
+export const getCashAdjustment = (token, params) => request(`/api/journaux/feuille/ajustement?${query(params)}`, token);
+export const saveCashAdjustment = (token, payload) => request('/api/journaux/feuille/ajustement', token, { method: 'PUT', body: JSON.stringify(payload) });
