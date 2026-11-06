@@ -102,3 +102,5 @@ async function getJson(path, accessToken, filters = {}) {
 }
 export const getUnpaidStatement = (accessToken, filters) => getJson('/api/impayes-agence/etat', accessToken, filters);
 export const listStatementCompanies = (accessToken) => getJson('/api/impayes-agence/etat/compagnies', accessToken);
+// The clients linked to a client (its Lien, and the clients whose Lien it is): { client, liens: [{ code_client, nom_client, relation }] }.
+export const getClientLinks = (accessToken, code) => getJson(`/api/impayes-agence/etat/liens/${encodeURIComponent(code)}`, accessToken);

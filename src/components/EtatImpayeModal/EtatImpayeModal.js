@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getUnpaidStatement, listStatementCompanies } from '../../services/unpaidApi';
+import { getClientLinks, getUnpaidStatement, listStatementCompanies } from '../../services/unpaidApi';
 import { getClientReglements } from '../../services/reglementClientApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -55,7 +55,8 @@ function byCompany(rows) {
 
 // Etat des impayés: quittances still unpaid, "avec pièce" (a cheque / traite en instance covers them, the solde is what it
 // leaves) or "sans pièce" (nothing given yet, solde > 0). The modal only takes the criteria; "Aperçu" opens the preview page:
-// "Global" lists the quittances by client, "Détaillé" the mémoire de règlement of each client by compagnie.
+// "Global" lists the quittances by client, "Détaillé" the mémoire de règlement of each client by compagnie. A client asked
+// for by code gets both, and so do its liens, each in its own dossier.
 export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   const { accessToken } = useAuth();
   const [filters, setFilters] = useState(initialFilters);
@@ -101,6 +102,21 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       code_compagnie: filters.compagnie ? filters.code_compagnie : '',
     };
   };
+  // The client's dossier, then one per lien (its own Lien and the clients whose Lien it is) that has impayés, read with
+  // the same criteria. The client's own dossier is kept even when empty, so its liens can still be reached.
+  async function linkedDossiers(code, items) {
+    let links = { client: { code_client: code, nom_client: filters.nom_client }, liens: [] };
+    try { links = await getClientLinks(accessToken, code); } catch { /* no lien: the client alone */ }
+    const others = [];
+    for (let start = 0; start < links.liens.length; start += 6) {
+      const batch = links.liens.slice(start, start + 6);
+      // eslint-disable-next-line no-await-in-loop
+      const bodies = await Promise.all(batch.map((lien) => getUnpaidStatement(accessToken, { ...query(), code_client: lien.code_client })));
+      batch.forEach((lien, index) => { if (bodies[index].items?.length) others.push({ ...lien, items: bodies[index].items }); });
+    }
+    return [{ ...links.client, relation: 'client', items }, ...others];
+  }
+
   async function apercu() {
     if (filters.dates && filters.date_debut && filters.date_fin && filters.date_debut > filters.date_fin) { setError('La date de début doit précéder la date de fin.'); return; }
     const jours = Number(filters.jours);
@@ -122,8 +138,10 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
         { title: `AUTRES — IMPAYÉS DE PLUS DE ${joursAutres} JOURS${range}`, rows: owed.filter((row) => !autoParticulier(row) && daysLate(row) >= joursAutres) },
       ] : null;
       const items = groups ? groups.flatMap((group) => group.rows) : body.items || [];
-      if (!items.length) setError('Aucune quittance impayée ne correspond aux critères.');
-      else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups });
+      // One client asked for by code: its état and mémoire, then those of its liens, each in its own dossier.
+      const dossiers = !relance && filters.code_client.trim() ? await linkedDossiers(filters.code_client.trim(), items) : null;
+      if (dossiers ? !dossiers.some((dossier) => dossier.items.length) : !items.length) setError('Aucune quittance impayée ne correspond aux critères.');
+      else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups, dossiers });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -218,53 +236,83 @@ function StatementPage({ title, rows, sans, summary }) {
   </article>;
 }
 
-function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose }) {
+// One client's "Mémoire de règlement": its unpaid quittances by compagnie.
+function MemoirePage({ client }) {
+  return <article className="eti-page">
+    {letterhead('MÉMOIRE DE RÈGLEMENT')}
+    <dl className="eti-client-card">
+      <dt>Client</dt><dd><b>{client.code_client}</b>&nbsp;&nbsp;{client.nom_client}</dd>
+      <dt>Adresse</dt><dd>{client.adresse || '—'}</dd>
+      <dt>Ville</dt><dd>{client.ville || '—'}</dd>
+      <dt>Code postal</dt><dd>{client.cp ?? '—'}</dd>
+    </dl>
+    {byCompany(client.rows).map(([name, rows]) => <section key={name} className="eti-company">
+      <h4>Compagnie : {name}</h4>
+      <div className="eti-scroll"><table className="eti-table">
+        <thead><tr><th>N° Police</th><th>TC</th><th>Échéance</th><th className="eti-num">Prime</th><th className="eti-num">Solde</th><th>Risque</th><th>Observation</th></tr></thead>
+        <tbody>{rows.map((row) => <tr key={row.num_quittance}>
+          <td data-label="N° Police">{row.num_int}</td><td data-label="TC">{termOf(row)}</td><td data-label="Échéance">{formatDate(row.echeance)}</td>
+          <td data-label="Prime" className="eti-num">{money.format(amount(row.montant_quittance))}</td><td data-label="Solde" className="eti-num">{money.format(amount(row.solde))}</td>
+          <td data-label="Risque">{row.risque}</td><td data-label="Observation">{row.observation}</td>
+        </tr>)}</tbody>
+        <tfoot><tr className="eti-subtotal"><td colSpan={4}>Total compagnie</td><td className="eti-num">{money.format(total(rows))}</td><td colSpan={2} /></tr></tfoot>
+      </table></div>
+    </section>)}
+    <p className="eti-client-total">Total client <b>{money.format(total(client.rows))}</b></p>
+  </article>;
+}
+
+const RELATIONS = { client: 'Client recherché', lien: 'Son lien', lie: 'Client lié' };
+
+function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossiers, onBack, onClose }) {
+  // A client searched by code: one dossier at a time (the client, then its liens), "◀ / ▶" to move between them.
+  const [current, setCurrent] = useState(0);
+  const dossier = dossiers ? dossiers[current] : null;
+  const items = dossier ? dossier.items : allItems;
   const clients = useMemo(() => byClient(items), [items]);
   const grandTotal = useMemo(() => total(items), [items]);
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') onBack(); };
+    const onKey = (event) => {
+      if (event.key === 'Escape') onBack();
+      if (dossiers && event.key === 'ArrowRight') setCurrent((index) => Math.min(index + 1, dossiers.length - 1));
+      if (dossiers && event.key === 'ArrowLeft') setCurrent((index) => Math.max(index - 1, 0));
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onBack]);
-  const pages = detail ? clients.length : 1;
+  }, [onBack, dossiers]);
+  const pages = dossier ? 2 : detail ? clients.length : 1;
+  const heading = dossier ? 'Etat des impayées et mémoire de règlement' : detail ? 'Mémoire de règlement' : 'Etat des impayées';
 
-  return <div className="eti-preview" role="dialog" aria-modal="true" aria-label={detail ? 'Mémoire de règlement' : 'Etat des impayées'}>
+  return <div className="eti-preview" role="dialog" aria-modal="true" aria-label={heading}>
     <header className="eti-preview-bar">
       <button type="button" className="expert-cancel" onClick={onBack}>← Retour aux critères</button>
-      <div className="eti-preview-title"><strong>{detail ? 'Mémoire de règlement' : 'Etat des impayées'}</strong>
-        <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} (${money.format(total(groups[0].rows))} TND) · autres : ${groups[1].rows.length} (${money.format(total(groups[1].rows))} TND) · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
+      <div className="eti-preview-title"><strong>{heading}</strong>
+        <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} (${money.format(total(groups[0].rows))} TND) · autres : ${groups[1].rows.length} (${money.format(total(groups[1].rows))} TND) · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail || dossier ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
       <div className="eti-preview-actions">
         <button type="button" className="expert-submit" onClick={() => window.print()}>Imprimer</button>
         <button type="button" className="expert-close" onClick={onClose} aria-label="Fermer">×</button>
       </div>
     </header>
+    {dossiers && <nav className="eti-dossiers" aria-label="Client et ses liens">
+      <button type="button" className="expert-cancel" onClick={() => setCurrent(current - 1)} disabled={current === 0} aria-label="Dossier précédent">◀</button>
+      <div className="eti-dossier-tabs">{dossiers.map((item, index) => (
+        <button key={item.code_client} type="button" className={index === current ? 'is-current' : ''} onClick={() => setCurrent(index)} aria-current={index === current ? 'page' : undefined}>
+          <small>{RELATIONS[item.relation]}</small><b>{item.code_client}</b> {item.nom_client}<em>{money.format(total(item.items))}</em>
+        </button>
+      ))}</div>
+      <button type="button" className="expert-cancel" onClick={() => setCurrent(current + 1)} disabled={current === dossiers.length - 1} aria-label="Dossier suivant">▶</button>
+    </nav>}
+    {dossiers && dossiers.length === 1 && <p className="eti-limit eti-preview-limit">Aucun lien de ce client n’a de quittance impayée.</p>}
     {limit > 0 && items.length >= limit && <p className="eti-limit eti-preview-limit">Résultats limités à {limit} quittances : précisez les critères.</p>}
     <div className="eti-report">
-      {groups ? groups.map((group, index) => <StatementPage key={group.title} title={group.title} rows={group.rows} sans={sans}
-        summary={index === 0 ? [['Total automobile particuliers', total(groups[0].rows)], ['Total autres', total(groups[1].rows)], ['Total général', grandTotal]] : undefined} />)
-        : !detail ? <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} />
-        : clients.map((client) => <article key={client.code_client} className="eti-page">
-          {letterhead('MÉMOIRE DE RÈGLEMENT')}
-          <dl className="eti-client-card">
-            <dt>Client</dt><dd><b>{client.code_client}</b>&nbsp;&nbsp;{client.nom_client}</dd>
-            <dt>Adresse</dt><dd>{client.adresse || '—'}</dd>
-            <dt>Ville</dt><dd>{client.ville || '—'}</dd>
-            <dt>Code postal</dt><dd>{client.cp ?? '—'}</dd>
-          </dl>
-          {byCompany(client.rows).map(([name, rows]) => <section key={name} className="eti-company">
-            <h4>Compagnie : {name}</h4>
-            <div className="eti-scroll"><table className="eti-table">
-              <thead><tr><th>N° Police</th><th>TC</th><th>Échéance</th><th className="eti-num">Prime</th><th className="eti-num">Solde</th><th>Risque</th><th>Observation</th></tr></thead>
-              <tbody>{rows.map((row) => <tr key={row.num_quittance}>
-                <td data-label="N° Police">{row.num_int}</td><td data-label="TC">{termOf(row)}</td><td data-label="Échéance">{formatDate(row.echeance)}</td>
-                <td data-label="Prime" className="eti-num">{money.format(amount(row.montant_quittance))}</td><td data-label="Solde" className="eti-num">{money.format(amount(row.solde))}</td>
-                <td data-label="Risque">{row.risque}</td><td data-label="Observation">{row.observation}</td>
-              </tr>)}</tbody>
-              <tfoot><tr className="eti-subtotal"><td colSpan={4}>Total compagnie</td><td className="eti-num">{money.format(total(rows))}</td><td colSpan={2} /></tr></tfoot>
-            </table></div>
-          </section>)}
-          <p className="eti-client-total">Total client <b>{money.format(total(client.rows))}</b></p>
-        </article>)}
+      {dossier ? (items.length ? <>
+        <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} />
+        {clients.map((client) => <MemoirePage key={client.code_client} client={client} />)}
+      </> : <article className="eti-page">{letterhead('ETAT DES IMPAYÉES')}<p className="eti-empty">Aucune quittance impayée pour le client {dossier.code_client} {dossier.nom_client} : voyez ses liens.</p></article>)
+        : groups ? groups.map((group, index) => <StatementPage key={group.title} title={group.title} rows={group.rows} sans={sans}
+          summary={index === 0 ? [['Total automobile particuliers', total(groups[0].rows)], ['Total autres', total(groups[1].rows)], ['Total général', grandTotal]] : undefined} />)
+          : !detail ? <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} />
+            : clients.map((client) => <MemoirePage key={client.code_client} client={client} />)}
     </div>
   </div>;
 }
