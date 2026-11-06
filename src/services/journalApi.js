@@ -39,7 +39,9 @@ export const getDailyProduction = (token, params) => request(`/api/journaux/prod
 export const getDailyFinancial = (token, params) => request(`/api/journaux/financier?${query(params)}`, token);
 // Etat des comptes client: per client, primes, ristournes, sinistres, règlements and commissions (filters: dates, company,
 // client, police, état tous | comptabilise | instance | ristourne).
-export const getClientAccounts = (token, params) => request(`/api/journaux/comptes-clients?${query(params)}`, token);
+// Etat du terme: the policies en cours whose terme falls in the month (1-12), of every company or one.
+export const getTermStatement = (token, params) => request(`/api/journaux/terme?${query(params)}`, token);
+export const getClientAccounts =(token, params) => request(`/api/journaux/comptes-clients?${query(params)}`, token);
 // Etat de la recette technique: the client payments between two dates, one line per quittance paid.
 export const getRecetteTechnique = (token, params) => request(`/api/journaux/recette?${query(params)}`, token);
 // Retour: the quittances of a company, type and period, and their return to the company (retour true / false).

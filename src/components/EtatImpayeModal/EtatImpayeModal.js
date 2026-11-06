@@ -23,6 +23,7 @@ const daysLate = (row) => Math.floor((Date.parse(today()) - Date.parse(String(ro
 // "T" + "10/2026" as the legacy report prints it; a comptant quittance is just "C".
 const termOf = (row) => (row.tc === 'T' && row.periode ? `T${row.periode}` : row.tc || '');
 const total = (rows) => rows.reduce((sum, row) => sum + amount(row.solde), 0);
+const sumOf = (rows, key) => rows.reduce((sum, row) => sum + amount(row[key]), 0);
 // summary: [label, amount] lines printed under the date (the mise en demeure totals, on its first page).
 const letterhead = (title, summary) => <div className="eti-letterhead">
   <address>{AGENCY.map((line) => <span key={line}>{line}</span>)}</address>
@@ -192,24 +193,27 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
 }
 
 // The preview page (as the legacy report viewer): a toolbar, then the report on paper sheets; "Imprimer" prints only them.
-// One "Etat des impayées" sheet: the quittances by client, with client and general totals.
+// One "Etat des impayées" sheet: the quittances by client, with what the client already paid on them (its règlements) and
+// client and general totals. "Avec pièce": a line whose pièces leave a solde to pay is shown in red.
 function StatementPage({ title, rows, sans, summary }) {
   const clients = useMemo(() => byClient(rows), [rows]);
   const span = sans ? 2 : 3;
   return <article className="eti-page">
     {letterhead(title, summary)}
     {rows.length ? <div className="eti-scroll"><table className="eti-table">
-      <thead><tr><th>N° Police</th><th>TC</th><th>Échéance</th><th className="eti-num">Prime</th><th className="eti-num">Solde</th><th>N° quittance</th>{!sans && <th>Pièce(s)</th>}<th>Observation</th></tr></thead>
+      <thead><tr><th>N° Police</th><th>TC</th><th>Échéance</th><th className="eti-num">Prime</th><th className="eti-num">Réglé</th><th className="eti-num">Solde</th><th>N° quittance</th>{!sans && <th>Pièce(s)</th>}<th>Observation</th></tr></thead>
       {clients.map((client) => <tbody key={client.code_client}>
-        <tr className="eti-client"><td colSpan={sans ? 7 : 8}>Code client : <b>{client.code_client}</b><span>Nom client : <b>{client.nom_client || '—'}</b></span></td></tr>
-        {client.rows.map((row) => <tr key={row.num_quittance}>
+        <tr className="eti-client"><td colSpan={sans ? 8 : 9}>Code client : <b>{client.code_client}</b><span>Nom client : <b>{client.nom_client || '—'}</b></span></td></tr>
+        {client.rows.map((row) => <tr key={row.num_quittance} className={!sans && amount(row.solde) > 0.0005 ? 'is-due' : undefined}>
           <td data-label="N° Police">{row.num_int}</td><td data-label="TC">{termOf(row)}</td><td data-label="Échéance">{formatDate(row.echeance)}</td>
-          <td data-label="Prime" className="eti-num">{money.format(amount(row.montant_quittance))}</td><td data-label="Solde" className="eti-num">{money.format(amount(row.solde))}</td>
+          <td data-label="Prime" className="eti-num">{money.format(amount(row.montant_quittance))}</td>
+          <td data-label="Réglé" className="eti-num" title={row.date_reglement ? `Dernier règlement le ${formatDate(row.date_reglement)}` : undefined}>{money.format(amount(row.regle))}</td>
+          <td data-label="Solde" className="eti-num">{money.format(amount(row.solde))}</td>
           <td data-label="N° quittance">{row.num_quittance}</td>{!sans && <td data-label="Pièce(s)">{row.pieces}</td>}<td data-label="Observation">{row.observation}</td>
         </tr>)}
-        <tr className="eti-subtotal"><td colSpan={4}>Total client</td><td className="eti-num">{money.format(total(client.rows))}</td><td colSpan={span} /></tr>
+        <tr className="eti-subtotal"><td colSpan={4}>Total client</td><td className="eti-num">{money.format(sumOf(client.rows, 'regle'))}</td><td className="eti-num">{money.format(total(client.rows))}</td><td colSpan={span} /></tr>
       </tbody>)}
-      <tfoot><tr className="eti-grand"><td colSpan={4}>Total général</td><td className="eti-num">{money.format(total(rows))}</td><td colSpan={span} /></tr></tfoot>
+      <tfoot><tr className="eti-grand"><td colSpan={4}>Total général</td><td className="eti-num">{money.format(sumOf(rows, 'regle'))}</td><td className="eti-num">{money.format(total(rows))}</td><td colSpan={span} /></tr></tfoot>
     </table></div> : <p className="eti-empty">Aucune quittance impayée dans ce groupe.</p>}
   </article>;
 }
@@ -224,8 +228,7 @@ function EtatImpayePreview({ items, limit, detail, sans, groups, onBack, onClose
   }, [onBack]);
   const pages = detail ? clients.length : 1;
 
-  // "Sans pièce" is printed on a red background, so it is never taken for the "Avec pièce" état.
-  return <div className={`eti-preview${sans ? ' is-sans' : ''}`} role="dialog" aria-modal="true" aria-label={detail ? 'Mémoire de règlement' : 'Etat des impayées'}>
+  return <div className="eti-preview" role="dialog" aria-modal="true" aria-label={detail ? 'Mémoire de règlement' : 'Etat des impayées'}>
     <header className="eti-preview-bar">
       <button type="button" className="expert-cancel" onClick={onBack}>← Retour aux critères</button>
       <div className="eti-preview-title"><strong>{detail ? 'Mémoire de règlement' : 'Etat des impayées'}</strong>

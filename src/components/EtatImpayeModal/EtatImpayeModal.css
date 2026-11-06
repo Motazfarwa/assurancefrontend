@@ -125,12 +125,5 @@
   .eti-table tr { break-inside: avoid; }
 }
 
-/* "Sans pièce": red pages and lines, to tell it from the "Avec pièce" état (printed in colour too) */
-.eti-preview.is-sans .eti-page { background: #fdecec; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.eti-preview.is-sans .eti-table td { border-color: #f1c4c4; background: #fbdcdc; }
-.eti-preview.is-sans .eti-table th { border-color: #e2a5a5; background: #f6c9c9; }
-.eti-preview.is-sans .eti-client td { background: #f8d0d0; }
-.eti-preview.is-sans .eti-subtotal td, .eti-preview.is-sans .eti-grand td { background: #f4c0c0; }
-.eti-preview.is-sans .eti-summary td { background: #fbdcdc; }
-.eti-preview.is-sans .eti-preview-bar { border-bottom: 3px solid #c0392b; }
-.eti-preview.is-sans * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* "Avec pièce": the lines whose pièces leave a solde to pay, in red (printed in colour too) */
+.eti-table tr.is-due td { border-color: #f1c4c4; background: #fbdcdc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

@@ -25,8 +25,10 @@ const KINDS = {
     key: (row) => row.num_quittance,
     // Fully paid receipts are proposed; unpaid ones are chosen by hand.
     preselect: (row) => row.paye || row.a_s === 'A',
-    text: (row) => `${row.num_quittance} ${row.num_police || ''} ${row.assure || ''} ${row.code_client || ''}`,
+    text: (row) => `${row.num_quittance} ${row.num_police || ''} ${row.assure || ''} ${row.code_client || ''} ${row.nom_compagnie || ''}`,
     amount: 'montant',
+    // Every company is listed until one is chosen.
+    allCompanies: true,
   },
   depense: {
     title: 'Journal de dépense',
@@ -67,7 +69,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   }, [accessToken]);
 
   useEffect(() => {
-    if (!compagnie || !date) { setState({ loading: false, error: '', items: [] }); return undefined; }
+    if ((!compagnie && !config.allCompanies) || !date) { setState({ loading: false, error: '', items: [] }); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
     config.load(accessToken, { compagnie, date, nature, comptabilises: showDone })
@@ -88,6 +90,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   }, [sheet, cashSheet, onClose]);
 
   const company = companies.find((item) => String(item.code_compagnie) === String(compagnie));
+  const listed = Boolean(compagnie) || Boolean(config.allCompanies);
+  const allListed = !compagnie && listed;
   const shown = useMemo(() => {
     const text = search.trim().toLocaleLowerCase();
     return text ? state.items.filter((row) => config.text(row).toLocaleLowerCase().includes(text)) : state.items;
@@ -110,18 +114,28 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
 
   async function comptabiliser() {
     if (!selected.length) return;
-    const message = `Comptabiliser ${selected.length} ligne${selected.length > 1 ? 's' : ''} (${fmt(sum(selected, config.amount))} TND) pour ${company?.nom_compagnie || 'la compagnie'} au ${formatDate(date)} ?`;
+    const message = `Comptabiliser ${selected.length} ligne${selected.length > 1 ? 's' : ''} (${fmt(sum(selected, config.amount))} TND) pour ${company?.nom_compagnie || (compagnie ? 'la compagnie' : 'leurs compagnies')} au ${formatDate(date)} ?`;
     if (!window.confirm(message)) return;
     setSaving(true); setNotice('');
     try {
-      const result = await config.post(accessToken, Number(compagnie), date, selected);
+      // With every company listed, each company's lines go in its own journal.
+      const groups = new Map();
+      selected.forEach((row) => {
+        const code = compagnie || row.code_compagnie;
+        groups.set(code, [...(groups.get(code) || []), row]);
+      });
+      let count = 0;
+      for (const [code, rows] of groups) {
+        const result = await config.post(accessToken, Number(code), date, rows);
+        count += result.comptabilisees;
+      }
       const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true });
       const items = body.items || [];
       setShowDone(true);
       setState({ loading: false, error: '', items });
       setChosen(new Set());
-      setNotice(`${result.comptabilisees} ligne${result.comptabilisees > 1 ? 's' : ''} comptabilisée${result.comptabilisees > 1 ? 's' : ''} au ${formatDate(date)}.`);
-      setCashSheet(true);
+      setNotice(`${count} ligne${count > 1 ? 's' : ''} comptabilisée${count > 1 ? 's' : ''} au ${formatDate(date)}${groups.size > 1 ? ` (${groups.size} compagnies)` : ''}.`);
+      if (company) setCashSheet(true);
     } catch (requestError) {
       setState((current) => ({ ...current, error: requestError.message }));
     } finally {
@@ -142,7 +156,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         <div className="unpaid-filter-form acompte-filters">
           <label className="acompte-field jrn-company"><span>Compagnie</span>
             <select value={compagnie} onChange={(event) => setCompagnie(event.target.value)} autoFocus>
-              <option value="">Choisir la compagnie…</option>
+              <option value="">{config.allCompanies ? 'Toutes les compagnies' : 'Choisir la compagnie…'}</option>
               {companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.nom_compagnie}</option>)}
             </select>
           </label>
@@ -160,20 +174,20 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
         <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>{config.heading}</span><h3>{!compagnie ? 'Choisissez une compagnie' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
+            <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez une compagnie' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
               <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(selected, config.amount))} TND</strong></div>
-              <button type="button" className="expert-cancel" onClick={openSheet} disabled={!compagnie || (!selected.length && !(showDone && done.length))}>Imprimer le journal</button>
-              <button type="button" className="expert-cancel" onClick={() => setCashSheet(true)} disabled={!company}>Feuille de caisse</button>
+              <button type="button" className="expert-cancel" onClick={openSheet} disabled={!compagnie || (!selected.length && !(showDone && done.length))} title={compagnie ? undefined : 'Choisissez une compagnie'}>Imprimer le journal</button>
+              <button type="button" className="expert-cancel" onClick={() => setCashSheet(true)} disabled={!company} title={company ? undefined : 'Choisissez une compagnie'}>Feuille de caisse</button>
               <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>
             </div>
           </div>
-          {compagnie && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune ligne à comptabiliser pour cette compagnie à cette date.</div>
-            : compagnie && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
+          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune ligne à comptabiliser {allListed ? '' : 'pour cette compagnie '}à cette date.</div>
+            : listed && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
                 {kind === 'encaissement'
-                  ? <><th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th>Comptabilisé</th></>
+                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th><th>Comptabilisé</th></>
                   : <><th>N° sinistre / ristourne</th><th>Type</th><th>Date</th><th>N° contrat</th><th>Immatriculation</th><th className="cqi-number">Montant</th><th>Assuré</th><th>Chèque</th><th>Comptabilisé</th></>}
               </tr></thead>
               <tbody>{shown.map((row) => {
@@ -182,9 +196,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                 return <tr key={key} className={row.comptabilise ? 'is-done' : on ? 'is-chosen' : ''} onClick={() => { if (!row.comptabilise) toggle(row); }}>
                   <td className="cqi-verser"><input type="checkbox" checked={on} disabled={row.comptabilise} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
                   {kind === 'encaissement'
-                    ? <><td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
+                    ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.a_s}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
-                      <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}</td><td>{row.comptabilise ? 'Oui' : row.paye ? 'Non' : 'Non · impayée'}</td></>
+                      <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}</td>
+                      <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td><td>{row.comptabilise ? 'Oui' : row.paye ? 'Non' : 'Non · impayée'}</td></>
                     : <><td><strong>{row.numero}</strong></td><td>{row.nature === 'R' ? 'Ristourne' : 'Sinistre'}</td><td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.num_imat}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.assure}</td><td>{row.num_cheq}</td><td>{row.comptabilise ? `Oui · ${formatDate(row.date_comptabilise)}` : 'Non'}</td></>}
                 </tr>;
