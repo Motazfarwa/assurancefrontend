@@ -25,7 +25,7 @@ const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES À DÉCLARER · COCHEZ « CHOIX » POUR LES IMPRIMER',
+    heading: 'QUITTANCES RÉGLÉES À DÉCLARER · COCHEZ « CHOIX » POUR LES IMPRIMER',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
@@ -60,8 +60,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [companies, setCompanies] = useState([]);
   const [compagnie, setCompagnie] = useState('');
   const [date, setDate] = useState(config.settled ? journalDay : today);
-  // As the legacy software: every quittance due by the date, settled or not (Réglé shows what the clients paid).
-  const settledParams = {};
+  // Encaissement: only the quittances a client paid something on (a règlement date and Réglé > 0).
+  const settledParams = config.settled ? { regles: true } : {};
   const [nature, setNature] = useState(''); // dépense: '' | S | R
   const [showDone, setShowDone] = useState(false);
   const [search, setSearch] = useState('');
@@ -195,7 +195,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               {!config.readOnly && <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>}
             </div>
           </div>
-          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune quittance à déclarer {allListed ? '' : 'pour cette compagnie '}à cette date.</div>
+          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune quittance réglée à déclarer {allListed ? '' : 'pour cette compagnie '}à cette date.</div>
             : listed && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
