@@ -97,7 +97,7 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
             <select value={tc} onChange={(event) => setTc(event.target.value)}><option value="C">Comptant</option><option value="T">Terme</option></select>
           </label>
           <label className="acompte-field jrn-date"><span>Période</span><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label>
-          <label className="jrn-check"><input type="checkbox" checked={onlyReturned} onChange={(event) => setOnlyReturned(event.target.checked)} />Retournées dans la période</label>
+          <label className="jrn-check"><input type="checkbox" checked={onlyReturned} onChange={(event) => setOnlyReturned(event.target.checked)} />Retournées</label>
         </div>
 
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}

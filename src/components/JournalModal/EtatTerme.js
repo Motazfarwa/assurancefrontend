@@ -12,8 +12,8 @@ const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').rev
 const today = () => new Date().toISOString().slice(0, 10);
 const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-// The month after the current one (Décembre in November), as the legacy software proposes.
-const nextMonth = () => (new Date().getMonth() + 1) % 12 + 1;
+// The current month by default.
+const currentMonth = () => new Date().getMonth() + 1;
 
 // The printable état: one line per policy; a temporary policy (with an expiration date) says so in Observation.
 function TermeSheet({ params, month, companyName, onClose }) {
@@ -58,7 +58,7 @@ function TermeSheet({ params, month, companyName, onClose }) {
 // Module "Etat du terme": the month (and, ticked, a company), then the aperçu in a tab of its own.
 export default function EtatTermeModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
-  const [month, setMonth] = useState(nextMonth);
+  const [month, setMonth] = useState(currentMonth);
   const [byCompany, setByCompany] = useState(false);
   const [company, setCompany] = useState('');
   const [companies, setCompanies] = useState([]);

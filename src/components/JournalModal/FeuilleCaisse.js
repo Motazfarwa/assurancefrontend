@@ -18,17 +18,16 @@ const RS_RATE = 0.1;
 
 const compact = (value) => String(value).slice(0, 10).replaceAll('-', '');
 
-// Lines of the feuille de caisse of a company over a period, from what is comptabilisé in it: for each journal day its
-// JEQ (primes, timbres, commission) and FSSR, every claim and rebate paid, and the RS on the net commission.
+// Lines of the feuille de caisse of a company over a period, from the client settlements (TRegCli): for each day what the
+// clients paid and the commission of the quittances settled, every claim and rebate paid, and the RS on the net commission.
 export function cashSheetLines(journals, expenses) {
-  const several = journals.length > 1;
   const jeqCommission = sum(journals, 'commission');
   const rebateCommission = sum(expenses.filter((row) => row.nature === 'R'), 'd_com');
   const commission = jeqCommission - rebateCommission;
   const lines = [
     ...journals.flatMap((day) => [
-      { label: `JEQ N° ${compact(day.jour)}`, primes: Number(day.primes || 0), tq: Number(day.tq || 0), commission: Number(day.commission || 0), depenses: 0 },
-      { label: several ? `FSSR JEQ ${compact(day.jour)}` : 'FSSR JEQ', primes: Number(day.frais || 0), tq: 0, commission: 0, depenses: 0 },
+      { label: `Règlements clients du ${formatDate(day.jour)} (${day.quittances} quittance${day.quittances > 1 ? 's' : ''})`, primes: Number(day.primes || 0), tq: Number(day.tq || 0), commission: Number(day.commission || 0), depenses: 0 },
+      ...(Number(day.frais || 0) ? [{ label: `FSSR ${compact(day.jour)}`, primes: Number(day.frais), tq: 0, commission: 0, depenses: 0 }] : []),
     ]),
     ...expenses.map((row) => ({
       label: `${row.nature === 'R' ? 'Ristourne' : 'Sinistre'} N° ${row.numero || ''}`,
@@ -209,7 +208,7 @@ export function CashSheet({ company, date, debut = date, fin = date, onClose }) 
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
           <div className="jrn-cash-company"><strong>{company.nom_compagnie}</strong><strong>{periodTitle(debut, fin)}</strong></div>
-          <div className="jrn-sheet-title"><h1>AGENCE : {company.code_agent}</h1><p>Journal d’encaissement non validé</p></div>
+          <div className="jrn-sheet-title"><h1>AGENCE : {company.code_agent}</h1><p>Règlements clients et dépenses du jour</p></div>
           <div className="jrn-agency jrn-printed"><span>Date impression : {formatDate(today())}</span></div>
         </header>
         {state.loading ? <p className="jrn-sheet-state">Chargement…</p> : state.error ? <p className="jrn-sheet-state" role="alert">{state.error}</p> : <table className="jrn-sheet-table jrn-cash-table">
@@ -268,7 +267,7 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
           <button type="button" className="expert-submit jrn-open" onClick={() => setOpen(true)} disabled={!company || !jour}>Aperçu</button>
         </div>
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
-        <p className="jrn-hint">La feuille reprend ce jour-là les quittances payées comptabilisées (journal d’encaissement) et les sinistres et ristournes payés comptabilisés. « Détails » ouvre la page A4, où le solde et le montant à déclarer peuvent être arrondis de 1 DT au plus.</p>
+        <p className="jrn-hint">La feuille reprend les règlements des clients de ce jour-là (montants payés, commission des quittances soldées) et les sinistres et ristournes payés ce jour-là. « Détails » ouvre la page A4, où le solde et le montant à déclarer peuvent être arrondis de 1 DT au plus.</p>
       </div>
     </section>
     {open && company && <CashSheet company={company} date={jour} onClose={() => setOpen(false)} />}
