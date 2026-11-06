@@ -4,18 +4,18 @@ import { createCompany, deleteCompany, listCompanies, updateCompany } from '../.
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import './CompanyManagementModal.css';
 
-// Fields in the order of the legacy "Gestion des compagnies" screen ([name, label, type, columns out of 6]);
-// the last ones of each group are not on the legacy screen and come after.
+// Fields of the "Gestion des compagnies" screen ([name, label, type, columns out of 12]), two rows per section so the
+// whole sheet shows without scrolling: the company row starts after its code (2) and libellé (4).
 const COMPANY_FIELDS = [
   ['Nbr_Chiffre_Code', 'Longueur branche', 'number', 2], ['contre_ass_spe', 'Prime CAS', 'number', 2], ['Capital_CAS', 'Capital CAS', 'number', 2],
-  ['Assistance_Voyage', 'Assistance voyage', 'number', 2], ['Num_Quittance_Auto', 'N° quittance automatique', 'check', 4],
-  ['Taux_Majoration', 'Taux majoration', 'number', 2], ['Adresse_Compagnie', 'Adresse compagnie', 'text', 2], ['Ville_Compagnie', 'Ville compagnie', 'text', 2],
+  ['Assistance_Voyage', 'Assistance voyage', 'number', 2], ['Taux_Majoration', 'Taux majoration', 'number', 2],
+  ['Adresse_Compagnie', 'Adresse compagnie', 'text', 3], ['Ville_Compagnie', 'Ville compagnie', 'text', 2],
+  ['Num_Quittance_Auto', 'N° quittance automatique', 'check', 3],
 ];
 const AGENCY_FIELDS = [
-  ['Adresse_Agence', 'Adresse', 'text', 6],
-  ['Code_Agent', 'Code', 'text', 2], ['Ville_Agence', 'Ville', 'text', 2], ['CP_Agence', 'Code postal', 'number', 2],
-  ['Pays_Agence', 'Pays', 'text', 2], ['Tel_Agence', 'Tél', 'text', 2], ['Fax_Agence', 'Fax', 'text', 2],
-  ['Nom_Agence', 'Nom agence', 'text', 2],
+  ['Adresse_Agence', 'Adresse', 'text', 6], ['Nom_Agence', 'Nom agence', 'text', 3], ['Code_Agent', 'Code', 'text', 3],
+  ['Ville_Agence', 'Ville', 'text', 2], ['CP_Agence', 'Code postal', 'number', 2], ['Pays_Agence', 'Pays', 'text', 2],
+  ['Tel_Agence', 'Tél', 'text', 3], ['Fax_Agence', 'Fax', 'text', 3],
 ];
 const fields = [['nom_compagnie', 'Libellé', 'text'], ...COMPANY_FIELDS, ...AGENCY_FIELDS];
 const blankCompany = (code = '') => ({ code_compagnie: code, Num_Quittance_Auto: 'N' });
@@ -127,7 +127,7 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
   }
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
-    <section className="catalog-modal" role="dialog" aria-modal="true" aria-labelledby="company-title">
+    <section className="catalog-modal cmp-modal" role="dialog" aria-modal="true" aria-labelledby="company-title">
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali · Siège</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE {moduleId}</span><h2 id="company-title">Gestion compagnies</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       {loading && !company ? <div className="catalog-empty">Chargement des compagnies…</div> : <form className="catalog-body" onSubmit={save}>
         <div className="catalog-toolbar cmp-toolbar">
@@ -139,7 +139,10 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
         </div>
 
         <div className="catalog-section">
-          <div className="catalog-section-heading"><div><span>COMPAGNIE</span>{creating && codeText && <h3>Nouvelle compagnie</h3>}{!creating && <h3>{company?.nom_compagnie}</h3>}</div></div>
+          <div className="catalog-section-heading">
+            <div><span>COMPAGNIE</span>{creating && codeText && <h3>Nouvelle compagnie</h3>}{!creating && <h3>{company?.nom_compagnie}</h3>}</div>
+            <p className="cmp-hint">Tapez le code d’une compagnie pour l’afficher, ou un nouveau code pour l’ajouter.</p>
+          </div>
           <div className="cmp-grid">
             <label className="catalog-field cmp-span-2"><span>Code compagnie</span>
               <input value={codeText} onChange={typeCode} inputMode="numeric" readOnly={editing && !creating} autoFocus autoComplete="off" required title="Tapez un code existant pour l’ouvrir, ou un nouveau code pour ajouter une compagnie" />
@@ -149,7 +152,6 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
             </label>
             {company && <Fields list={COMPANY_FIELDS} company={company} editing={editing} onChange={changeField} />}
           </div>
-          <p className="cmp-hint">Tapez le code d’une compagnie pour l’afficher, ou un nouveau code pour l’ajouter.</p>
         </div>
 
         {company && <div className="catalog-section">
