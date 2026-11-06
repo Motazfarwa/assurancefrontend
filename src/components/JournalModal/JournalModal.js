@@ -20,7 +20,7 @@ const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES À DÉCLARER · COCHEZ « CHOIX » PUIS « COMPTABILISER »',
+    heading: 'QUITTANCES RÉGLÉES À DÉCLARER · COCHEZ « CHOIX » POUR LES IMPRIMER',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
@@ -32,6 +32,8 @@ const KINDS = {
     allCompanies: true,
     // Only the quittances with a client settlement, by default all of them or those settled between two dates.
     settled: true,
+    // No "Comptabiliser" here: the journal is only consulted and printed.
+    readOnly: true,
   },
   depense: {
     title: 'Journal de dépense',
@@ -195,7 +197,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(selected, config.amount))} TND</strong></div>
               <button type="button" className="expert-cancel" onClick={openSheet} disabled={!compagnie || (!selected.length && !(showDone && done.length))} title={compagnie ? undefined : 'Choisissez une compagnie'}>Imprimer le journal</button>
               <button type="button" className="expert-cancel" onClick={() => setCashSheet(true)} disabled={!company} title={company ? undefined : 'Choisissez une compagnie'}>Feuille de caisse</button>
-              <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>
+              {!config.readOnly && <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>}
             </div>
           </div>
           {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune quittance réglée à comptabiliser {allListed ? '' : 'pour cette compagnie '}{config.settled && between ? 'entre ces deux dates' : 'à cette date'}.</div>
