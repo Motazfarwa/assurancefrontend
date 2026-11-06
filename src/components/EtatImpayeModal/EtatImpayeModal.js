@@ -56,7 +56,7 @@ function byCompany(rows) {
 // Etat des impayés: quittances still unpaid, "avec pièce" (a cheque / traite en instance covers them, the solde is what it
 // leaves) or "sans pièce" (nothing given yet, solde > 0). The modal only takes the criteria; "Aperçu" opens the preview page:
 // "Global" lists the quittances by client, "Détaillé" the mémoire de règlement of each client by compagnie. A client asked
-// for by code gets both, and so do its liens, each in its own dossier.
+// for by code gets its mémoire de règlement only, and so do its liens, each in its own dossier.
 export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
   const { accessToken } = useAuth();
   const [filters, setFilters] = useState(initialFilters);
@@ -138,7 +138,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
         { title: `AUTRES — IMPAYÉS DE PLUS DE ${joursAutres} JOURS${range}`, rows: owed.filter((row) => !autoParticulier(row) && daysLate(row) >= joursAutres) },
       ] : null;
       const items = groups ? groups.flatMap((group) => group.rows) : body.items || [];
-      // One client asked for by code: its état and mémoire, then those of its liens, each in its own dossier.
+      // One client asked for by code: its mémoire de règlement, then those of its liens, each in its own dossier.
       const dossiers = !relance && filters.code_client.trim() ? await linkedDossiers(filters.code_client.trim(), items) : null;
       if (dossiers ? !dossiers.some((dossier) => dossier.items.length) : !items.length) setError('Aucune quittance impayée ne correspond aux critères.');
       else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups, dossiers });
@@ -280,8 +280,8 @@ function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossi
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack, dossiers]);
-  const pages = dossier ? 2 : detail ? clients.length : 1;
-  const heading = dossier ? 'Etat des impayées et mémoire de règlement' : detail ? 'Mémoire de règlement' : 'Etat des impayées';
+  const pages = dossier ? 1 : detail ? clients.length : 1;
+  const heading = dossier || detail ? 'Mémoire de règlement' : 'Etat des impayées';
 
   return <div className="eti-preview" role="dialog" aria-modal="true" aria-label={heading}>
     <header className="eti-preview-bar">
@@ -305,10 +305,8 @@ function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossi
     {dossiers && dossiers.length === 1 && <p className="eti-limit eti-preview-limit">Aucun lien de ce client n’a de quittance impayée.</p>}
     {limit > 0 && items.length >= limit && <p className="eti-limit eti-preview-limit">Résultats limités à {limit} quittances : précisez les critères.</p>}
     <div className="eti-report">
-      {dossier ? (items.length ? <>
-        <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} />
-        {clients.map((client) => <MemoirePage key={client.code_client} client={client} />)}
-      </> : <article className="eti-page">{letterhead('ETAT DES IMPAYÉES')}<p className="eti-empty">Aucune quittance impayée pour le client {dossier.code_client} {dossier.nom_client} : voyez ses liens.</p></article>)
+      {dossier ? (items.length ? clients.map((client) => <MemoirePage key={client.code_client} client={client} />)
+        : <article className="eti-page">{letterhead('MÉMOIRE DE RÈGLEMENT')}<p className="eti-empty">Aucune quittance impayée pour le client {dossier.code_client} {dossier.nom_client} : voyez ses liens.</p></article>)
         : groups ? groups.map((group, index) => <StatementPage key={group.title} title={group.title} rows={group.rows} sans={sans}
           summary={index === 0 ? [['Total automobile particuliers', total(groups[0].rows)], ['Total autres', total(groups[1].rows)], ['Total général', grandTotal]] : undefined} />)
           : !detail ? <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} />

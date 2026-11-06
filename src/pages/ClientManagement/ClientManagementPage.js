@@ -8,6 +8,7 @@ import FicheImportModal from '../../components/FicheImportModal/FicheImportModal
 import SinistreModal from '../../components/SinistreModal/SinistreModal';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
 import ClientListModal from '../ClientListModal/ClientListModal';
+import ClientListerModal from '../ClientListModal/ClientListerModal';
 import { navigate } from '../../navigation';
 import { showToast } from '../../services/toast';
 import './ClientManagementPage.css';
@@ -93,6 +94,7 @@ export default function ClientManagementPage({ modal = false }) {
   const [successToast, setSuccessToast] = useState('');
   const [saving, setSaving] = useState(false);
   const [showClientList, setShowClientList] = useState(false);
+  const [showLister, setShowLister] = useState(false); // "Lister": every client, filtered by nom / code, dates and type
   const [step, setStep] = useState(1);
   const [activeAction, setActiveAction] = useState(null);
   const [ficheFile, setFicheFile] = useState(null);
@@ -268,7 +270,7 @@ export default function ClientManagementPage({ modal = false }) {
     <main className={`client-page${modal ? ' client-page-modal' : ''}`}>
       <section ref={windowRef} className={`client-window${modal ? ' client-window-modal' : ''}`}>
         <header className="client-page-header"><a className="client-page-brand" href="/workspace"><span className="client-brand-mark">A</span><span>GESTION ASSURANCES<small>Assurance Jemmali · Siege</small></span></a><div className="client-page-heading"><span>PRODUCTION · MODULE 100</span><h1>Gestion des clients</h1></div><button type="button" className="client-close-button" onClick={() => navigate('/workspace')} aria-label="Fermer">×</button></header>
-        <nav className="client-view-tabs" aria-label="Vue du dossier client"><button type="button" onClick={() => setShowClientList(true)}><span aria-hidden="true">◉</span> Rechercher</button><button type="button" className="is-current" aria-current="page"><span aria-hidden="true">✎</span> Modifier</button></nav>
+        <nav className="client-view-tabs" aria-label="Vue du dossier client"><button type="button" onClick={() => setShowClientList(true)}><span aria-hidden="true">◉</span> Rechercher</button><button type="button" className="is-current" aria-current="page"><span aria-hidden="true">✎</span> Modifier</button><button type="button" onClick={() => setShowLister(true)}><span aria-hidden="true">☰</span> Lister</button></nav>
         <div className="client-action-bar" role="group" aria-label="Gestion du client">
           <button type="button" className="client-action-button client-import-button" onClick={() => fileInputRef.current?.click()} title="Importer une fiche scannée (français ou arabe) et remplir les champs">⬆ Importer une fiche</button>
           <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setFicheFile(file); }} />
@@ -351,6 +353,7 @@ export default function ClientManagementPage({ modal = false }) {
       {activeAction?.key === 'claim' && <SinistreModal moduleId={activeAction.module.id} clientCode={client.clientCode} onClose={() => setActiveAction(null)} />}
       {activeAction && activeAction.key !== 'claim' && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}
       {ficheFile && <FicheImportModal file={ficheFile} accessToken={accessToken} onClose={() => setFicheFile(null)} onApply={applyFiche} />}
+      {showLister && <ClientListerModal accessToken={accessToken} onClose={() => setShowLister(false)} onView={(record) => { setShowLister(false); setClient({ ...record, _persisted: true }); navigate('/clients/preview'); }} />}
       {showClientList && <ClientListModal accessToken={accessToken} localClients={clients} onClose={() => setShowClientList(false)} onView={(record) => { setClient({ ...record, _persisted: true }); navigate('/clients/preview'); }} />}
     </main>
   );
