@@ -11,11 +11,10 @@ import './JournalModal.css';
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
-// The month before the current one ("2026-10" in November 2026): the period usually returned.
-const previousMonth = () => {
+// The current month ("2026-11" in November 2026).
+const currentMonth = () => {
   const now = new Date();
-  const month = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 };
 const toPeriode = (month) => (/^\d{4}-\d{2}$/.test(month) ? `${month.slice(5)}/${month.slice(0, 4)}` : '');
 
@@ -27,7 +26,7 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
   const [companies, setCompanies] = useState([]);
   const [company, setCompany] = useState('');
   const [tc, setTc] = useState('C');
-  const [month, setMonth] = useState(previousMonth);
+  const [month, setMonth] = useState(currentMonth);
   const [onlyReturned, setOnlyReturned] = useState(false);
   const [state, setState] = useState({ loading: false, error: '', items: [] });
   const [saving, setSaving] = useState('');

@@ -19,6 +19,13 @@ const journalDay = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 };
 const sum = (rows, key) => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
+// What the journal line of a quittance is: [label, explanation shown on hover].
+const receiptStatus = (row) => {
+  if (row.comptabilise) return ['Déjà déclarée', `Comptabilisée au journal (${row.a_s === 'A' ? 'acompte' : 'solde'}).`];
+  if (row.paye) return ['Payée intégralement', 'Le client a tout réglé : la quittance est déclarée pour son montant.'];
+  if (row.a_s === 'A') return ['Acompte', `Paiement partiel : l’acompte de ${fmt(row.montant)} est à déclarer, il reste ${fmt(row.solde_quittance)} dû par le client.`];
+  return ['Reste dû', `Les acomptes (${fmt(row.regle)}) sont déjà déclarés : la ligne déclarerait les ${fmt(row.solde_quittance)} que le client n’a pas encore payés.`];
+};
 const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 
 // Each journal: how its lines are read, keyed, pre-chosen, searched and comptabilisées.
@@ -200,7 +207,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
                 {kind === 'encaissement'
-                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th><th>Comptabilisé</th></>
+                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th><th>Statut</th></>
                   : <><th>N° sinistre / ristourne</th><th>Type</th><th>Date</th><th>N° contrat</th><th>Immatriculation</th><th className="cqi-number">Montant</th><th>Assuré</th><th>Chèque</th><th>Comptabilisé</th></>}
               </tr></thead>
               <tbody>{shown.map((row) => {
@@ -212,7 +219,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                     ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.a_s}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
                       <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}</td>
-                      <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td><td>{row.comptabilise ? 'Oui' : row.paye ? 'Non' : 'Non · impayée'}</td></>
+                      <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td><td title={receiptStatus(row)[1]}>{receiptStatus(row)[0]}</td></>
                     : <><td><strong>{row.numero}</strong></td><td>{row.nature === 'R' ? 'Ristourne' : 'Sinistre'}</td><td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.num_imat}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.assure}</td><td>{row.num_cheq}</td><td>{row.comptabilise ? `Oui · ${formatDate(row.date_comptabilise)}` : 'Non'}</td></>}
                 </tr>;
