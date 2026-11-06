@@ -12,6 +12,7 @@ const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximum
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
+const firstOfMonth = () => `${today().slice(0, 8)}01`;
 const sum = (rows, key) => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
 const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 
@@ -29,6 +30,8 @@ const KINDS = {
     amount: 'montant',
     // Every company is listed until one is chosen.
     allCompanies: true,
+    // Only the quittances with a client settlement, by default all of them or those settled between two dates.
+    settled: true,
   },
   depense: {
     title: 'Journal de dépense',
@@ -49,7 +52,14 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [compagnie, setCompagnie] = useState('');
-  const [date, setDate] = useState(today);
+  const [day, setDate] = useState(today);
+  const [between, setBetween] = useState(false); // encaissement: settled between debut and fin
+  const [debut, setDebut] = useState(firstOfMonth);
+  const [fin, setFin] = useState(today);
+  const reversed = between && Boolean(debut && fin && fin < debut);
+  // The journal date (JEQ N°, comptabilisation): the end of the interval, else the day chosen (today).
+  const date = config.settled && between ? fin : day;
+  const settledParams = config.settled ? { regles: true, debut: between ? debut : '', fin: between ? fin : '' } : {};
   const [nature, setNature] = useState(''); // dépense: '' | S | R
   const [showDone, setShowDone] = useState(false);
   const [search, setSearch] = useState('');
@@ -69,10 +79,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   }, [accessToken]);
 
   useEffect(() => {
-    if ((!compagnie && !config.allCompanies) || !date) { setState({ loading: false, error: '', items: [] }); return undefined; }
+    if ((!compagnie && !config.allCompanies) || !date || (between && (!debut || reversed))) { setState({ loading: false, error: '', items: [] }); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
-    config.load(accessToken, { compagnie, date, nature, comptabilises: showDone })
+    config.load(accessToken, { compagnie, date, nature, comptabilises: showDone, ...settledParams })
       .then((body) => {
         if (!active) return;
         const items = body.items || [];
@@ -81,7 +91,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
       })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [] }); });
     return () => { active = false; };
-  }, [accessToken, config, compagnie, date, nature, showDone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams is rebuilt from between / debut / fin
+  }, [accessToken, config, compagnie, date, nature, showDone, between, debut, fin, reversed]);
 
   useEffect(() => {
     const onKey = (event) => { if (event.key === 'Escape') { if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else onClose(); } };
@@ -129,7 +140,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         const result = await config.post(accessToken, Number(code), date, rows);
         count += result.comptabilisees;
       }
-      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true });
+      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true, ...settledParams });
       const items = body.items || [];
       setShowDone(true);
       setState({ loading: false, error: '', items });
@@ -160,7 +171,11 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               {companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.nom_compagnie}</option>)}
             </select>
           </label>
-          <label className="acompte-field jrn-date"><span>Date</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+          {config.settled ? <>
+            <label className="jrn-check"><input type="checkbox" checked={between} onChange={(event) => setBetween(event.target.checked)} />Entre deux dates</label>
+            <label className="acompte-field jrn-date"><span>Règlement du</span><input type="date" value={debut} onChange={(event) => setDebut(event.target.value)} disabled={!between} /></label>
+            <label className="acompte-field jrn-date"><span>au</span><input type="date" value={fin} onChange={(event) => setFin(event.target.value)} disabled={!between} /></label>
+          </> : <label className="acompte-field jrn-date"><span>Date</span><input type="date" value={day} onChange={(event) => setDate(event.target.value)} /></label>}
           {kind === 'depense' && <label className="acompte-field jrn-date"><span>S/R</span>
             <select value={nature} onChange={(event) => setNature(event.target.value)}>
               <option value="">Tous</option><option value="S">Sinistres</option><option value="R">Ristournes</option>
@@ -170,6 +185,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
           <label className="jrn-check"><input type="checkbox" checked={showDone} onChange={(event) => setShowDone(event.target.checked)} /> Comptabilisés du jour</label>
         </div>
 
+        {reversed && <div className="expert-error unpaid-error" role="alert">La date de fin précède la date de début.</div>}
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
         <section className="unpaid-results">
@@ -182,7 +198,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>
             </div>
           </div>
-          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune ligne à comptabiliser {allListed ? '' : 'pour cette compagnie '}à cette date.</div>
+          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune quittance réglée à comptabiliser {allListed ? '' : 'pour cette compagnie '}{config.settled && between ? 'entre ces deux dates' : 'à cette date'}.</div>
             : listed && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
