@@ -237,7 +237,9 @@ function byAdverseCompany(items, compagnies) {
 }
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
-export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '' }) {
+// policyNumber: a new claim on this policy (the "Saisir sinistre" step of a new client), its client and company filled.
+// onSaved(numero) runs once a claim is stored.
+export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '', policyNumber = '', onSaved }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
   const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], compagnies_adverses: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
@@ -454,6 +456,15 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     }
   }
 
+  // Opened on a policy (the new client's): the claim starts on it, its client, company, branch and risk filled.
+  useEffect(() => {
+    const number = String(policyNumber || '').trim();
+    if (!number) return;
+    setForm((value) => ({ ...value, Num_Int: number }));
+    fillFromPolicy({ numero: number });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [policyNumber]);
+
   // Client code typed: its name, then its policies; the most recent policy in force fills the police fields.
   async function fillFromClient() {
     const code = formRef.current.Code_Client.trim();
@@ -547,6 +558,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         : (await createSinistre(accessToken, payload)).numero;
       setReglement(null); // stored with the claim
       showToast(current ? `Sinistre N° ${numero} modifié avec succès.` : `Sinistre N° ${numero} créé avec succès.`);
+      onSaved?.(numero);
       if (reset === true) {
         autoNumber.current = '';
         setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setClientPolicies([]); setTab('sinistre');

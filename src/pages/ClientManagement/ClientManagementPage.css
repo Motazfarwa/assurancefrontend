@@ -362,3 +362,9 @@
 
 /* Rechercher looks like Modifier: green text with the green line under it */
 .client-view-tabs button:not(.client-new-button) { border-bottom-color: #278477; color: #1c756a; }
+
+/* Step 5 "Saisir sinistre": after the police and its quittance, a claim on that police, or the end of the flow */
+.client-claim-step { display: grid; gap: 10px; margin: 18px 28px; padding: 18px 20px; border: 1px solid #dce6e9; border-radius: 11px; background: #fbfcfc; color: #294553; font-size: 13px; }
+.client-claim-step h3 { margin: 0; color: #1c394b; font-size: 16px; }
+.client-claim-step p { margin: 0; }
+.client-claim-step .client-form-actions { position: static; margin: 6px 0 0; padding: 0; border: 0; box-shadow: none; background: none; }

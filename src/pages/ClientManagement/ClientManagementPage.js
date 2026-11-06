@@ -101,6 +101,10 @@ export default function ClientManagementPage({ modal = false }) {
   const [policyPrefill, setPolicyPrefill] = useState(null);
   // New client = one flow: identity (1), coordinates (2), then policy and first receipt (3, shown as steps 3 and 4).
   const [policyStep, setPolicyStep] = useState(1);
+  // Step 5 "Saisir sinistre" (step === 4): the police just stored, and whether its claim form is open.
+  const [savedPolicy, setSavedPolicy] = useState(null);
+  const [claimOpen, setClaimOpen] = useState(false);
+  const claimNumber = useRef('');
   const [prefillKey, setPrefillKey] = useState(0);
   const [flowStarted, setFlowStarted] = useState(false);
   const clientSavedRef = useRef(false);
@@ -179,8 +183,15 @@ export default function ClientManagementPage({ modal = false }) {
     setClients((current) => [...current.filter((item) => item.clientCode !== record.clientCode), record]);
   }
 
-  function handlePolicySaved() {
-    setSuccessToast(editingClient ? 'Client modifié, police et quittance enregistrées avec succès.' : 'Client, police et quittance enregistrés avec succès.');
+  // Police and quittance stored: step 5 proposes a claim on that police, or ends the flow.
+  function handlePolicySaved(result) {
+    setSavedPolicy(result || {});
+    changeStep(4);
+  }
+
+  function finishFlow(numeroSinistre = '') {
+    const done = editingClient ? 'Client modifié, police et quittance enregistrées' : 'Client, police et quittance enregistrés';
+    setSuccessToast(`${done}${numeroSinistre ? `, sinistre N° ${numeroSinistre} créé` : ''} avec succès.`);
   }
 
   function changeStep(nextStep) {
@@ -277,7 +288,7 @@ export default function ClientManagementPage({ modal = false }) {
           <span>Gérer pour ce client</span>
           {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
         </div>
-        <div className="client-form-progress" aria-label={`Étape ${step === 3 ? 2 + policyStep : step} sur 4`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div><><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step === 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : ''}><span>4</span><strong>Saisir quittance</strong></div></></div>
+        <div className="client-form-progress" aria-label={`Étape ${step === 4 ? 5 : step === 3 ? 2 + policyStep : step} sur 5`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div><><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step >= 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : step === 4 ? 'is-complete' : ''}><span>4</span><strong>Saisir quittance</strong></div><i /><div className={step === 4 ? 'is-active' : ''}><span>5</span><strong>Saisir sinistre</strong></div></></div>
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
         {step <= 2 && <form className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
           {step === 1 && <>
@@ -348,7 +359,19 @@ export default function ClientManagementPage({ modal = false }) {
             />
           </div>
         )}
+        {step === 4 && <div className="client-claim-step">
+          <h3>Saisir sinistre</h3>
+          <p>Police <b>{savedPolicy?.num_police || savedPolicy?.num_int || '—'}</b>{savedPolicy?.num_quittance ? <> et quittance <b>{savedPolicy.num_quittance}</b></> : null} enregistrées pour le client <b>{client.clientCode}</b>.</p>
+          <p>Le client a-t-il un sinistre à déclarer sur cette police ? Le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
+          <div className="client-form-actions">
+            <button type="button" className="client-secondary-button" onClick={() => finishFlow()}>Terminer sans sinistre</button>
+            <button type="button" className="client-primary-button" onClick={() => setClaimOpen(true)}>Saisir le sinistre →</button>
+          </div>
+        </div>}
       </section>
+      {claimOpen && <SinistreModal mode="new" moduleId="620" clientCode={client.clientCode} policyNumber={savedPolicy?.num_int || savedPolicy?.num_police || ''}
+        onSaved={(numero) => { claimNumber.current = numero; }}
+        onClose={() => { setClaimOpen(false); if (claimNumber.current) finishFlow(claimNumber.current); }} />}
       {/* Gestion sinistre: the claims module, its list on the client's claims */}
       {activeAction?.key === 'claim' && <SinistreModal moduleId={activeAction.module.id} clientCode={client.clientCode} onClose={() => setActiveAction(null)} />}
       {activeAction && activeAction.key !== 'claim' && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}
