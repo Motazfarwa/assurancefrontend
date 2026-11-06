@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { changePoliceClient, findClient, findPolice, renameNumber } from '../../services/reconciliationApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
@@ -103,20 +103,35 @@ export default function ReconciliationPoliceModal({ moduleId, onClose }) {
     return () => { active = false; clearTimeout(timer); };
   }, [accessToken, newCode]);
 
+  // Only the answer to the latest search is shown (the N° police is searched as it is typed).
+  const searchId = useRef(0);
+
   async function search(number = numero, notice = '') {
     const value = number.trim();
-    if (!value) return;
+    const id = ++searchId.current;
+    if (!value) { setPolices([]); setState({ loading: false, error: '', notice: '', searched: '' }); return; }
     setState({ loading: true, error: '', notice, searched: value });
     try {
       const { items = [] } = await findPolice(accessToken, value);
+      if (id !== searchId.current) return;
       setPolices(items);
       setSelected(0);
       setChosen(new Set((items[0]?.quittances || []).map((row) => row.num_quittance)));
       setState({ loading: false, error: items.length ? '' : `Aucune police N° ${value}.`, notice, searched: value });
     } catch (requestError) {
+      if (id !== searchId.current) return;
       setPolices([]);
       setState({ loading: false, error: requestError.message, notice: '', searched: value });
     }
+  }
+
+  // The police and its client show as the N° is typed (a short pause after the last key).
+  const typingTimer = useRef(null);
+  useEffect(() => () => clearTimeout(typingTimer.current), []);
+  function typeNumero(value) {
+    setNumero(value);
+    clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => search(value), 350);
   }
 
   function choosePolice(index) {
@@ -163,9 +178,8 @@ export default function ReconciliationPoliceModal({ moduleId, onClose }) {
         <div className="rcn-top"><button type="button" className="expert-cancel" onClick={() => setRenaming(true)}>Mise à jour Police Quittance Attestation</button></div>
 
         <h4 className="rcn-section">Information police</h4>
-        <form className="unpaid-filter-form acompte-filters" onSubmit={(event) => { event.preventDefault(); search(); }}>
-          <label className="acompte-field jrn-company"><span>N° Police</span><input value={numero} onChange={(event) => setNumero(event.target.value)} maxLength={30} autoFocus /></label>
-          <button type="submit" className="expert-submit jrn-open" disabled={!numero.trim() || state.loading}>{state.loading ? 'Recherche…' : 'Rechercher'}</button>
+        <form className="unpaid-filter-form acompte-filters" onSubmit={(event) => { event.preventDefault(); clearTimeout(typingTimer.current); search(); }}>
+          <label className="acompte-field jrn-company"><span>N° Police{state.loading ? ' · recherche…' : ''}</span><input value={numero} onChange={(event) => typeNumero(event.target.value)} maxLength={30} autoFocus /></label>
           {polices.length > 1 && <label className="acompte-field jrn-company"><span>{polices.length} polices portent ce N°</span>
             <select value={selected} onChange={(event) => choosePolice(Number(event.target.value))}>
               {polices.map((item, index) => <option key={item.num_int} value={index}>{item.num_police} · {item.nom_compagnie || '—'} · client {item.code_client}</option>)}

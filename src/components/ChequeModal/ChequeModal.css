@@ -27,6 +27,12 @@
 .chq-error { border: 1px solid #f1cccc; background: #fff7f7; color: #b34747; }
 .chq-notice { border: 1px solid #cfe6df; background: #f3faf8; color: #1d6b62; }
 .chq-table-head { display: flex; align-items: center; justify-content: space-between; color: #1d4f7a; font-size: 13px; }
+.chq-table-head .chq-tool { margin-left: auto; }
+.chq-table-head { flex-wrap: wrap; gap: 8px 18px; }
+.chq-due { display: flex; flex-wrap: wrap; gap: 14px; color: #263d4f; font-size: 12px; font-weight: 600; }
+.chq-due label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.chq-due input { accent-color: #208477; }
+.chq-due-note { color: #a0611c; font-size: 11px; }
 /* The quittances take all the height the form leaves, never less than about 8 rows */
 .chq-body > * { flex-shrink: 0; }
 .chq-table-wrap { flex: 1 0 300px; min-height: 300px; overflow: auto; border: 1px solid #cfdde3; border-radius: 8px; }

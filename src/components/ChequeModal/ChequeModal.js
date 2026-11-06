@@ -32,6 +32,7 @@ export default function ChequeModal({ onClose }) {
   const [code, setCode] = useState('');
   const [client, setClient] = useState(null);
   const [quittances, setQuittances] = useState([]);
+  const [due, setDue] = useState('toutes'); // quittances shown: toutes, échues (échéance passed) or non échues
   const [pieces, setPieces] = useState([]);
   const [form, setForm] = useState(blankForm);
   const [alloc, setAlloc] = useState({});
@@ -111,9 +112,17 @@ export default function ChequeModal({ onClose }) {
   const allocated = useMemo(() => Object.values(alloc).reduce((sum, value) => sum + num(value), 0), [alloc]);
   const solde = Math.max(0, num(form.montant) - allocated);
   const bankName = banks.find((bank) => bank.code_banque === form.code_banque)?.nom_banque || '';
-  const totals = useMemo(() => quittances.reduce((sum, row) => ({
+  // A quittance is échue once its échéance is today or past.
+  const shown = useMemo(() => {
+    if (due === 'toutes') return quittances;
+    const day = today();
+    return quittances.filter((row) => (String(row.echeance || '').slice(0, 10) <= day) === (due === 'echues'));
+  }, [quittances, due]);
+  // Amounts typed on quittances the filter hides still go with the piece.
+  const hiddenAllocated = allocated - shown.reduce((sum, row) => sum + num(alloc[row.num_quittance]), 0);
+  const totals = useMemo(() => shown.reduce((sum, row) => ({
     solde: sum.solde + Number(row.solde), instance: sum.instance + Number(row.instance), montant: sum.montant + num(alloc[row.num_quittance]),
-  }), { solde: 0, instance: 0, montant: 0 }), [quittances, alloc]);
+  }), { solde: 0, instance: 0, montant: 0 }), [shown, alloc]);
 
   function change(patch) {
     setForm((current) => ({ ...current, ...patch }));
@@ -147,11 +156,11 @@ export default function ChequeModal({ onClose }) {
     change({ typep, nump: proposal });
   }
 
-  // Spreads the amount over the oldest receipts first.
+  // Spreads the amount over the oldest receipts shown first.
   function autoSpread() {
     let left = num(form.montant);
     const next = {};
-    quittances.forEach((row) => {
+    shown.forEach((row) => {
       const available = Number(row.solde) - Number(row.instance);
       const part = Math.max(0, Math.min(left, available));
       if (part > 0) next[row.num_quittance] = part.toFixed(3);
@@ -368,14 +377,23 @@ export default function ChequeModal({ onClose }) {
 
           {error && <p className="chq-error" role="alert">{error}</p>}
           {notice && !error && <p className="chq-notice" role="status">{notice}</p>}
-          <div className="chq-table-head"><strong>QUITTANCES</strong><button type="button" className="chq-tool" onClick={autoSpread} disabled={!client || num(form.montant) <= 0}>Répartir automatiquement</button></div>
+          <div className="chq-table-head">
+            <strong>QUITTANCES</strong>
+            <div className="chq-due" role="radiogroup" aria-label="Quittances affichées">
+              {[['toutes', 'Toutes'], ['echues', 'Échues'], ['non-echues', 'Non échues']].map(([value, label]) => (
+                <label key={value}><input type="radio" name="chq-due" checked={due === value} onChange={() => setDue(value)} />{label}</label>
+              ))}
+            </div>
+            {hiddenAllocated > 0.0005 && <span className="chq-due-note">{money(hiddenAllocated)} réparti sur des quittances masquées</span>}
+            <button type="button" className="chq-tool" onClick={autoSpread} disabled={!client || num(form.montant) <= 0 || !shown.length}>Répartir automatiquement</button>
+          </div>
           <div className="chq-table-wrap">
             <table className="chq-table">
               <thead><tr><th>N° Police</th><th>Échéance</th><th>N° Quittance</th><th>Solde Quittance</th><th>Traite/Chèque</th><th>Reste à régler</th><th>Montant</th></tr></thead>
               <tbody>
-                {quittances.length === 0 ? (
-                  <tr><td colSpan={7} className="chq-empty">{client ? 'Aucune quittance impayée pour ce client.' : 'Saisissez un code client pour afficher ses quittances impayées.'}</td></tr>
-                ) : quittances.map((row) => {
+                {shown.length === 0 ? (
+                  <tr><td colSpan={7} className="chq-empty">{!client ? 'Saisissez un code client pour afficher ses quittances impayées.' : quittances.length ? `Aucune quittance impayée ${due === 'echues' ? 'échue' : 'non échue'} pour ce client.` : 'Aucune quittance impayée pour ce client.'}</td></tr>
+                ) : shown.map((row) => {
                   const reste = Number(row.solde) - Number(row.instance) - num(alloc[row.num_quittance]);
                   return (
                     <tr key={row.num_quittance}>
@@ -389,7 +407,7 @@ export default function ChequeModal({ onClose }) {
                     </tr>
                   );
                 })}
-                {quittances.length > 0 && (
+                {shown.length > 0 && (
                   <tr className="chq-totals"><td colSpan={3}>TOTAUX</td><td className="chq-number">{money(totals.solde)}</td><td className="chq-number">{money(totals.instance)}</td><td className="chq-number">{money(totals.solde - totals.instance - totals.montant)}</td><td className="chq-number">{money(totals.montant)}</td></tr>
                 )}
               </tbody>

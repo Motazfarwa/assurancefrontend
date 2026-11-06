@@ -131,7 +131,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
         </div>
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
         {reversed && <div className="expert-error unpaid-error" role="alert">La date de fin précède la date de début.</div>}
-        <p className="jrn-hint">Quittances d’échéance dans la période : prime, ristourne (quittances de ristourne), règlements reçus du client et commission. Sinistre : sinistres payés au client dans la période.</p>
+        <p className="jrn-hint">Quittances d’échéance dans la période, sauf les quittances retournées à la compagnie : prime, ristourne (quittances de ristourne), règlements reçus du client et commission. Sinistre : sinistres payés au client dans la période.</p>
       </div>
     </section>
     {report && <NewWindow popup={report.popup} title="Etat des comptes client" onClose={() => setReport(null)}>
