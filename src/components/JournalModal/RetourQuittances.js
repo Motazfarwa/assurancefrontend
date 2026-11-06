@@ -19,8 +19,9 @@ const previousMonth = () => {
 };
 const toPeriode = (month) => (/^\d{4}-\d{2}$/.test(month) ? `${month.slice(5)}/${month.slice(0, 4)}` : '');
 
-// Module "Retour": the quittances of a company, type and period; ticking « Retour » gives the quittance back to the
-// company (its return date is saved), unticking takes the return back.
+// Module "Retour": the quittances of a type and period, of every company or one; ticking « Retour » gives the quittance
+// back to the company (its return date is saved), unticking takes the return back. "Retournées seulement" lists the
+// quittances returned during the period's month.
 export default function RetourQuittancesModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
@@ -43,7 +44,7 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!company || !periode) { setState({ loading: false, error: '', items: [] }); return undefined; }
+    if (!periode) { setState({ loading: false, error: '', items: [] }); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
     listReturns(accessToken, { code_compagnie: company, tc, periode, retournees: onlyReturned })
@@ -88,7 +89,7 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
         <div className="unpaid-filter-form acompte-filters">
           <label className="acompte-field jrn-company"><span>Compagnie</span>
             <select value={company} onChange={(event) => setCompany(event.target.value)} autoFocus>
-              <option value="">Choisir…</option>
+              <option value="">Toutes</option>
               {companies.map((item) => <option key={item.code_compagnie} value={item.code_compagnie}>{item.nom_compagnie}</option>)}
             </select>
           </label>
@@ -96,22 +97,22 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
             <select value={tc} onChange={(event) => setTc(event.target.value)}><option value="C">Comptant</option><option value="T">Terme</option></select>
           </label>
           <label className="acompte-field jrn-date"><span>Période</span><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label>
-          <label className="jrn-check"><input type="checkbox" checked={onlyReturned} onChange={(event) => setOnlyReturned(event.target.checked)} />Retournées seulement</label>
+          <label className="jrn-check"><input type="checkbox" checked={onlyReturned} onChange={(event) => setOnlyReturned(event.target.checked)} />Retournées dans la période</label>
         </div>
 
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
         <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>QUITTANCES {tc === 'C' ? 'COMPTANT' : 'TERME'} DE LA PÉRIODE {periode} · COCHEZ « RETOUR » POUR LES RETOURNER À LA COMPAGNIE</span>
-              <h3>{state.loading ? 'Chargement…' : company ? `${state.items.length} quittance${state.items.length > 1 ? 's' : ''} · ${returned.length} retournée${returned.length > 1 ? 's' : ''}` : 'Choisissez la compagnie'}</h3></div>
+            <div><span>{onlyReturned ? `QUITTANCES ${tc === 'C' ? 'COMPTANT' : 'TERME'} RETOURNÉES EN ${periode}` : `QUITTANCES ${tc === 'C' ? 'COMPTANT' : 'TERME'} DE LA PÉRIODE ${periode} · COCHEZ « RETOUR » POUR LES RETOURNER À LA COMPAGNIE`}</span>
+              <h3>{state.loading ? 'Chargement…' : `${state.items.length} quittance${state.items.length > 1 ? 's' : ''} · ${returned.length} retournée${returned.length > 1 ? 's' : ''}`}</h3></div>
             <div className="unpaid-total"><small>Total retourné</small><strong>{fmt(total)} TND</strong></div>
           </div>
-          {company && !state.loading && state.items.length === 0 ? <div className="unpaid-empty">Aucune quittance {onlyReturned ? 'retournée ' : ''}pour cette compagnie et cette période.</div>
-            : company && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table jrn-return-table">
-              <thead><tr><th>N° Police</th><th>Code Clt</th><th>Nom Client</th><th>Echéance</th><th>N° Quit.</th><th className="cqi-number">P.Net</th><th className="cqi-number">Com.</th><th className="cqi-number">P.Total</th><th className="cqi-number">Solde</th><th className="cqi-verser">Retour</th></tr></thead>
+          {!state.loading && state.items.length === 0 ? <div className="unpaid-empty">{onlyReturned ? `Aucune quittance retournée en ${periode}` : `Aucune quittance de la période ${periode}`}{company ? ' pour cette compagnie' : ''}.</div>
+            : <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table jrn-return-table">
+              <thead><tr>{!company && <th>Compagnie</th>}<th>N° Police</th><th>Code Clt</th><th>Nom Client</th><th>Echéance</th>{onlyReturned && <th>Période</th>}<th>N° Quit.</th><th className="cqi-number">P.Net</th><th className="cqi-number">Com.</th><th className="cqi-number">P.Total</th><th className="cqi-number">Solde</th><th className="cqi-verser">Retour</th></tr></thead>
               <tbody>{state.items.map((row) => <tr key={`${row.num_police}-${row.num_quittance}`} className={row.date_retour ? 'is-returned' : undefined}>
-                <td>{row.num_police}</td><td>{row.code_client}</td><td>{row.nom_client}</td><td>{formatDate(row.echeance)}</td><td>{row.num_quittance}</td>
+                {!company && <td>{row.nom_compagnie}</td>}<td>{row.num_police}</td><td>{row.code_client}</td><td>{row.nom_client}</td><td>{formatDate(row.echeance)}</td>{onlyReturned && <td>{row.periode}</td>}<td>{row.num_quittance}</td>
                 <td className="cqi-number">{fmt(row.prime_net)}</td><td className="cqi-number">{fmt(row.commission)}</td><td className="cqi-number">{fmt(row.prime_total)}</td><td className="cqi-number">{fmt(row.solde_quittance)}</td>
                 <td className="cqi-verser"><input type="checkbox" aria-label={`Retour de la quittance ${row.num_quittance}`} checked={Boolean(row.date_retour)} disabled={Boolean(saving)} onChange={(event) => toggle(row, event.target.checked)} />
                   {row.date_retour && <small>{formatDate(row.date_retour)}</small>}</td>

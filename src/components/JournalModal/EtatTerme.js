@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { listCompanies } from '../../services/companyApi';
+import { isBordereauCompany, listCompanies } from '../../services/companyApi';
 import { getTermStatement } from '../../services/journalApi';
 import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
@@ -68,7 +68,8 @@ export default function EtatTermeModal({ moduleId, onClose }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((result) => { if (active) setCompanies(Array.isArray(result) ? result : result.items || []); })
+      // Without STAR, MAE, SALIM, EUROP ASSISTANCE and EL AMANA TAKAFUL, as in Réception comptant.
+      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(isBordereauCompany)); })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);
