@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { isBordereauCompany, listCompanies } from '../../services/companyApi';
-import { cancelFusion, fuseBordereau, getConfrontation, monthToPeriode, nextMonth } from '../../services/bordereauApi';
+import { cancelFusion, fuseBordereau, getConfrontation, listBordereauPeriodes, monthToPeriode, nextMonth } from '../../services/bordereauApi';
 import { money, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
 export default function BordereauFusionModal({ onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
-  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: nextMonth() });
+  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', periode: '' });
+  // Periods that really have a bordereau for the chosen company (null while they load).
+  const [periodes, setPeriodes] = useState([]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const periode = monthToPeriode(form.month);
+  const { periode } = form;
+  const companyName = companies.find((company) => String(company.code_compagnie) === String(form.code_compagnie))?.nom_compagnie || '';
 
   useEffect(() => {
     let active = true;
@@ -23,18 +26,36 @@ export default function BordereauFusionModal({ onClose }) {
     return () => { active = false; };
   }, [accessToken]);
 
+  // The periods offered are the ones with a bordereau: the coming term when it has one, otherwise the most recent.
+  useEffect(() => {
+    if (!form.code_compagnie) { setPeriodes([]); return undefined; }
+    let active = true;
+    setPeriodes(null);
+    listBordereauPeriodes(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc })
+      .then((rows) => {
+        if (!active) return;
+        setPeriodes(rows);
+        const coming = monthToPeriode(nextMonth());
+        const chosen = rows.find((row) => row.periode === coming) || rows[0];
+        setForm((current) => ({ ...current, periode: chosen ? chosen.periode : '' }));
+      })
+      .catch((requestError) => { if (active) { setPeriodes([]); setError(requestError.message); } });
+    return () => { active = false; };
+  }, [accessToken, form.code_compagnie, form.tc]);
+
   // Any change of the selection invalidates the displayed verification.
   function change(patch) {
     setForm((current) => ({ ...current, ...patch }));
     setResult(null);
     setNotice('');
+    setError('');
   }
 
   async function verify() {
     setError('');
     setNotice('');
     if (!form.code_compagnie) { setError('Choisissez la compagnie.'); return; }
-    if (!periode) { setError('Choisissez la période (mois).'); return; }
+    if (!periode) { setError(`Aucun bordereau enregistré pour ${companyName || 'cette compagnie'}.`); return; }
     setLoading(true);
     try {
       setResult(await getConfrontation(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc, periode }));
@@ -99,13 +120,25 @@ export default function BordereauFusionModal({ onClose }) {
           <label>TC
             <select value="T" disabled><option value="T">Terme</option></select>
           </label>
-          <label>Période<input type="month" value={form.month} onChange={(event) => change({ month: event.target.value })} /></label>
-          <button type="button" className="bd-tool" onClick={verify} disabled={loading}>{loading ? 'Vérification…' : 'Vérifier le bordereau'}</button>
+          <label>Période
+            <select value={periode} onChange={(event) => change({ periode: event.target.value })} disabled={!form.code_compagnie || !periodes?.length}>
+              {!form.code_compagnie && <option value="">Choisissez la compagnie</option>}
+              {periodes === null && <option value="">Chargement…</option>}
+              {form.code_compagnie && periodes?.length === 0 && <option value="">Aucun bordereau</option>}
+              {(periodes || []).map((row) => (
+                <option key={row.periode} value={row.periode}>{row.periode} · {row.nb_lignes} ligne(s){row.fusionne ? ' · fusionné' : ''}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="bd-tool" onClick={verify} disabled={loading || !periode}>{loading ? 'Vérification…' : 'Vérifier le bordereau'}</button>
         </div>
 
         {error && <p className="bd-error" role="alert">{error}</p>}
         {notice && !error && <p className="bd-notice" role="status">{notice}</p>}
-        {!result && !error && <p className="bd-notice">Choisissez la compagnie et la période : le bordereau reçu est comparé avec vos polices et quittances, puis vous pouvez le fusionner. La fusion marque le bordereau comme traité ; vos polices et quittances ne sont pas modifiées.</p>}
+        {form.code_compagnie && periodes?.length === 0 && !error && (
+          <p className="bd-error" role="status">Aucun bordereau enregistré pour {companyName || 'cette compagnie'} (terme). Importez-le d'abord (Réception terme).</p>
+        )}
+        {!result && !error && !(form.code_compagnie && periodes?.length === 0) && <p className="bd-notice">Choisissez la compagnie et la période : le bordereau reçu est comparé avec vos polices et quittances, puis vous pouvez le fusionner. La fusion marque le bordereau comme traité ; vos polices et quittances ne sont pas modifiées.</p>}
 
         {result && (
           <div className="bd-report">

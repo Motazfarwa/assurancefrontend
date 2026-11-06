@@ -36,6 +36,8 @@ export const listQuittances = (token, { tc, periode, annee, code_compagnie, comp
 // Validates a comptant quittance in a period ('' takes the validation back); avant = the period it has now.
 export const setQuittancePeriode = (token, { num_quittance, num_int, periode, avant }) => request('/api/bordereaux/quittances/periode', token, { method: 'PUT', body: JSON.stringify({ num_quittance, num_int, periode, avant }) });
 export const getConfrontation =(token, params) => request(`/api/bordereaux/confrontation?${query(params)}`, token);
+// Periods that have a bordereau for a company and T/C, most recent first: [{ periode, nb_lignes, fusionne }].
+export const listBordereauPeriodes = (token, { code_compagnie, tc }) => request(`/api/bordereaux/periodes?${query({ code_compagnie, tc })}`, token);
 
 // "2026-11" (month input) <-> "11/2026" (period stored with the bordereau)
 export const monthToPeriode = (month) => (/^\d{4}-\d{2}$/.test(month) ? `${month.slice(5)}/${month.slice(0, 4)}` : '');
