@@ -56,6 +56,8 @@ const KINDS = {
     preselect: () => true,
     text: (row) => `${row.numero || ''} ${row.num_police || ''} ${row.num_imat || ''} ${row.assure || ''} ${row.num_cheq || ''}`,
     amount: 'montant',
+    // As the legacy journal: the dépenses comptabilisées on the date are listed (and printed) from the start.
+    showDone: true,
   },
 };
 
@@ -70,7 +72,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   // Encaissement: only the quittances a client paid something on (a règlement date and Réglé > 0).
   const settledParams = config.settled ? { regles: true } : {};
   const [nature, setNature] = useState(''); // dépense: '' | S | R
-  const [showDone, setShowDone] = useState(false);
+  const [showDone, setShowDone] = useState(Boolean(config.showDone));
   const [search, setSearch] = useState('');
   const [state, setState] = useState({ loading: false, error: '', items: [] });
   const [chosen, setChosen] = useState(() => new Set());
