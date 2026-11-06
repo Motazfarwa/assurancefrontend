@@ -25,8 +25,15 @@ const EXCLUDED_COMPANIES = new Set(['BIAT']);
 export const isOfferedCompany = (company) => !EXCLUDED_COMPANIES.has(String(company?.nom_compagnie || '').trim().toUpperCase());
 // Companies whose bordereaux are not handled by the agency (fusion, réception comptant), by name, spaces and case ignored.
 const NO_BORDEREAU_COMPANIES = new Set(['STAR', 'MAE', 'SALIM', 'EL AMANA TAKAFUL', 'EUROP ASSISTANCE', 'EUROPE ASSISTANCE']);
-export const isBordereauCompany = (company) => isOfferedCompany(company)
-  && !NO_BORDEREAU_COMPANIES.has(String(company?.nom_compagnie || '').trim().replace(/\s+/g, ' ').toUpperCase());
+const withoutStatement = (company) => !NO_BORDEREAU_COMPANIES.has(String(company?.nom_compagnie || '').trim().replace(/\s+/g, ' ').toUpperCase());
+export const isBordereauCompany = (company) => isOfferedCompany(company) && withoutStatement(company);
+// The same five companies left out of the états' company choice (Etat des comptes client); every other one is kept.
+export const isStatementCompany = withoutStatement;
+
+// Companies whose terme bordereau is not received (Réception terme), by name, spaces and case ignored.
+const NO_TERME_COMPANIES = new Set(['STAR', 'MAE', 'SALIM', 'EUROP ASSISTANCE', 'EUROPE ASSISTANCE']);
+export const isTermeCompany = (company) => isOfferedCompany(company)
+  && !NO_TERME_COMPANIES.has(String(company?.nom_compagnie || '').trim().replace(/\s+/g, ' ').toUpperCase());
 
 export function listCompanies(token) { return request('/api/compagnies', token); }
 export function createCompany(token, values) {

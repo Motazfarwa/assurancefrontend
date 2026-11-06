@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { isBordereauCompany, isOfferedCompany, listCompanies } from '../../services/companyApi';
+import { isBordereauCompany, isTermeCompany, listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
 import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau, setQuittancePeriode } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
@@ -76,7 +76,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(kind.quittances ? isBordereauCompany : isOfferedCompany)); })
+      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(kind.quittances ? isBordereauCompany : isTermeCompany)); })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken, kind.quittances]);
@@ -308,7 +308,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
               {companies.map((company) => <option key={company.code_compagnie} value={company.code_compagnie}>{company.nom_compagnie}</option>)}
             </select>
           </label>
-          <label>Date réception<input type="date" value={form.date_reception} onChange={(event) => setForm((current) => ({ ...current, date_reception: event.target.value }))} /></label>
+          <label>Date réception<input type="date" value={form.date_reception} readOnly title="Date de réception : le jour de l’enregistrement (celle du bordereau quand il est déjà reçu)" /></label>
           <label>TC
             <select value={form.tc} disabled><option value={form.tc}>{kind.label}</option></select>
           </label>

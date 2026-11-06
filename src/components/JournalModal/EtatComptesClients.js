@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { listCompanies } from '../../services/companyApi';
+import { isStatementCompany, listCompanies } from '../../services/companyApi';
 import { getClientAccounts } from '../../services/journalApi';
 import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
@@ -71,7 +71,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
   useEffect(() => {
     let active = true;
     listCompanies(accessToken)
-      .then((result) => { if (active) setCompanies(Array.isArray(result) ? result : result.items || []); })
+      .then((result) => { if (active) setCompanies((Array.isArray(result) ? result : result.items || []).filter(isStatementCompany)); })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);

@@ -20,7 +20,7 @@ const blank = () => ({
 const toForm = (item) => ({
   num_ristourne: item.num_ristourne || '', num_police: item.num_police || item.num_int || '',
   date_du: day(item.date_du), date_au: day(item.date_au), date_saisie: day(item.date_saisie),
-  nette: item.nette ?? '', decommission: item.decommission ?? '', detaxe: item.detaxe ?? '',
+  nette: item.nette ?? '', decommission: item.decommission ?? '', detaxe: item.detaxe ?? '', totale: item.totale ?? '',
   observation: item.observation || '', informations: item.informations || '',
 });
 
@@ -232,7 +232,10 @@ export default function RistourneModal({ moduleId, onClose }) {
             {field('nette', 'Ristourne nette (DT)', { type: 'number', step: '0.001', min: 0, required: true })}
             {field('decommission', 'Décommission (DT)', { type: 'number', step: '0.001', min: 0 })}
             {field('detaxe', 'Détaxe (DT)', { type: 'number', step: '0.001', min: 0 })}
-            {shown('Ristourne totale (DT)', current || editing ? fmt(totale) : '')}
+            {/* The Prime Totale of the company's document; left empty, it is nette + détaxe. */}
+            {editing ? <label className="catalog-field" key="totale"><span>Ristourne totale (DT)</span>
+              <input name="totale" type="number" step="0.001" min={0} value={form.totale ?? ''} onChange={change} placeholder={fmt(round3(Number(form.nette || 0) + Number(form.detaxe || 0)))} title="Prime totale du document ; vide : nette + détaxe" />
+            </label> : shown('Ristourne totale (DT)', current ? fmt(totale) : '')}
             {shown('Solde ristourne (DT)', current || editing ? fmt(solde) : '')}
             <span />
             <label className="catalog-field rst-full"><span>Observation</span><input name="observation" value={form.observation} onChange={change} readOnly={!editing} maxLength={50} /></label>
