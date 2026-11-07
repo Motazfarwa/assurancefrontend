@@ -88,6 +88,9 @@
 .jrn-sheet-table td.jrn-center { text-align: center; }
 .jrn-terme-table tr.is-temporary td { background: #fff4dd; font-style: italic; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
+.jrn-terme-table tr.jrn-terme-branch td { background: #e8f1f1; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.jrn-terme-table tr.is-round-age td { background: #ff6b6b; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
 /* Recodification de client */
 .rcn-top { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 .rcn-top button { min-height: 36px; padding: 0 14px; font: inherit; font-size: 10px; font-weight: 650; }
