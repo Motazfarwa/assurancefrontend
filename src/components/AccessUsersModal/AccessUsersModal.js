@@ -97,7 +97,7 @@ export default function AccessUsersModal({ onClose }) {
               <label className="catalog-check"><input type="checkbox" checked={!draft} onChange={(event) => setDraft(event.target.checked ? null : new Set(ALL))} />Tous les modules (y compris les futurs)</label>
             </div>
             {MODULE_CATEGORIES.map((category) => {
-              const modules = INSURANCE_MODULES.filter((module) => module.category === category.id);
+              const modules = INSURANCE_MODULES.filter((module) => module.category === category.id && !module.visibleToAll); // visibleToAll: never restricted, nothing to tick
               if (!modules.length) return null;
               const ids = modules.map((module) => module.id);
               const count = ids.filter((id) => chosen.has(id)).length;

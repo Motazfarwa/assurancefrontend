@@ -101,7 +101,8 @@ export default function ClientManagementPage({ modal = false }) {
   const [policyPrefill, setPolicyPrefill] = useState(null);
   // New client = one flow: identity (1), coordinates (2), then policy and first receipt (3, shown as steps 3 and 4).
   const [policyStep, setPolicyStep] = useState(1);
-  // Step 5 "Saisir sinistre" (step === 4): the police just stored, and whether its claim form is open.
+  // Step 5 "Saisir sinistre" (step === 4), where the whole flow is stored: the police once stored, and whether its claim form is open.
+  const policySaveRef = useRef(null);
   const [savedPolicy, setSavedPolicy] = useState(null);
   const [claimOpen, setClaimOpen] = useState(false);
   const claimNumber = useRef('');
@@ -183,10 +184,16 @@ export default function ClientManagementPage({ modal = false }) {
     setClients((current) => [...current.filter((item) => item.clientCode !== record.clientCode), record]);
   }
 
-  // Police and quittance stored: step 5 proposes a claim on that police, or ends the flow.
-  function handlePolicySaved(result) {
-    setSavedPolicy(result || {});
-    changeStep(4);
+  // Last step: stores the client, its police and quittance. The claim form needs the stored police, so it opens afterwards.
+  async function saveWholeFlow(withClaim) {
+    setSaving(true);
+    const result = await policySaveRef.current?.();
+    setSaving(false);
+    if (!result) { changeStep(3); return; } // the error is shown on the receipt form
+    setSavedPolicy(result);
+    if (result.fleet) return; // its vehicles window is open: the step's buttons remain for afterwards
+    if (withClaim) setClaimOpen(true);
+    else finishFlow();
   }
 
   function finishFlow(numeroSinistre = '') {
@@ -354,19 +361,30 @@ export default function ClientManagementPage({ modal = false }) {
               onStepChange={handlePolicyStep}
               onClose={() => changeStep(2)}
               beforeSave={createClientBeforePolicy}
-              onSaved={handlePolicySaved}
-              finalLabel={editingClient ? 'Enregistrer le client et la police' : 'Créer le client'}
+              saveRef={policySaveRef}
+              onReceiptReady={() => changeStep(4)}
+              finalLabel="Suivant : sinistre →"
             />
           </div>
         )}
         {step === 4 && <div className="client-claim-step">
           <h3>Saisir sinistre</h3>
-          <p>Police <b>{savedPolicy?.num_police || savedPolicy?.num_int || '—'}</b>{savedPolicy?.num_quittance ? <> et quittance <b>{savedPolicy.num_quittance}</b></> : null} enregistrées pour le client <b>{client.clientCode}</b>.</p>
-          <p>Le client a-t-il un sinistre à déclarer sur cette police ? Le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
-          <div className="client-form-actions">
-            <button type="button" className="client-secondary-button" onClick={() => finishFlow()}>Terminer sans sinistre</button>
-            <button type="button" className="client-primary-button" onClick={() => setClaimOpen(true)}>Saisir le sinistre →</button>
-          </div>
+          {savedPolicy ? <>
+            <p>Police <b>{savedPolicy.num_police || savedPolicy.num_int || '—'}</b>{savedPolicy.num_quittance ? <> et quittance <b>{savedPolicy.num_quittance}</b></> : null} enregistrées pour le client <b>{client.clientCode}</b>.</p>
+            <p>Le client a-t-il un sinistre à déclarer sur cette police ? Le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
+            <div className="client-form-actions">
+              <button type="button" className="client-secondary-button" onClick={() => finishFlow()}>Terminer sans sinistre</button>
+              <button type="button" className="client-primary-button" onClick={() => setClaimOpen(true)}>Saisir le sinistre →</button>
+            </div>
+          </> : <>
+            <p>Dernière étape : le client <b>{client.clientCode}</b>, sa police et sa quittance ne sont pas encore enregistrés.</p>
+            <p>Le client a-t-il un sinistre à déclarer sur cette police ? Après l’enregistrement, le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
+            <div className="client-form-actions">
+              <button type="button" className="client-secondary-button" disabled={saving} onClick={() => changeStep(3)}>← Précédent</button>
+              <button type="button" className="client-secondary-button" disabled={saving} onClick={() => saveWholeFlow(false)}>{saving ? 'Enregistrement…' : 'Enregistrer sans sinistre'}</button>
+              <button type="button" className="client-primary-button" disabled={saving} onClick={() => saveWholeFlow(true)}>{saving ? 'Enregistrement…' : 'Enregistrer et saisir le sinistre →'}</button>
+            </div>
+          </>}
         </div>}
       </section>
       {claimOpen && <SinistreModal mode="new" moduleId="620" clientCode={client.clientCode} policyNumber={savedPolicy?.num_int || savedPolicy?.num_police || ''}

@@ -22,7 +22,7 @@ async function request(path, accessToken, options = {}) {
   return body;
 }
 
-// Réconciliation de police (administrator): the police(s) of a number, with their quittances not yet comptabilisées.
+// Recodification de client (administrator): the police(s) of a number, with their quittances not yet comptabilisées.
 export const findPolice = (token, numero) => request(`/api/reconciliation/police?${new URLSearchParams({ numero })}`, token);
 export const findClient = (token, code) => request(`/api/reconciliation/client/${encodeURIComponent(code)}`, token);
 // The police goes to the new client with the chosen quittances.

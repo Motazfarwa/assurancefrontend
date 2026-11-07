@@ -205,9 +205,10 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
     };
 }
 
-// embedded: used as steps 3 and 4 of the "new client" flow. beforeSave runs first (it creates the client) and onSaved
-// runs once the policy and its first receipt are stored.
-export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onSaved, finalLabel = "Soumettre" }) {
+// embedded: used as steps 3 and 4 of the "new client" flow. "Suivant" on the receipt calls onReceiptReady without storing
+// anything; the last step stores everything through saveRef. beforeSave runs first (it creates the client). saveRef.current()
+// resolves to the stored result, with `fleet` when a fleet window opened, or to null with the error shown on the receipt.
+export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onReceiptReady, saveRef, finalLabel = "Soumettre" }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
@@ -431,8 +432,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     }
 
     async function save(e) {
-        e.preventDefault();
-        if (!isCreate || step !== 2 || saved) return;
+        e?.preventDefault();
+        if (!isCreate || step !== 2 || saved) return null;
         setError("");
         setMessage("");
 
@@ -490,17 +491,27 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             }
             setSaved(true);
             setMessage(`Police ${result.num_police} enregistrée. Quittance : ${result.num_quittance}`);
-            if (values.flotte && result.num_int) { setFleetNumInt(String(result.num_int)); setFleetOpen(true); }
-            if (onSaved) onSaved(result);
+            const fleet = Boolean(values.flotte && result.num_int);
+            if (fleet) { setFleetNumInt(String(result.num_int)); setFleetOpen(true); }
+            return { ...result, fleet };
         } catch (err) {
             setError(
                 err instanceof TypeError
                     ? "Le serveur n'a pas répondu. Vérifiez la connexion puis réessayez."
                     : err.message
             );
+            return null;
         } finally {
             setSaving(false);
         }
+    }
+    if (saveRef) saveRef.current = save;
+
+    function submitForm(e) {
+        if (!onReceiptReady) return save(e);
+        e.preventDefault();
+        if (step === 2 && !saved && quittanceComplete) { setError(""); onReceiptReady(); }
+        return undefined;
     }
 
     // Fallback built on /client/{code} or /search and the client's receipts (needs a signed-in token).
@@ -652,7 +663,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     return (
          <>
-        <form className={`policy-legacy-form ${isCreate ? "is-create" : "is-view"}`} onSubmit={save}>
+        <form className={`policy-legacy-form ${isCreate ? "is-create" : "is-view"}`} onSubmit={submitForm}>
             <div className="pf-toolbar">
                 <strong>{isCreate && step === 2 ? "GESTION DES QUITTANCES" : "GESTION DES POLICES"}</strong>
                 <div className="pf-toolbar-actions">

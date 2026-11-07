@@ -88,8 +88,8 @@ export default function ModulesWorkspace() {
     getMyModules(accessToken).then(setAllowedModules).catch(() => setAllowedModules(null));
   }, [accessToken, user.isAdmin]);
   const visibleModules = useMemo(
-    () => INSURANCE_MODULES.filter((module) => (!module.adminOnly || user.isAdmin) && (!user.role || hasPermission(user, module.permission))
-      && (user.isAdmin || !allowedModules || allowedModules.includes(module.id))),
+    () => INSURANCE_MODULES.filter((module) => module.visibleToAll || ((!module.adminOnly || user.isAdmin) && (!user.role || hasPermission(user, module.permission))
+      && (user.isAdmin || !allowedModules || allowedModules.includes(module.id)))),
     [user, allowedModules],
   );
   // A category without any module yet (e.g. Comptabilite) stays listed; otherwise it needs a module the user may open.

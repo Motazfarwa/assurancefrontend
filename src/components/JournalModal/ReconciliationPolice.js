@@ -68,7 +68,7 @@ function RenameDialog({ initialPolice, onDone, onClose }) {
   </div>;
 }
 
-// Module "Réconciliation de police": a police (its client and quittances not yet comptabilisées) goes to another
+// Module "Recodification de client": a police (its client and quittances not yet comptabilisées) goes to another
 // client with the quittances chosen; "Mise à jour Police Quittance Attestation" corrects a wrong number.
 export default function ReconciliationPoliceModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
@@ -173,7 +173,7 @@ export default function ReconciliationPoliceModal({ moduleId, onClose }) {
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !renaming) onClose(); }}>
     <section className="unpaid-modal jrn-modal" role="dialog" aria-modal="true" aria-labelledby="rcn-title">
-      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE {moduleId}</span><h2 id="rcn-title">Réconciliation de police</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
+      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE {moduleId}</span><h2 id="rcn-title">Recodification de client</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
         <div className="rcn-top"><button type="button" className="expert-cancel" onClick={() => setRenaming(true)}>Mise à jour Police Quittance Attestation</button></div>
 

@@ -5,12 +5,12 @@ import { getClientReglements } from '../../services/reglementClientApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import './EtatImpayeModal.css';
+import { AGENCY } from '../../data/agencyInfo';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const amount = (value) => Number(value || 0);
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
-const AGENCY = ['Cabinet d’Assurance Jemmali', '4, Rue Ohod - Mutuelleville', '1082 - Tunis', 'Tél : 71 893 000', 'Cell : 93 893 000'];
 const initialFilters = {
   code_client: '', nom_client: '', view: 'global', piece: 'avec',
   dates: false, date_debut: '2020-01-01', date_fin: today(),
