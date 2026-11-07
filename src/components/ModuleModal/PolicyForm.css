@@ -661,3 +661,13 @@
 .policy-legacy-form label:has(> .pf-field-error) select,
 .policy-legacy-form label:has(> .pf-field-error) textarea,
 .policy-legacy-form section:has(> .pf-field-error) > textarea { border-color: #d92d20; }
+
+/* The polices fictives of a police flotte (shown once "Police flotte" is ticked) */
+.policy-modal-expanded .policy-legacy-form > .pf-flotte-section { order: 0; }
+.pf-flotte-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 10px; }
+.pf-flotte-head p { margin: 0; color: #4b6370; font-size: 12px; }
+.pf-flotte-actions { white-space: nowrap; text-align: right; }
+.pf-flotte-actions .pf-link-button { margin-left: 10px; color: #187d78; }
+.policy-modal-expanded .pf-flotte-section .pf-receipts { width: 100%; }
+.policy-modal-expanded .pf-flotte-section .is-number { text-align: right; }
+@media (max-width: 760px) { .policy-modal-expanded .policy-legacy-form > .pf-flotte-section { order: 3; } }

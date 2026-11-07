@@ -380,13 +380,15 @@ export default function ClientManagementPage({ modal = false }) {
               saveRef={policySaveRef}
               onReceiptReady={() => changeStep(4)}
               finalLabel="Suivant : sinistre →"
+              clientName={clientDisplayName}
             />
           </div>
         )}
         {step === 4 && <div className="client-claim-step">
           <h3>Saisir sinistre</h3>
           {savedPolicy ? <>
-            <p>Police <b>{savedPolicy.num_police || savedPolicy.num_int || '—'}</b>{savedPolicy.num_quittance ? <> et quittance <b>{savedPolicy.num_quittance}</b></> : null} enregistrées pour le client <b>{client.clientCode}</b>.</p>
+            <p>Police <b>{savedPolicy.num_police || savedPolicy.num_int || '—'}</b>{savedPolicy.num_quittance ? <> et quittance <b>{savedPolicy.num_quittance}</b></> : null} enregistrées pour le client <b>{client.clientCode}</b>{savedPolicy.fleetCount ? <>, avec <b>{savedPolicy.fleetCount}</b> police(s) fictive(s)</> : null}.</p>
+            {savedPolicy.fleetRefused?.length > 0 && <p className="client-save-notice" role="alert">Polices fictives non enregistrées : {savedPolicy.fleetRefused.map((item) => `${item.num_imat} (${item.message})`).join(', ')}. Saisissez-les de nouveau dans la fenêtre de la flotte.</p>}
             <p>Le client a-t-il un sinistre à déclarer sur cette police ? Le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
             <div className="client-form-actions">
               <button type="button" className="client-secondary-button" onClick={() => finishFlow()}>Terminer sans sinistre</button>

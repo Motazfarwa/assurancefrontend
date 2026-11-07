@@ -81,7 +81,9 @@ function Estimate({ amount, days, period, positive = 'Quittance d’avenant', ne
 
 // Vehicle added, modified or replacing another: the form, with the client of the vehicle (the souscripteur when left
 // empty) and the avenant it makes (amount estimated as the server bills it).
-function VehicleForm({ contract, vehicle, mode, onSubmit, onClose }) {
+// draft: a "police fictive" entered before its police flotte is stored: it stays in the form (no avenant yet, the
+// souscripteur may not exist yet) and onSubmit receives it with nom_client, for the list.
+export function VehicleForm({ contract, vehicle, mode, onSubmit, onClose, draft = false }) {
   const { accessToken } = useAuth();
   const replacing = mode === 'replace';
   const [values, setValues] = useState(() => formValues(replacing
@@ -97,6 +99,7 @@ function VehicleForm({ contract, vehicle, mode, onSubmit, onClose }) {
   useEffect(() => {
     const code = values.code_client.trim();
     if (!code) { setClientName(contract.nom_client || ''); return undefined; }
+    if (draft && code === String(contract.code_client || '').trim()) { setClientName(contract.nom_client || `Client ${code}`); return undefined; } // not stored yet
     let active = true;
     const timer = setTimeout(() => {
       getClientByCode(accessToken, code)
@@ -104,7 +107,7 @@ function VehicleForm({ contract, vehicle, mode, onSubmit, onClose }) {
         .catch(() => { if (active) setClientName(''); });
     }, 300);
     return () => { active = false; clearTimeout(timer); };
-  }, [accessToken, values.code_client, contract.nom_client]);
+  }, [accessToken, draft, values.code_client, contract.code_client, contract.nom_client]);
 
   // The avenant this form makes and its estimated amount (+ owed, - returned).
   const premium = Number(values.prime_total || 0);
@@ -128,6 +131,7 @@ function VehicleForm({ contract, vehicle, mode, onSubmit, onClose }) {
     setSaving(true);
     try {
       await withConfirmation(onSubmit, (forcer) => {
+        if (draft) return toPayload(values, { nom_client: clientName });
         if (replacing) return { date_remplacement: avenantDate, avenant: avenant.on, vehicule: toPayload(values, { forcer }) };
         if (mode === 'add') return toPayload(values, { forcer, avenant: avenant.on });
         return toPayload(values, { forcer, avenant: avenant.on, date_avenant: avenantDate });
@@ -138,7 +142,8 @@ function VehicleForm({ contract, vehicle, mode, onSubmit, onClose }) {
     }
   }
 
-  const title = replacing ? `Remplacer ${vehicle.num_imat}` : vehicle ? `Véhicule ${vehicle.num_imat}` : 'Ajouter un véhicule';
+  const title = draft ? (vehicle ? `Police fictive ${vehicle.num_imat}` : 'Ajouter une police fictive')
+    : replacing ? `Remplacer ${vehicle.num_imat}` : vehicle ? `Véhicule ${vehicle.num_imat}` : 'Ajouter un véhicule';
   const fields = replacing ? VEHICLE_FIELDS.filter(([key]) => key !== 'effet') : VEHICLE_FIELDS;
   return <div className="client-records-backdrop is-nested flt-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <form className="client-records-dialog flt-form" onSubmit={submit} role="dialog" aria-modal="true" aria-label={title}>
@@ -167,7 +172,7 @@ function VehicleForm({ contract, vehicle, mode, onSubmit, onClose }) {
           </label>)}
         </div>
 
-        <fieldset className="flt-avenant">
+        {draft ? (avenant.auto && <p className="flt-hint">Entrée après le début de la police : un avenant d’incorporation (quittance au prorata) sera établi à l’enregistrement.</p>) : <fieldset className="flt-avenant">
           <legend>Avenant</legend>
           {mode === 'add' && <>
             <label className="flt-check"><input type="checkbox" checked={avenant.on} onChange={(event) => setBill(event.target.checked)} /> Avenant d’incorporation : facturer la prime au prorata</label>
@@ -186,10 +191,10 @@ function VehicleForm({ contract, vehicle, mode, onSubmit, onClose }) {
             <label className="flt-check"><input type="checkbox" checked={avenant.on} onChange={(event) => setBill(event.target.checked)} /> Facturer (ou ristourner) la différence de prime</label>
             {avenant.on && <Estimate amount={avenant.delta * estimate.share} days={estimate.days} period={estimate.period} />}
           </>}
-        </fieldset>
+        </fieldset>}
         {error && <p className="client-records-message is-error flt-error" role="alert">{error}</p>}
       </div>
-      <footer><span /><div className="client-footer-actions"><button className="client-secondary-button" type="button" onClick={onClose}>Annuler</button><button className="client-primary-button" type="submit" disabled={saving}>{saving ? 'Enregistrement…' : replacing ? 'Remplacer' : vehicle ? 'Enregistrer' : 'Ajouter à la flotte'}</button></div></footer>
+      <footer><span /><div className="client-footer-actions"><button className="client-secondary-button" type="button" onClick={onClose}>Annuler</button><button className="client-primary-button" type="submit" disabled={saving}>{saving ? 'Enregistrement…' : replacing ? 'Remplacer' : vehicle ? 'Enregistrer' : draft ? 'Ajouter' : 'Ajouter à la flotte'}</button></div></footer>
     </form>
   </div>;
 }
