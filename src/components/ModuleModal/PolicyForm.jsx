@@ -911,6 +911,39 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     )}
                 </div>
 
+                {isCreate && step === 1 && values.flotte && (
+                <div className="pf-flotte-section">
+                    <h4>Police flotte</h4>
+                    <div className="pf-flotte-head">
+                        <p>{fleetDrafts.length ? `${fleetDrafts.length} police${fleetDrafts.length > 1 ? "s" : ""} fictive${fleetDrafts.length > 1 ? "s" : ""} · prime totale ${fleetDrafts.reduce((sum, item) => sum + Number(item.prime_total || 0), 0).toFixed(3)}` : "Ajoutez une à une les polices fictives de cette flotte. Elles seront enregistrées avec la police."}</p>
+                        <button type="button" className="pf-view-client-button" onClick={() => setFleetEditor({ index: -1 })}>+ Ajouter une police fictive</button>
+                    </div>
+                    {fleetDrafts.length > 0 && (
+                    <div className="pf-receipts-wrap">
+                        <table className="pf-receipts">
+                            <thead><tr><th>N°</th><th>Immatriculation</th><th>Marque</th><th>Client</th><th>Entrée</th><th className="is-number">Prime totale</th><th /></tr></thead>
+                            <tbody>
+                                {fleetDrafts.map((item, index) => (
+                                    <tr key={item.num_imat}>
+                                        <td>{index + 1}</td>
+                                        <td><b>{item.num_imat}</b></td>
+                                        <td>{item.marque || "—"}</td>
+                                        <td>{item.code_client || values.code_client} {item.nom_client}</td>
+                                        <td>{item.effet ? item.effet.split("-").reverse().join("/") : "—"}</td>
+                                        <td className="is-number">{item.prime_total != null ? Number(item.prime_total).toFixed(3) : "—"}</td>
+                                        <td className="pf-flotte-actions">
+                                            <button type="button" className="pf-link-button" onClick={() => setFleetEditor({ index })}>Modifier</button>
+                                            <button type="button" className="pf-link-button" onClick={() => setFleetDrafts(current => current.filter((_, position) => position !== index))}>Supprimer</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    )}
+                </div>
+                )}
+
                 <div className="pf-grid">
                     {field("Heure effet", "heure_effet", "time")}
                     {/* TPolice.etat holds a 2-letter code (AN, RE, SS, RV) */}
@@ -1036,39 +1069,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 </div>
             </section>
             </div>
-            )}
-
-            {isCreate && step === 1 && values.flotte && (
-            <section className="pf-section pf-flotte-section pf-span-full">
-                <h3>Police flotte</h3>
-                <div className="pf-flotte-head">
-                    <p>{fleetDrafts.length ? `${fleetDrafts.length} police${fleetDrafts.length > 1 ? "s" : ""} fictive${fleetDrafts.length > 1 ? "s" : ""} · prime totale ${fleetDrafts.reduce((sum, item) => sum + Number(item.prime_total || 0), 0).toFixed(3)}` : "Ajoutez une à une les polices fictives de cette flotte. Elles seront enregistrées avec la police."}</p>
-                    <button type="button" className="pf-view-client-button" onClick={() => setFleetEditor({ index: -1 })}>+ Ajouter une police fictive</button>
-                </div>
-                {fleetDrafts.length > 0 && (
-                <div className="pf-receipts-wrap">
-                    <table className="pf-receipts">
-                        <thead><tr><th>N°</th><th>Immatriculation</th><th>Marque</th><th>Client</th><th>Entrée</th><th className="is-number">Prime totale</th><th /></tr></thead>
-                        <tbody>
-                            {fleetDrafts.map((item, index) => (
-                                <tr key={item.num_imat}>
-                                    <td>{index + 1}</td>
-                                    <td><b>{item.num_imat}</b></td>
-                                    <td>{item.marque || "—"}</td>
-                                    <td>{item.code_client || values.code_client} {item.nom_client}</td>
-                                    <td>{item.effet ? item.effet.split("-").reverse().join("/") : "—"}</td>
-                                    <td className="is-number">{item.prime_total != null ? Number(item.prime_total).toFixed(3) : "—"}</td>
-                                    <td className="pf-flotte-actions">
-                                        <button type="button" className="pf-link-button" onClick={() => setFleetEditor({ index })}>Modifier</button>
-                                        <button type="button" className="pf-link-button" onClick={() => setFleetDrafts(current => current.filter((_, position) => position !== index))}>Supprimer</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                )}
-            </section>
             )}
 
             {isCreate && step === 2 && (
