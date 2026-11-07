@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { EMPTY_CLIENT, useClient } from '../../contexts/ClientContext';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientByCode, getNextClientCode, saveClient, searchClients } from '../../services/clientApi';
@@ -11,11 +11,19 @@ import ClientListModal from '../ClientListModal/ClientListModal';
 import ClientListerModal from '../ClientListModal/ClientListerModal';
 import { navigate } from '../../navigation';
 import { showToast } from '../../services/toast';
+import { clientStepErrors, REQUIRED_CLIENT_FIELDS } from './clientValidation';
 import './ClientManagementPage.css';
+
+// The messages of the current step, read by each field.
+const FieldErrors = createContext({});
+const FieldError = ({ name }) => {
+  const message = useContext(FieldErrors)[name];
+  return message ? <small className="client-field-error" role="alert">{message}</small> : null;
+};
 
 function ClientField({ client, onChange, name, label, type = 'text', options, wide = false, required = false, maxLength, disabled = false, readOnly = false }) {
   const className = `client-field${wide ? ' client-field-wide' : ''}${readOnly ? ' client-field-readonly' : ''}`;
-  return <label className={className}><span>{label}</span>{type === 'select' ? <select required={required} disabled={disabled} value={client[name]} onChange={(event) => onChange(name, event.target.value)}><option value="">Selectionner</option>{options.map((option) => <option key={option}>{option}</option>)}</select> : <input required={required} disabled={disabled} readOnly={readOnly} maxLength={maxLength} type={type} value={client[name] || ''} onChange={(event) => onChange(name, event.target.value)} />}</label>;
+  return <label className={className}><span>{label}{REQUIRED_CLIENT_FIELDS.has(name) ? ' *' : ''}</span>{type === 'select' ? <select required={required} disabled={disabled} value={client[name]} onChange={(event) => onChange(name, event.target.value)}><option value="">Selectionner</option>{options.map((option) => <option key={option}>{option}</option>)}</select> : <input required={required} disabled={disabled} readOnly={readOnly} maxLength={maxLength} type={type} value={client[name] || ''} onChange={(event) => onChange(name, event.target.value)} />}<FieldError name={name} /></label>;
 }
 
 // Nom / Prénom input that looks for existing clients while typing, to avoid creating duplicates.
@@ -46,7 +54,7 @@ function NameAutocomplete({ client, onChange, name, label, accessToken, onPick }
   }, [accessToken, checkable, name, text]);
 
   return <div className="client-field client-autocomplete">
-    <label><span>{label}</span><input type="text" autoComplete="off" value={client[name] || ''} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} onChange={(event) => { onChange(name, event.target.value); setOpen(true); }} /></label>
+    <label><span>{label} *</span><input type="text" autoComplete="off" value={client[name] || ''} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} onChange={(event) => { onChange(name, event.target.value); setOpen(true); }} /><FieldError name={name} /></label>
     {checkable && checked && <small className={matches.length ? 'client-autocomplete-warn' : 'client-autocomplete-ok'}>{matches.length ? `${matches.length} client(s) existant(s) — vérifiez avant de créer` : '✓ Aucun client existant'}</small>}
     {open && checkable && matches.length > 0 && <ul className="client-autocomplete-list" role="listbox">{matches.map((item) => <li key={item.clientCode}><button type="button" role="option" onMouseDown={(event) => { event.preventDefault(); onPick(item); setOpen(false); }}><strong>{[item.lastName, item.firstName].filter(Boolean).join(' ') || item.nom_client}</strong><span>Code {item.clientCode}</span></button></li>)}</ul>}
   </div>;
@@ -70,13 +78,13 @@ function ContactFields({ client, onChange, kind }) {
       const id = `${key}-${index}`;
       const contact = client[key]?.[index] || {};
       return <div className="client-contact-entry" key={id}>
-        <label className="client-field"><span>{contact.label?.trim() || `${label} ${index + 1}`}</span><input type={type} value={contact.value || ''} onFocus={() => setActiveLabel(id)} onChange={(event) => updateContact(key, index, 'value', event.target.value)} /></label>
+        <label className="client-field"><span>{contact.label?.trim() || `${label} ${index + 1}`}</span><input type={type} value={contact.value || ''} onFocus={() => setActiveLabel(id)} onChange={(event) => updateContact(key, index, 'value', event.target.value)} /><FieldError name={`${key}.${index}`} /></label>
         {activeLabel === id && <label className="client-field client-contact-label"><span>Libellé</span><input type="text" maxLength={50} value={contact.label || ''} onChange={(event) => updateContact(key, index, 'label', event.target.value)} onBlur={() => setActiveLabel('')} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); setActiveLabel(''); } }} placeholder={`Libellé ${label.toLowerCase()} ${index + 1}`} /><button type="button" onClick={() => setActiveLabel('')} aria-label="Masquer le libellé">×</button></label>}
       </div>;
     });
   }
   return <div className="client-contact-fields client-field-wide">
-    <div className="client-contact-group"><strong>Téléphones</strong><div>{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
+    <div className="client-contact-group"><strong>Téléphones{kind === 'home' ? ' *' : ''}</strong><div>{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
     <div className="client-contact-group"><strong>Emails</strong><div>{renderContacts(emailKey, 3, 'Email', 'email')}</div></div>
   </div>;
 }
@@ -91,6 +99,7 @@ export default function ClientManagementPage({ modal = false }) {
   const { client, setClient, clients, setClients } = useClient();
   const { accessToken } = useAuth();
   const [notice, setNotice] = useState('');
+  const [triedSteps, setTriedSteps] = useState({}); // a step whose "Suivant" was clicked shows its input errors
   const [successToast, setSuccessToast] = useState('');
   const [saving, setSaving] = useState(false);
   const [showClientList, setShowClientList] = useState(false);
@@ -206,15 +215,22 @@ export default function ClientManagementPage({ modal = false }) {
     windowRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // False, with the messages shown and the first wrong field focused, when the current step has an input error.
+  function checkStep() {
+    const count = Object.keys(clientStepErrors(client, step)).length;
+    if (!count) return true;
+    setTriedSteps((current) => ({ ...current, [step]: true }));
+    setNotice(`Corrigez ${count > 1 ? `les ${count} champs signalés` : 'le champ signalé'} pour continuer.`);
+    requestAnimationFrame(() => windowRef.current?.querySelector('.client-field-error')?.parentElement?.querySelector('input, select, textarea')?.focus());
+    return false;
+  }
+
   function goToNextStep() {
     if (step === 1 && !client.clientCode.trim()) {
-      setNotice('Renseignez le code client et la date de création pour continuer.');
+      setNotice('Le code client est en cours de chargement : réessayez dans un instant.');
       return;
     }
-    if (step === 2 && (client.homePostalCode === '' || !Number.isInteger(Number(client.homePostalCode)))) {
-      setNotice('Le code postal du domicile est obligatoire et doit être un nombre.');
-      return;
-    }
+    if (!checkStep()) return;
     setNotice('');
     changeStep(step + 1);
   }
@@ -237,7 +253,7 @@ export default function ClientManagementPage({ modal = false }) {
     // A new client is created at the end of the flow (with its policy and first receipt), never alone.
     if (newFlow || step === 1) { goToNextStep(); return; } // Modifier too goes through Coordonnées before saving
     if (!client.clientCode.trim()) { setNotice('Le code client est obligatoire.'); return; }
-    if (client.homePostalCode === '' || !Number.isInteger(Number(client.homePostalCode))) { setNotice('Le code postal du domicile est obligatoire et doit être un nombre.'); return; }
+    if (!checkStep()) return;
     setSaving(true);
     setNotice('');
     try {
@@ -260,7 +276,7 @@ export default function ClientManagementPage({ modal = false }) {
     setPolicyPrefill(Object.keys(policy).length ? policy : null);
     setPrefillKey((current) => current + 1);
     setFicheFile(null);
-    setNotice(`Fiche importée : ${Object.keys(clientPatch).length} champ(s) client remplis${Object.keys(policy).length ? `, ${Object.keys(policy).length} champ(s) police / quittance prêts dans « Gestion police »` : ''}.`);
+    setNotice(`Contrat importé : ${Object.keys(clientPatch).length} champ(s) client remplis${Object.keys(policy).length ? `, ${Object.keys(policy).length} champ(s) police / quittance prêts dans « Gestion police »` : ''}.`);
   }
 
   function pickExistingClient(record) {
@@ -290,14 +306,14 @@ export default function ClientManagementPage({ modal = false }) {
         <header className="client-page-header"><a className="client-page-brand" href="/workspace"><span className="client-brand-mark">A</span><span>GESTION ASSURANCES<small>Assurance Jemmali · Siege</small></span></a><div className="client-page-heading"><span>PRODUCTION · MODULE 100</span><h1>Gestion des clients</h1></div><button type="button" className="client-close-button" onClick={() => navigate('/workspace')} aria-label="Fermer">×</button></header>
         <nav className="client-view-tabs" aria-label="Vue du dossier client"><button type="button" onClick={() => setShowClientList(true)}><span aria-hidden="true">◉</span> Rechercher</button><button type="button" className="is-current" aria-current="page"><span aria-hidden="true">✎</span> Modifier</button><button type="button" onClick={() => setShowLister(true)}><span aria-hidden="true">☰</span> Lister</button></nav>
         <div className="client-action-bar" role="group" aria-label="Gestion du client">
-          <button type="button" className="client-action-button client-import-button" onClick={() => fileInputRef.current?.click()} title="Importer une fiche scannée (français ou arabe) et remplir les champs">⬆ Importer une fiche</button>
+          <button type="button" className="client-action-button client-import-button" onClick={() => fileInputRef.current?.click()} title="Importer un contrat scanné (français ou arabe) et remplir les champs">⬆ Importer un contrat</button>
           <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) setFicheFile(file); }} />
           <span>Gérer pour ce client</span>
           {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
         </div>
         <div className="client-form-progress" aria-label={`Étape ${step === 4 ? 5 : step === 3 ? 2 + policyStep : step} sur 5`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div><><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step >= 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : step === 4 ? 'is-complete' : ''}><span>4</span><strong>Saisir quittance</strong></div><i /><div className={step === 4 ? 'is-active' : ''}><span>5</span><strong>Saisir sinistre</strong></div></></div>
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
-        {step <= 2 && <form className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
+        {step <= 2 && <FieldErrors.Provider value={triedSteps[step] ? clientStepErrors(client, step) : {}}><form noValidate className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
           {step === 1 && <>
           <div className="client-record-options client-step-full client-type-row"><fieldset><legend>Type client</legend>{['Particulier', 'Societe'].map((value) => <label key={value}><input type="radio" name="clientType" checked={client.clientType === value} onChange={() => changeClientType(value)} />{value === 'Societe' ? 'Société' : value}</label>)}</fieldset></div>
           <FormSection title="Client" className="client-section-primary">
@@ -350,7 +366,7 @@ export default function ClientManagementPage({ modal = false }) {
           {notice && <p className="client-save-notice" role="status">{notice}</p>}
           {/* Distinct keys: React must not turn the clicked "Suivant" into the step-2 submit button (that submitted the form on the same click). */}
           <div className="client-form-actions">{step === 1 ? <><button key="close" type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button key="next" type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button key="back" type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button>{!newFlow && <button key="save" type="submit" className="client-secondary-button" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>}<button key="next-policy" type="button" className="client-primary-button" onClick={goToNextStep} disabled={saving}>Suivant : police →</button></>}</div>
-        </form>}
+        </form></FieldErrors.Provider>}
         {client.clientCode && (
           <div className={`policy-modal-expanded client-policy-embedded${step === 3 ? '' : ' is-hidden'}`}>
             <PolicyForm

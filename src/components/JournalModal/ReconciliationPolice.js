@@ -68,14 +68,12 @@ function RenameDialog({ initialPolice, onDone, onClose }) {
   </div>;
 }
 
-// Module "Recodification de client": a police (its client and quittances not yet comptabilisées) goes to another
-// client with the quittances chosen; "Mise à jour Police Quittance Attestation" corrects a wrong number.
+// Module "Recodification de client": a police goes to another client with all its quittances; "Mise à jour Police Quittance Attestation" corrects a wrong number.
 export default function ReconciliationPoliceModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [numero, setNumero] = useState('');
   const [polices, setPolices] = useState([]);
   const [selected, setSelected] = useState(0);
-  const [chosen, setChosen] = useState(() => new Set());
   const [newCode, setNewCode] = useState('');
   const [newClient, setNewClient] = useState({ loading: false, error: '', client: null });
   const [state, setState] = useState({ loading: false, error: '', notice: '', searched: '' });
@@ -116,7 +114,6 @@ export default function ReconciliationPoliceModal({ moduleId, onClose }) {
       if (id !== searchId.current) return;
       setPolices(items);
       setSelected(0);
-      setChosen(new Set((items[0]?.quittances || []).map((row) => row.num_quittance)));
       setState({ loading: false, error: items.length ? '' : `Aucune police N° ${value}.`, notice, searched: value });
     } catch (requestError) {
       if (id !== searchId.current) return;
@@ -134,30 +131,19 @@ export default function ReconciliationPoliceModal({ moduleId, onClose }) {
     typingTimer.current = setTimeout(() => search(value), 350);
   }
 
-  function choosePolice(index) {
-    setSelected(index);
-    setChosen(new Set((polices[index]?.quittances || []).map((row) => row.num_quittance)));
-  }
-
   const quittances = police?.quittances || [];
-  const allChosen = quittances.length > 0 && quittances.every((row) => chosen.has(row.num_quittance));
-  const toggle = (number) => setChosen((current) => {
-    const next = new Set(current);
-    if (next.has(number)) next.delete(number); else next.add(number);
-    return next;
-  });
   const sameClient = Boolean(police && newClient.client && newClient.client.code_client === police.code_client);
   const canValidate = Boolean(police && newClient.client && !sameClient && !saving);
 
   async function validate() {
-    const count = quittances.filter((row) => chosen.has(row.num_quittance)).length;
-    const message = `Passer la police N° ${police.num_police} du client ${police.code_client} (${police.nom_client || ''}) au client ${newClient.client.code_client} (${newClient.client.nom_client || ''}), avec ${count} quittance${count > 1 ? 's' : ''} non comptabilisée${count > 1 ? 's' : ''} ?`;
+    const count = quittances.length;
+    const message = `Passer la police N° ${police.num_police} du client ${police.code_client} (${police.nom_client || ''}) au client ${newClient.client.code_client} (${newClient.client.nom_client || ''}), avec ${count > 1 ? `ses ${count} quittances` : count ? 'sa quittance' : 'aucune quittance'}, ses sinistres et les règlements qui ne paient que cette police ?`;
     if (!window.confirm(message)) return;
     setSaving(true);
     try {
-      const result = await changePoliceClient(accessToken, { num_int: police.num_int, code_client: newClient.client.code_client, quittances: [...chosen] });
+      const result = await changePoliceClient(accessToken, { num_int: police.num_int, code_client: newClient.client.code_client });
       setNewCode('');
-      await search(state.searched || numero, `Police N° ${result.numero} passée au client ${result.code_client} avec ${result.quittances} quittance${result.quittances > 1 ? 's' : ''}.`);
+      await search(state.searched || numero, `Police N° ${result.numero} passée au client ${result.code_client} : ${result.quittances} quittance(s), ${result.sinistres} sinistre(s), ${result.reglements} règlement(s).${result.reglements_restes ? ` ${result.reglements_restes} règlement(s) restent chez l’ancien client : ils paient aussi une autre police ou leur N° de pièce existe déjà chez le nouveau client.` : ''}`);
     } catch (requestError) {
       setState((current) => ({ ...current, error: requestError.message, notice: '' }));
     } finally {
@@ -181,7 +167,7 @@ export default function ReconciliationPoliceModal({ moduleId, onClose }) {
         <form className="unpaid-filter-form acompte-filters" onSubmit={(event) => { event.preventDefault(); clearTimeout(typingTimer.current); search(); }}>
           <label className="acompte-field jrn-company"><span>N° Police{state.loading ? ' · recherche…' : ''}</span><input value={numero} onChange={(event) => typeNumero(event.target.value)} maxLength={30} autoFocus /></label>
           {polices.length > 1 && <label className="acompte-field jrn-company"><span>{polices.length} polices portent ce N°</span>
-            <select value={selected} onChange={(event) => choosePolice(Number(event.target.value))}>
+            <select value={selected} onChange={(event) => setSelected(Number(event.target.value))}>
               {polices.map((item, index) => <option key={item.num_int} value={index}>{item.num_police} · {item.nom_compagnie || '—'} · client {item.code_client}</option>)}
             </select>
           </label>}
@@ -202,16 +188,15 @@ export default function ReconciliationPoliceModal({ moduleId, onClose }) {
         {state.notice && <div className="cqi-notice" role="status">{state.notice}<button type="button" onClick={() => setState((current) => ({ ...current, notice: '' }))} aria-label="Masquer">×</button></div>}
 
         <section className="unpaid-results">
-          <div className="unpaid-results-heading"><div><span>LISTE DES QUITTANCES NON COMPTABILISÉES · LES QUITTANCES COCHÉES PASSENT AU NOUVEAU CLIENT</span>
-            <h3>{police ? `${quittances.length} quittance${quittances.length > 1 ? 's' : ''} · ${chosen.size} choisie${chosen.size > 1 ? 's' : ''}` : 'Saisissez le N° police'}</h3></div></div>
-          {police && (quittances.length === 0 ? <div className="unpaid-empty">Aucune quittance non comptabilisée pour cette police : seule la police changera de client.</div>
+          <div className="unpaid-results-heading"><div><span>LISTE DES QUITTANCES · TOUTES PASSENT AU NOUVEAU CLIENT</span>
+            <h3>{police ? `${quittances.length} quittance${quittances.length > 1 ? 's' : ''}` : 'Saisissez le N° police'}</h3></div></div>
+          {police && (quittances.length === 0 ? <div className="unpaid-empty">Aucune quittance pour cette police : seule la police changera de client.</div>
             : <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
-              <thead><tr><th>Nom client</th><th>N° Quittance</th><th>Date saisie</th><th>Echéance</th><th>TC</th><th className="cqi-number">P.Net</th><th className="cqi-number">P.Total</th><th className="cqi-number">Solde quit.</th>
-                <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={() => setChosen(allChosen ? new Set() : new Set(quittances.map((row) => row.num_quittance)))} /> Choix</th></tr></thead>
-              <tbody>{quittances.map((row) => <tr key={row.num_quittance} className={chosen.has(row.num_quittance) ? 'is-chosen' : ''} onClick={() => toggle(row.num_quittance)}>
+              <thead><tr><th>Nom client</th><th>N° Quittance</th><th>Date saisie</th><th>Echéance</th><th>TC</th><th className="cqi-number">P.Net</th><th className="cqi-number">P.Total</th><th className="cqi-number">Solde quit.</th><th>Comptabilisée</th></tr></thead>
+              <tbody>{quittances.map((row) => <tr key={row.num_quittance}>
                 <td>{row.nom_client}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.date_saisie)}</td><td>{formatDate(row.echeance)}</td><td>{row.tc}</td>
                 <td className="cqi-number">{fmt(row.prime_net)}</td><td className="cqi-number">{fmt(row.prime_total)}</td><td className="cqi-number">{fmt(row.solde_quittance)}</td>
-                <td className="cqi-verser"><input type="checkbox" checked={chosen.has(row.num_quittance)} onChange={() => toggle(row.num_quittance)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${row.num_quittance}`} /></td>
+                <td>{row.comptabilise ? 'Oui' : 'Non'}</td>
               </tr>)}</tbody>
             </table></div>)}
         </section>

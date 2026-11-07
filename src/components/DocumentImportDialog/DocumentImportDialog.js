@@ -4,7 +4,7 @@ import { isPdf } from '../../services/ficheOcr';
 import '../FicheImportModal/FicheImportModal.css';
 import './DocumentImportDialog.css';
 
-// The import window of every module, like "Importer une fiche (OCR)": the imported PDF or image on the left, the
+// The import window of every module, like "Importer un contrat (OCR)": the imported PDF or image on the left, the
 // reading on the right, then what was read; "Appliquer" hands the result to the module, which fills its form.
 // read(onProgress) reads the document; summarize(result) gives { rows: [[label, value]], empty, note } to show.
 export default function DocumentImportDialog({ file, kicker, title, read, summarize, applyLabel = 'Appliquer', onApply, onClose }) {

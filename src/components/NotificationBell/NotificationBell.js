@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { listNotifications, markNotificationsRead } from '../../services/notificationApi';
+import { useClient } from '../../contexts/ClientContext';
+import { navigate } from '../../navigation';
+import { getClientByCode } from '../../services/clientApi';
+import { listIncompleteClients, listNotifications, markNotificationsRead } from '../../services/notificationApi';
 import HistoryDetailDialog from '../HistoriqueModal/HistoryDetailDialog';
 import './NotificationBell.css';
 
@@ -20,6 +23,9 @@ export default function NotificationBell({ onOpenHistory }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState(null); // the administrator opens what exactly an action did
+  const { setClient } = useClient();
+  const [incomplete, setIncomplete] = useState(null); // administrator: the clients with missing information
+  const [showIncomplete, setShowIncomplete] = useState(false);
   const rootRef = useRef(null);
 
   const load = useCallback(() => {
@@ -35,6 +41,24 @@ export default function NotificationBell({ onOpenHistory }) {
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, [load]);
 
+  // Read once per opening of the workspace and at each opening of the panel: it does not change every 30 seconds.
+  const loadIncomplete = useCallback(() => {
+    if (!user.isAdmin || !accessToken) return;
+    listIncompleteClients(accessToken).then(setIncomplete).catch(() => setIncomplete(null));
+  }, [accessToken, user.isAdmin]);
+  useEffect(() => { loadIncomplete(); }, [loadIncomplete]);
+
+  async function openClient(code) {
+    try {
+      const record = await getClientByCode(accessToken, code);
+      setOpen(false);
+      setClient({ ...record, _persisted: true });
+      navigate('/clients');
+    } catch (openError) {
+      setError(openError.message);
+    }
+  }
+
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (event) => { if (rootRef.current && !rootRef.current.contains(event.target)) setOpen(false); };
@@ -47,6 +71,7 @@ export default function NotificationBell({ onOpenHistory }) {
   function toggle() {
     if (open) { setOpen(false); return; }
     setOpen(true);
+    loadIncomplete();
     // The list keeps the "new" marks while it is open; the counter is cleared on the server and in the badge.
     load().then(() => {
       setData((current) => ({ ...current, unread: 0 }));
@@ -61,6 +86,7 @@ export default function NotificationBell({ onOpenHistory }) {
         aria-label={unread ? `Notifications : ${unread} nouvelle${unread > 1 ? 's' : ''}` : 'Notifications'} title="Notifications">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></svg>
         {unread > 0 && <span className="notif-count">{unread > 99 ? '99+' : unread}</span>}
+        {!unread && incomplete?.total > 0 && <span className="notif-alert-dot" title="Clients à compléter" />}
       </button>
       {open && (
         <div className="notif-panel" role="dialog" aria-label="Notifications">
@@ -68,6 +94,19 @@ export default function NotificationBell({ onOpenHistory }) {
             <strong>Notifications</strong>
             <small>{user.isAdmin ? 'Actions de tous les utilisateurs' : 'Vos actions'}</small>
           </div>
+          {incomplete?.total > 0 && <div className="notif-incomplete">
+            <button type="button" className="notif-incomplete-head" aria-expanded={showIncomplete} onClick={() => setShowIncomplete((value) => !value)}>
+              <span><strong>{incomplete.total} client{incomplete.total > 1 ? 's' : ''} à compléter</strong>
+                <small>Coordonnées manquantes : {incomplete.coordonnees} · Sans police : {incomplete.sans_police} · Police incomplète : {incomplete.polices}</small></span>
+              <b aria-hidden="true">{showIncomplete ? '▴' : '▾'}</b>
+            </button>
+            {showIncomplete && <ul>
+              {incomplete.items.map((item) => <li key={item.code_client}><button type="button" title="Ouvrir la fiche du client" onClick={() => openClient(item.code_client)}>
+                <strong>{item.code_client} · {item.nom_client || 'Client sans nom'}</strong><small>Manque : {item.manques.join(', ')}</small>
+              </button></li>)}
+              {incomplete.total > incomplete.items.length && <li className="notif-incomplete-more">Les {incomplete.items.length} clients les plus récents sont affichés.</li>}
+            </ul>}
+          </div>}
           <div className="notif-list">
             {error && <p className="notif-empty">{error}</p>}
             {!error && !items.length && <p className="notif-empty">Aucune action enregistrée pour le moment.</p>}

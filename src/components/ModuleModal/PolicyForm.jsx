@@ -6,6 +6,7 @@ import { API_BASE_URL as API_URL } from "../../services/apiBase";
 import { isOfferedCompany } from "../../services/companyApi";
 import { listClients, normalizeClientRecord, rankClients } from "../../services/clientApi";
 import FlotteDialog from "../FlotteDialog/FlotteDialog";
+import { policeErrors, quittanceErrors, REQUIRED_POLICY_FIELDS } from "./policyValidation";
 
 // A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
 // month only, "dd/mm" as the policy table stores it) on the same day.
@@ -120,12 +121,6 @@ const maskEcheance = (text) => {
     const digits = text.replace(/\D/g, "").slice(0, 4);
     return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
 };
-const validEcheance = (echeance) => {
-    const match = /^(\d{2})\/(\d{2})$/.exec(echeance || "");
-    if (!match) return false;
-    const [day, month] = [Number(match[1]), Number(match[2])];
-    return month >= 1 && month <= 12 && day >= 1 && day <= new Date(2024, month, 0).getDate(); // leap year: 29/02 allowed
-};
 const termDates = (effet, duree) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(effet || "")) return {};
     const months = Number(duree) || 12;
@@ -217,6 +212,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const [saved, setSaved] = useState(false);
     const [fleetNumInt, setFleetNumInt] = useState(""); // fleet contract saved
     const [fleetOpen, setFleetOpen] = useState(false); // its "Véhicules de la flotte" window
+    const [triedSteps, setTriedSteps] = useState({}); // a step whose "Suivant" was clicked shows its input errors
+    const formRef = useRef(null);
 
     useEffect(() => {
         if (onStepChange) onStepChange(step);
@@ -347,11 +344,23 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     }, [values.code_compagnie, values.code_branche]);
 
+    const stepErrors = !isCreate ? {} : step === 1
+        ? policeErrors({ ...values, echeance: echeanceText(values.echeance) }, DC_GUARANTEES.map(([key]) => key))
+        : quittanceErrors(values);
+    const errorCount = triedSteps[step] ? Object.keys(stepErrors).length : 0;
+    const err = (name) => (triedSteps[step] && stepErrors[name] ? <small className="pf-field-error" role="alert">{stepErrors[name]}</small> : null);
+
+    // Shows the messages of the step and goes to its first wrong field.
+    function showStepErrors() {
+        setTriedSteps(prev => ({ ...prev, [step]: true }));
+        requestAnimationFrame(() => formRef.current?.querySelector(".pf-field-error")?.parentElement?.querySelector("input, select, textarea")?.focus());
+    }
+
     const field = (
         label, name, type = "text", options = null
     ) => (
         <label className="pf-field" key={name}>
-            <span>{label}</span>
+            <span>{label}{isCreate && REQUIRED_POLICY_FIELDS.has(name) ? " *" : ""}</span>
             {options ? (
                 <select
                     value={values[name]}
@@ -373,6 +382,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     onChange={e => update(name, e.target.value)}
                 />
             )}
+            {err(name)}
         </label>
     );
 
@@ -402,32 +412,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     const loadedExisting = loadedRef.current.num !== "" && loadedRef.current.num === values.num_police;
 
-    // A first receipt must be filled in before a new client can be created.
-    const carteVerteValid = !values.carte_verte || Boolean(values.cv_du && values.cv_au && values.cv_du <= values.cv_au);
-    const quittanceComplete = Boolean(values.date_emission && values.prime_net !== "" && values.prime_total !== "" && values.montant_quittance !== "" && carteVerteValid);
-
     function goToReceipt() {
         setError("");
-        if (!/^\d{12}$/.test(values.num_police)) {
-            setError("Le numéro doit contenir 12 chiffres : année + branche + 5 chiffres.");
-            return;
-        }
-        if (values.num_police.slice(4, 7) !== values.code_branche) {
-            setError("Le code branche ne correspond pas au numéro de police.");
-            return;
-        }
-        if (!values.code_compagnie) {
-            setError("Veuillez sélectionner la compagnie.");
-            return;
-        }
-        if (values.echeance && !validEcheance(values.echeance)) {
-            setError("L'échéance doit être un jour et un mois valides (jj/mm).");
-            return;
-        }
-        if (values.revalorisation && !values.date_revalorisation) {
-            setError("Renseignez la date de revalorisation.");
-            return;
-        }
+        if (Object.keys(stepErrors).length) { showStepErrors(); return; }
         setStep(2);
     }
 
@@ -508,10 +495,12 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     if (saveRef) saveRef.current = save;
 
     function submitForm(e) {
-        if (!onReceiptReady) return save(e);
         e.preventDefault();
-        if (step === 2 && !saved && quittanceComplete) { setError(""); onReceiptReady(); }
-        return undefined;
+        if (!isCreate || step !== 2 || saved) return;
+        setError("");
+        if (Object.keys(stepErrors).length) { showStepErrors(); return; }
+        if (onReceiptReady) onReceiptReady();
+        else save();
     }
 
     // Fallback built on /client/{code} or /search and the client's receipts (needs a signed-in token).
@@ -663,7 +652,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     return (
          <>
-        <form className={`policy-legacy-form ${isCreate ? "is-create" : "is-view"}`} onSubmit={submitForm}>
+        <form ref={formRef} noValidate className={`policy-legacy-form ${isCreate ? "is-create" : "is-view"}`} onSubmit={submitForm}>
             <div className="pf-toolbar">
                 <strong>{isCreate && step === 2 ? "GESTION DES QUITTANCES" : "GESTION DES POLICES"}</strong>
                 <div className="pf-toolbar-actions">
@@ -706,6 +695,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                                 </option>
                             ))}
                         </select>
+                        {err("code_compagnie")}
                         {compagniesError && (
                             <small className="pf-error">{compagniesError}</small>
                         )}
@@ -722,6 +712,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             }
                             placeholder="Ex : 011"
                         />
+                        {err("code_branche")}
                     </label>
 
                     <label className="pf-field pf-field-branche-nom">
@@ -751,6 +742,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             onChange={e => handleNumberChange(e.target.value)}
                             placeholder="202601156895"
                         />
+                        {err("num_police")}
                     </label>
 
                     {!isCreate && (
@@ -793,12 +785,13 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     )}
 
                     <label className="pf-field pf-field-narrow">
-                        <span>Date création</span>
+                        <span>Date création{isCreate ? " *" : ""}</span>
                         <input
                             type="date"
                             value={values.date_creation}
                             onChange={e => update("date_creation", e.target.value)}
                         />
+                        {err("date_creation")}
                     </label>
                     {field("Immatriculation", "num_imat")}
                 </div>
@@ -840,7 +833,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         </select>
                     </label>
                     <label className="pf-field">
-                        <span>Échéance</span>
+                        <span>Échéance{isCreate ? " *" : ""}</span>
                         <input
                             type="text"
                             inputMode="numeric"
@@ -849,22 +842,25 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             value={echeanceText(values.echeance)}
                             onChange={e => update("echeance", maskEcheance(e.target.value))}
                         />
+                        {err("echeance")}
                     </label>
                     <label className="pf-field">
-                        <span>Date effet</span>
+                        <span>Date effet{isCreate ? " *" : ""}</span>
                         <input
                             type="date"
                             value={values.effet}
                             onChange={e => setValues(prev => ({ ...prev, effet: e.target.value, ...termDates(e.target.value, prev.duree) }))}
                         />
+                        {err("effet")}
                     </label>
                     <label className="pf-field">
-                        <span>Expiration</span>
+                        <span>Expiration{isCreate ? " *" : ""}</span>
                         <input
                             type="date"
                             value={values.expiration}
                             onChange={e => update("expiration", e.target.value)}
                         />
+                        {err("expiration")}
                     </label>
                 </div>
 
@@ -878,6 +874,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             <label className="pf-franchise pf-inline-date">
                                 <span>Date de revalorisation</span>
                                 <input type="date" value={values.date_revalorisation} onChange={e => update("date_revalorisation", e.target.value)} />
+                                {err("date_revalorisation")}
                             </label>
                             <label className="pf-franchise pf-inline-date">
                                 <span>Date d'envoi de décharge</span>
@@ -889,11 +886,17 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
                 <div className="pf-grid">
                     {field("Heure effet", "heure_effet", "time")}
-                    {field("État", "etat")}
+                    {/* TPolice.etat holds a 2-letter code (AN, RE, SS, RV) */}
+                    <label className="pf-field" key="etat">
+                        <span>État{isCreate ? " *" : ""}</span>
+                        <input type="text" maxLength={2} value={values.etat} onChange={e => update("etat", e.target.value.toUpperCase())} />
+                        {err("etat")}
+                    </label>
                     {field("Date mouvement", "date_mvt", "date")}
                     <label className="pf-field pf-risque">
                         <span>Risque</span>
                         <textarea rows={3} value={values.risque} onChange={e => update("risque", e.target.value)} />
+                        {err("risque")}
                     </label>
                 </div>
             </section>
@@ -927,15 +930,18 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <label className="pf-franchise">
                             <span>Franchise</span>
                             <input type="number" min="0" step="any" value={values.franchise} onChange={e => update("franchise", e.target.value)} />
+                            {err("franchise")}
                             <b>%</b>
                         </label>
                         <label className="pf-franchise">
                             <span>Valeur à neuf</span>
                             <input type="number" min="0" step="any" value={values.neuf} onChange={e => update("neuf", e.target.value)} />
+                            {err("neuf")}
                         </label>
                         <label className="pf-franchise">
                             <span>Valeur vénale</span>
                             <input type="number" min="0" step="any" value={values.venale} onChange={e => { const value = e.target.value; setValues(prev => ({ ...prev, venale: value, g_vol: value, g_incendie: value })); }} />
+                            {err("venale")}
                         </label>
                     </>
                 )}
@@ -948,6 +954,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                                     <label className="pf-franchise">
                                         <span>Montant</span>
                                         <input type="number" min="0" step="any" value={values[`dc_${key}_montant`]} onChange={e => update(`dc_${key}_montant`, e.target.value)} />
+                                        {err(`dc_${key}_montant`)}
                                     </label>
                                 )}
                             </div>
@@ -996,6 +1003,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                                         : { ...prev, [key]: value }));
                                 }}
                             />
+                            {err(key)}
                         </label>
                     ))}
                 </div>
@@ -1075,9 +1083,11 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     value={values.observation}
                     onChange={e => update("observation", e.target.value)}
                 />
+                {err("observation")}
             </section>
             )}
 
+            {errorCount > 0 && <div className="pf-error" role="alert">Corrigez {errorCount > 1 ? `les ${errorCount} champs signalés` : "le champ signalé"} pour continuer.</div>}
             {error && <div className="pf-error">{error}</div>}
             {message && <div className="pf-success">{message}{saved && values.flotte && fleetNumInt && <> · <button type="button" className="pf-link-button" onClick={() => setFleetOpen(true)}>Véhicules de la flotte</button></>}</div>}
             {fleetNumInt && fleetOpen && <FlotteDialog key={fleetNumInt} numInt={fleetNumInt} onClose={() => setFleetOpen(false)} />}
@@ -1103,8 +1113,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <button
                             type="submit"
                             className="pf-primary"
-                            disabled={saving || saved || (embedded && !quittanceComplete)}
-                            title={embedded && !quittanceComplete ? "Renseignez la date d'émission, la prime nette, la prime totale et le montant de la quittance" : undefined}
+                            disabled={saving || saved}
                         >
                             {saving ? "Enregistrement..." : saved ? "Enregistré" : finalLabel}
                         </button>

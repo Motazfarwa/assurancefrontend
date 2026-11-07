@@ -88,9 +88,9 @@ export default function FicheImportModal({ file, accessToken, onClose, onApply }
 
   return (
     <div className="fiche-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="fiche-dialog" role="dialog" aria-modal="true" aria-label="Importer une fiche client">
+      <section className="fiche-dialog" role="dialog" aria-modal="true" aria-label="Importer un contrat">
         <header>
-          <div><span>GESTION DES CLIENTS · IMPORT</span><h2>Importer une fiche (OCR)</h2></div>
+          <div><span>GESTION DES CLIENTS · IMPORT</span><h2>Importer un contrat (OCR)</h2></div>
           <button type="button" onClick={onClose} aria-label="Fermer">×</button>
         </header>
 
