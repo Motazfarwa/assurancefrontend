@@ -46,7 +46,7 @@ function RenameDialog({ initialPolice, onDone, onClose }) {
 
   return <div className="jrn-sheet-backdrop rcn-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="unpaid-modal rcn-rename" role="dialog" aria-modal="true" aria-labelledby="rcn-rename-title">
-      <header className="expert-modal-header"><div className="expert-title"><span>RÉCONCILIATION DE POLICE</span><h2 id="rcn-rename-title">Rectification N° Police / N° Quittance / N° Attestation</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
+      <header className="expert-modal-header"><div className="expert-title"><span>RECODIFICATION DE CLIENT</span><h2 id="rcn-rename-title">Rectification N° Police / N° Quittance / N° Attestation</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
         {message.error && <div className="expert-error unpaid-error" role="alert">{message.error}</div>}
         {message.notice && <div className="cqi-notice" role="status">{message.notice}<button type="button" onClick={() => setMessage({ error: '', notice: '' })} aria-label="Masquer">×</button></div>}
