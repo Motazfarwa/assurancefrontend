@@ -238,8 +238,9 @@ function byAdverseCompany(items, compagnies) {
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
 // policyNumber: a new claim on this policy (the "Saisir sinistre" step of a new client), its client and company filled.
+// vehicle: { num_imat, code_client, nom_client } of a police flotte: the claim is on that vehicle and its client.
 // onSaved(numero) runs once a claim is stored.
-export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '', policyNumber = '', onSaved }) {
+export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '', policyNumber = '', vehicle, onSaved }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
   const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], compagnies_adverses: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
@@ -461,7 +462,9 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     const number = String(policyNumber || '').trim();
     if (!number) return;
     setForm((value) => ({ ...value, Num_Int: number }));
-    fillFromPolicy({ numero: number });
+    fillFromPolicy({ numero: number }).then(() => {
+      if (vehicle) change({ Num_Imat: vehicle.num_imat.slice(0, 12), Code_Client: vehicle.code_client, nom_client: vehicle.nom_client || '' });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [policyNumber]);
 

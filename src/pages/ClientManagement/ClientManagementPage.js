@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EMPTY_CLIENT, useClient } from '../../contexts/ClientContext';
 import { useAuth } from '../../auth/AuthContext';
-import { getClientByCode, getNextClientCode, saveClient, searchClients } from '../../services/clientApi';
+import { getClientByCode, getNextClientCode, saveClient } from '../../services/clientApi';
 import ModuleModal from '../../components/ModuleModal/ModuleModal';
 import PolicyForm from '../../components/ModuleModal/PolicyForm';
 import FicheImportModal from '../../components/FicheImportModal/FicheImportModal';
@@ -11,83 +11,9 @@ import ClientListModal from '../ClientListModal/ClientListModal';
 import ClientListerModal from '../ClientListModal/ClientListerModal';
 import { navigate } from '../../navigation';
 import { showToast } from '../../services/toast';
-import { clientStepErrors, REQUIRED_CLIENT_FIELDS } from './clientValidation';
+import { CoordinatesFields, FieldErrors, IdentityFields } from './ClientFormFields';
+import { clientStepErrors } from './clientValidation';
 import './ClientManagementPage.css';
-
-// The messages of the current step, read by each field.
-const FieldErrors = createContext({});
-const FieldError = ({ name }) => {
-  const message = useContext(FieldErrors)[name];
-  return message ? <small className="client-field-error" role="alert">{message}</small> : null;
-};
-
-function ClientField({ client, onChange, name, label, type = 'text', options, wide = false, required = false, maxLength, disabled = false, readOnly = false }) {
-  const className = `client-field${wide ? ' client-field-wide' : ''}${readOnly ? ' client-field-readonly' : ''}`;
-  return <label className={className}><span>{label}{REQUIRED_CLIENT_FIELDS.has(name) ? ' *' : ''}</span>{type === 'select' ? <select required={required} disabled={disabled} value={client[name]} onChange={(event) => onChange(name, event.target.value)}><option value="">Selectionner</option>{options.map((option) => <option key={option}>{option}</option>)}</select> : <input required={required} disabled={disabled} readOnly={readOnly} maxLength={maxLength} type={type} value={client[name] || ''} onChange={(event) => onChange(name, event.target.value)} />}<FieldError name={name} /></label>;
-}
-
-// Nom / Prénom input that looks for existing clients while typing, to avoid creating duplicates.
-function NameAutocomplete({ client, onChange, name, label, accessToken, onPick }) {
-  const [matches, setMatches] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [checked, setChecked] = useState(false);
-  const text = String(client[name] || '').trim();
-  const checkable = !client._persisted && text.length >= 2;
-
-  useEffect(() => {
-    if (!checkable) { setMatches([]); setChecked(false); return undefined; }
-    let active = true;
-    setChecked(false);
-    const timer = window.setTimeout(async () => {
-      try {
-        const found = await searchClients(accessToken, text, 20);
-        const lower = text.toLowerCase();
-        if (active) {
-          setMatches(found.filter((item) => String(item[name] || '').toLowerCase().includes(lower)).slice(0, 8));
-          setChecked(true);
-        }
-      } catch {
-        if (active) { setMatches([]); setChecked(false); }
-      }
-    }, 300);
-    return () => { active = false; window.clearTimeout(timer); };
-  }, [accessToken, checkable, name, text]);
-
-  return <div className="client-field client-autocomplete">
-    <label><span>{label} *</span><input type="text" autoComplete="off" value={client[name] || ''} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} onChange={(event) => { onChange(name, event.target.value); setOpen(true); }} /><FieldError name={name} /></label>
-    {checkable && checked && <small className={matches.length ? 'client-autocomplete-warn' : 'client-autocomplete-ok'}>{matches.length ? `${matches.length} client(s) existant(s) — vérifiez avant de créer` : '✓ Aucun client existant'}</small>}
-    {open && checkable && matches.length > 0 && <ul className="client-autocomplete-list" role="listbox">{matches.map((item) => <li key={item.clientCode}><button type="button" role="option" onMouseDown={(event) => { event.preventDefault(); onPick(item); setOpen(false); }}><strong>{[item.lastName, item.firstName].filter(Boolean).join(' ') || item.nom_client}</strong><span>Code {item.clientCode}</span></button></li>)}</ul>}
-  </div>;
-}
-
-function FormSection({ title, children, className = '' }) {
-  return <fieldset className={`client-section ${className}`}><legend>{title}</legend><div className="client-fields">{children}</div></fieldset>;
-}
-
-function ContactFields({ client, onChange, kind }) {
-  const [activeLabel, setActiveLabel] = useState('');
-  const phoneKey = `${kind}Phones`;
-  const emailKey = `${kind}Emails`;
-  function updateContact(key, index, property, value) {
-    const contacts = [...(client[key] || [])];
-    contacts[index] = { ...(contacts[index] || {}), [property]: value };
-    onChange(key, contacts);
-  }
-  function renderContacts(key, count, label, type) {
-    return Array.from({ length: count }, (_, index) => {
-      const id = `${key}-${index}`;
-      const contact = client[key]?.[index] || {};
-      return <div className="client-contact-entry" key={id}>
-        <label className="client-field"><span>{contact.label?.trim() || `${label} ${index + 1}`}</span><input type={type} value={contact.value || ''} onFocus={() => setActiveLabel(id)} onChange={(event) => updateContact(key, index, 'value', event.target.value)} /><FieldError name={`${key}.${index}`} /></label>
-        {activeLabel === id && <label className="client-field client-contact-label"><span>Libellé</span><input type="text" maxLength={50} value={contact.label || ''} onChange={(event) => updateContact(key, index, 'label', event.target.value)} onBlur={() => setActiveLabel('')} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); setActiveLabel(''); } }} placeholder={`Libellé ${label.toLowerCase()} ${index + 1}`} /><button type="button" onClick={() => setActiveLabel('')} aria-label="Masquer le libellé">×</button></label>}
-      </div>;
-    });
-  }
-  return <div className="client-contact-fields client-field-wide">
-    <div className="client-contact-group"><strong>Téléphones{kind === 'home' ? ' *' : ''}</strong><div>{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
-    <div className="client-contact-group"><strong>Emails</strong><div>{renderContacts(emailKey, 3, 'Email', 'email')}</div></div>
-  </div>;
-}
 
 const CLIENT_ACTIONS = [
   { key: 'policy', label: 'Gestion police', module: INSURANCE_MODULES.find((item) => item.id === '110'), category: 'production' },
@@ -112,6 +38,8 @@ export default function ClientManagementPage({ modal = false }) {
   const [policyStep, setPolicyStep] = useState(1);
   // Step 5 "Saisir sinistre" (step === 4), where the whole flow is stored: the police once stored, and whether its claim form is open.
   const policySaveRef = useRef(null);
+  const fleetRetryRef = useRef(null);
+  const [claimQueue, setClaimQueue] = useState([]); // the vehicles of a flotte with a claim to declare, one form after the other
   const [savedPolicy, setSavedPolicy] = useState(null);
   const [claimOpen, setClaimOpen] = useState(false);
   const claimNumber = useRef('');
@@ -200,9 +128,18 @@ export default function ClientManagementPage({ modal = false }) {
     setSaving(false);
     if (!result) { changeStep(3); return; } // the error is shown on the receipt form
     setSavedPolicy(result);
-    if (result.fleet) return; // its vehicles window is open: the step's buttons remain for afterwards
+    if (result.fleetRefused?.length) return; // shown on this step, with "Réessayer"
+    if (result.fleetClaims?.length) { setClaimQueue(result.fleetClaims); return; }
     if (withClaim) setClaimOpen(true);
     else finishFlow();
+  }
+
+  async function retryFleet() {
+    setSaving(true);
+    const { refused, claims, stored } = await fleetRetryRef.current();
+    setSaving(false);
+    setSavedPolicy((current) => ({ ...current, fleetRefused: refused, fleetCount: (current.fleetCount || 0) + stored, fleetClaims: claims }));
+    if (claims.length) setClaimQueue(claims);
   }
 
   function finishFlow(numeroSinistre = '') {
@@ -246,7 +183,6 @@ export default function ClientManagementPage({ modal = false }) {
     setClient((current) => ({ ...current, clientType: value, firstName: value === 'Societe' ? '' : current.firstName }));
     setNotice('');
   }
-  const isCompany = client.clientType === 'Societe';
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -314,55 +250,8 @@ export default function ClientManagementPage({ modal = false }) {
         <div className="client-form-progress" aria-label={`Étape ${step === 4 ? 5 : step === 3 ? 2 + policyStep : step} sur 5`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div><><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step >= 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : step === 4 ? 'is-complete' : ''}><span>4</span><strong>Saisir quittance</strong></div><i /><div className={step === 4 ? 'is-active' : ''}><span>5</span><strong>Saisir sinistre</strong></div></></div>
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
         {step <= 2 && <FieldErrors.Provider value={triedSteps[step] ? clientStepErrors(client, step) : {}}><form noValidate className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
-          {step === 1 && <>
-          <div className="client-record-options client-step-full client-type-row"><fieldset><legend>Type client</legend>{['Particulier', 'Societe'].map((value) => <label key={value}><input type="radio" name="clientType" checked={client.clientType === value} onChange={() => changeClientType(value)} />{value === 'Societe' ? 'Société' : value}</label>)}</fieldset></div>
-          <FormSection title="Client" className="client-section-primary">
-            {isCompany
-              ? <NameAutocomplete client={client} onChange={updateField} name="lastName" label="Raison sociale" accessToken={accessToken} onPick={pickExistingClient} />
-              : <>
-                <NameAutocomplete client={client} onChange={updateField} name="lastName" label="Nom" accessToken={accessToken} onPick={pickExistingClient} />
-                <NameAutocomplete client={client} onChange={updateField} name="firstName" label="Prenom" accessToken={accessToken} onPick={pickExistingClient} />
-              </>}
-            <ClientField client={client} onChange={updateField} name="nationality" label="Nationalite" type="select" options={['Tunisienne', 'Italienne', 'Française', 'Autre']} />
-            {client.nationality === 'Autre' && <ClientField client={client} onChange={updateField} name="nationalityOther" label="Precisez la nationalite" />}
-            <ClientField client={client} onChange={updateField} name="country" label="Pays" />
-            <ClientField client={client} onChange={updateField} name="birthDate" label="Date de naissance" type="date" />
-            <ClientField client={client} onChange={updateField} name="birthPlace" label="Pays de naissance" />
-            <ClientField client={client} onChange={updateField} name="profession" label={isCompany ? 'Secteur' : 'Profession'} />
-            {!isCompany && <ClientField client={client} onChange={updateField} name="civilStatus" label="Situation familiale" type="select" options={['Celibataire', 'Marie(e)', 'Divorce(e)', 'Veuf / Veuve']} />}
-            <ClientField client={client} onChange={updateField} name="title" label="Titre" type="select" options={['M.', 'Mme', 'Mlle', 'Soc.']} />
-            <ClientField client={client} onChange={updateField} name="identityNumber" label={isCompany ? 'Matricule fiscale' : 'N° C.I.N.'} />
-            {!isCompany && <>
-              <ClientField client={client} onChange={updateField} name="identityDate" label="Date C.I.N." type="date" />
-              <ClientField client={client} onChange={updateField} name="identityPlace" label="Lieu C.I.N." />
-              <ClientField client={client} onChange={updateField} name="licenseNumber" label="N° permis" />
-              <ClientField client={client} onChange={updateField} name="licenseDate" label="Date permis" type="date" />
-              <ClientField client={client} onChange={updateField} name="licensePlace" label="Lieu permis" />
-            </>}
-          </FormSection>
-          <FormSection title="Lien" className="client-link-section">
-            <ClientField client={client} onChange={updateField} name="relatedCode" label="Code de contact" type="number" />
-            <ClientField client={client} onChange={updateField} name="relatedName" label="Nom du contact" />
-            <ClientField client={client} onChange={updateField} name="relationship" label="Quérabilité" />
-          </FormSection>
-          </>}
-          {step === 2 && <>
-          <FormSection title="Domicile">
-            <ClientField client={client} onChange={updateField} name="homeAddress" label="Adresse" wide />
-            <ClientField client={client} onChange={updateField} name="homeCity" label="Ville" />
-            <ClientField client={client} onChange={updateField} name="homePostalCode" label="Code postal" type="number" required />
-            <ContactFields client={client} onChange={updateField} kind="home" />
-          </FormSection>
-
-          <FormSection title="Bureau">
-            <ClientField client={client} onChange={updateField} name="officeAddress" label="Adresse" wide />
-            <ClientField client={client} onChange={updateField} name="officeCity" label="Ville" />
-            <ClientField client={client} onChange={updateField} name="officePostalCode" label="Code postal" />
-            <ContactFields client={client} onChange={updateField} kind="office" />
-          </FormSection>
-          </>}
-          {step === 2 && <FormSection title="Observation" className="client-observation-section client-step-full"><label className="client-field client-field-wide"><span>Remarques sur le client</span><textarea rows={4} maxLength={500} value={client.notes || ''} placeholder="Saisir une observation (facultatif)" onChange={(event) => updateField('notes', event.target.value)} /><small className="client-observation-count">{(client.notes || '').length} / 500</small></label></FormSection>}
-          {step === 2 && <div className="client-record-options client-step-full"><fieldset><legend>Adresse de correspondance</legend>{['Bureau', 'Domicile'].map((value) => <label key={value}><input type="radio" name="correspondence" checked={client.correspondence === value} onChange={() => updateField('correspondence', value)} />{value}</label>)}</fieldset></div>}
+          {step === 1 && <IdentityFields client={client} updateField={updateField} changeClientType={changeClientType} accessToken={accessToken} pickExistingClient={pickExistingClient} />}
+          {step === 2 && <CoordinatesFields client={client} updateField={updateField} />}
           {notice && <p className="client-save-notice" role="status">{notice}</p>}
           {/* Distinct keys: React must not turn the clicked "Suivant" into the step-2 submit button (that submitted the form on the same click). */}
           <div className="client-form-actions">{step === 1 ? <><button key="close" type="button" className="client-secondary-button" onClick={() => navigate('/workspace')}>Fermer</button><button key="next" type="button" className="client-primary-button" onClick={goToNextStep}>Suivant →</button></> : <><button key="back" type="button" className="client-secondary-button" onClick={() => changeStep(1)}>← Précédent</button>{!newFlow && <button key="save" type="submit" className="client-secondary-button" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>}<button key="next-policy" type="button" className="client-primary-button" onClick={goToNextStep} disabled={saving}>Suivant : police →</button></>}</div>
@@ -378,6 +267,7 @@ export default function ClientManagementPage({ modal = false }) {
               onClose={() => changeStep(2)}
               beforeSave={createClientBeforePolicy}
               saveRef={policySaveRef}
+              fleetRetryRef={fleetRetryRef}
               onReceiptReady={() => changeStep(4)}
               finalLabel="Suivant : sinistre →"
               clientName={clientDisplayName}
@@ -388,7 +278,7 @@ export default function ClientManagementPage({ modal = false }) {
           <h3>Saisir sinistre</h3>
           {savedPolicy ? <>
             <p>Police <b>{savedPolicy.num_police || savedPolicy.num_int || '—'}</b>{savedPolicy.num_quittance ? <> et quittance <b>{savedPolicy.num_quittance}</b></> : null} enregistrées pour le client <b>{client.clientCode}</b>{savedPolicy.fleetCount ? <>, avec <b>{savedPolicy.fleetCount}</b> police(s) fictive(s)</> : null}.</p>
-            {savedPolicy.fleetRefused?.length > 0 && <p className="client-save-notice" role="alert">Polices fictives non enregistrées : {savedPolicy.fleetRefused.map((item) => `${item.num_imat} (${item.message})`).join(', ')}. Saisissez-les de nouveau dans la fenêtre de la flotte.</p>}
+            {savedPolicy.fleetRefused?.length > 0 && <p className="client-save-notice" role="alert">Polices fictives non enregistrées : {savedPolicy.fleetRefused.map((item) => `${item.num_imat} (${item.message})`).join(', ')}. <button type="button" className="client-secondary-button" disabled={saving} onClick={retryFleet}>{saving ? 'Enregistrement…' : 'Réessayer'}</button></p>}
             <p>Le client a-t-il un sinistre à déclarer sur cette police ? Le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
             <div className="client-form-actions">
               <button type="button" className="client-secondary-button" onClick={() => finishFlow()}>Terminer sans sinistre</button>
@@ -405,6 +295,8 @@ export default function ClientManagementPage({ modal = false }) {
           </>}
         </div>}
       </section>
+      {claimQueue[0] && <SinistreModal key={claimQueue[0].num_imat} mode="new" moduleId="620" clientCode={claimQueue[0].code_client} policyNumber={savedPolicy?.num_int || savedPolicy?.num_police || ''} vehicle={claimQueue[0]}
+        onClose={() => setClaimQueue((current) => current.slice(1))} />}
       {claimOpen && <SinistreModal mode="new" moduleId="620" clientCode={client.clientCode} policyNumber={savedPolicy?.num_int || savedPolicy?.num_police || ''}
         onSaved={(numero) => { claimNumber.current = numero; }}
         onClose={() => { setClaimOpen(false); if (claimNumber.current) finishFlow(claimNumber.current); }} />}

@@ -26,6 +26,9 @@ async function request(path, accessToken, options = {}) {
   return body;
 }
 
+// A registration before its police exists: { flotte, police } where it is already in force.
+export const checkPlate = (token, plate, exclude = '') => request(`/api/flotte/immatriculation/verifier?${new URLSearchParams({ plate, exclude })}`, token);
+
 const base = (numInt) => `/api/flotte/${encodeURIComponent(String(numInt).trim())}`;
 
 // The fleet contract, its vehicles (in the fleet or gone) and the totals of those in the fleet.

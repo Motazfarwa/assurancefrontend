@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import "./PolicyForm.css";
 import ClientPolicesModal from "./ClientPolicesModal";
 import { useAuth } from "../../auth/AuthContext";
 import { API_BASE_URL as API_URL } from "../../services/apiBase";
 import { isOfferedCompany } from "../../services/companyApi";
 import { listClients, normalizeClientRecord, rankClients } from "../../services/clientApi";
-import FlotteDialog, { VehicleForm } from "../FlotteDialog/FlotteDialog";
-import { importVehicles } from "../../services/flotteApi";
+import FlotteDialog from "../FlotteDialog/FlotteDialog";
+import PoliceFictiveWizard, { storeDraft } from "../FlotteDialog/PoliceFictiveWizard";
 import { policeErrors, quittanceErrors, REQUIRED_POLICY_FIELDS } from "./policyValidation";
 
 // A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
@@ -205,7 +204,7 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
 // embedded: used as steps 3 and 4 of the "new client" flow. "Suivant" on the receipt calls onReceiptReady without storing
 // anything; the last step stores everything through saveRef. beforeSave runs first (it creates the client). saveRef.current()
 // resolves to the stored result, with `fleet` when a fleet window opened, or to null with the error shown on the receipt.
-export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onReceiptReady, saveRef, finalLabel = "Soumettre", clientName = "" }) {
+export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onReceiptReady, saveRef, fleetRetryRef, finalLabel = "Soumettre", clientName = "" }) {
     const { accessToken } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
@@ -215,6 +214,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const [fleetNumInt, setFleetNumInt] = useState(""); // fleet contract saved
     const [fleetOpen, setFleetOpen] = useState(false); // its "Véhicules de la flotte" window
     const [fleetDrafts, setFleetDrafts] = useState([]); // polices fictives entered with the police flotte, stored just after it
+    const storedNumInt = useRef(""); // the police flotte once stored
     const [fleetEditor, setFleetEditor] = useState(null); // their window: { index } (-1: a new one)
     const [triedSteps, setTriedSteps] = useState({}); // a step whose "Suivant" was clicked shows its input errors
     const formRef = useRef(null);
@@ -419,12 +419,19 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     function goToReceipt() {
         setError("");
         if (Object.keys(stepErrors).length) { showStepErrors(); return; }
+        // A flotte has no quittance of its own: each police fictive has its own, paid by its client.
+        if (values.flotte) {
+            if (!fleetDrafts.length) { setError("Ajoutez au moins une police fictive à cette police flotte."); return; }
+            if (onReceiptReady) onReceiptReady();
+            else save();
+            return;
+        }
         setStep(2);
     }
 
     async function save(e) {
         e?.preventDefault();
-        if (!isCreate || step !== 2 || saved) return null;
+        if (!isCreate || (step !== 2 && !values.flotte) || saved) return null;
         setError("");
         setMessage("");
 
@@ -472,7 +479,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ police, quittance, garanties, carte_verte, dommages_cumules, revalorisation })
+                body: JSON.stringify({ police, quittance: values.flotte ? null : quittance, garanties, carte_verte: values.flotte ? null : carte_verte, dommages_cumules, revalorisation })
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -481,23 +488,13 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 );
             }
             setSaved(true);
-            setMessage(`Police ${result.num_police} enregistrée. Quittance : ${result.num_quittance}`);
-            // The polices fictives follow their police. A refused one never undoes it: the fleet window opens to enter it again.
-            const drafts = values.flotte && result.num_int ? fleetDrafts : [];
-            let fleetRefused = [];
-            if (drafts.length) {
-                try {
-                    const { resultats } = await importVehicles(accessToken, result.num_int, drafts.map(({ nom_client, ...draft }) => draft));
-                    fleetRefused = resultats.filter(item => !item.ok);
-                } catch (fleetError) {
-                    fleetRefused = drafts.map(draft => ({ num_imat: draft.num_imat, message: fleetError.message }));
-                }
-                if (fleetRefused.length) setMessage(current => `${current} · Polices fictives refusées : ${fleetRefused.map(item => `${item.num_imat} (${item.message})`).join(", ")}`);
-            }
-            const fleet = Boolean(values.flotte && result.num_int && (!drafts.length || fleetRefused.length));
-            if (values.flotte && result.num_int) setFleetNumInt(String(result.num_int));
-            if (fleet) setFleetOpen(true);
-            return { ...result, fleet, fleetRefused, fleetCount: drafts.length - fleetRefused.length };
+            setMessage(result.num_quittance ? `Police ${result.num_police} enregistrée. Quittance : ${result.num_quittance}` : `Police flotte ${result.num_police} enregistrée.`);
+            // The polices fictives follow their police. A refused one never undoes it: it stays in the list, to try again.
+            if (!values.flotte || !result.num_int) return result;
+            setFleetNumInt(String(result.num_int));
+            storedNumInt.current = String(result.num_int);
+            const { refused, claims, stored } = await storeFleet(String(result.num_int), fleetDrafts);
+            return { ...result, fleetRefused: refused, fleetClaims: claims, fleetCount: stored };
         } catch (err) {
             setError(
                 err instanceof TypeError
@@ -511,12 +508,35 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     }
     if (saveRef) saveRef.current = save;
 
-    const samePlate = (a, b) => String(a || "").replace(/\s/g, "").toUpperCase() === String(b || "").replace(/\s/g, "").toUpperCase();
+    if (fleetRetryRef) fleetRetryRef.current = () => storeFleet(storedNumInt.current, fleetDrafts);
+
+    // One after the other: a new client takes the next code. Those refused stay in the list, ready to try again.
+    async function storeFleet(numInt, drafts) {
+        const refused = [];
+        const remaining = [];
+        const claims = [];
+        for (const draft of drafts) {
+            try {
+                const code = await storeDraft(accessToken, numInt, draft);
+                if (draft.form.withClaim) claims.push({ num_imat: draft.num_imat, code_client: code, nom_client: draft.nom_client });
+            } catch (fleetError) {
+                refused.push({ num_imat: draft.num_imat, message: fleetError.message });
+                remaining.push(fleetError.draft || draft);
+            }
+        }
+        setFleetDrafts(remaining);
+        if (refused.length) setMessage(current => `${current} · Polices fictives refusées : ${refused.map(item => `${item.num_imat} (${item.message})`).join(", ")}`);
+        return { refused, claims, stored: drafts.length - refused.length };
+    }
+
+    async function retryFleet() {
+        setSaving(true);
+        await storeFleet(storedNumInt.current, fleetDrafts);
+        setSaving(false);
+    }
+
     function storeFleetDraft(draft) {
         const { index } = fleetEditor;
-        if (fleetDrafts.some((item, position) => position !== index && samePlate(item.num_imat, draft.num_imat))) {
-            throw new Error(`Le véhicule ${draft.num_imat} est déjà dans cette police flotte.`);
-        }
         setFleetDrafts(current => (index < 0 ? [...current, draft] : current.map((item, position) => (position === index ? draft : item))));
         setFleetEditor(null);
     }
@@ -915,22 +935,23 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 <div className="pf-flotte-section">
                     <h4>Police flotte</h4>
                     <div className="pf-flotte-head">
-                        <p>{fleetDrafts.length ? `${fleetDrafts.length} police${fleetDrafts.length > 1 ? "s" : ""} fictive${fleetDrafts.length > 1 ? "s" : ""} · prime totale ${fleetDrafts.reduce((sum, item) => sum + Number(item.prime_total || 0), 0).toFixed(3)}` : "Ajoutez une à une les polices fictives de cette flotte. Elles seront enregistrées avec la police."}</p>
+                        <p>{fleetDrafts.length ? `${fleetDrafts.length} police${fleetDrafts.length > 1 ? "s" : ""} fictive${fleetDrafts.length > 1 ? "s" : ""} · prime totale ${fleetDrafts.reduce((sum, item) => sum + Number(item.prime_total || 0), 0).toFixed(3)}` : "Ajoutez une à une les polices fictives de cette flotte : au moins une. Chacune a son client et sa quittance, à la place de la quittance de la police."}</p>
                         <button type="button" className="pf-view-client-button" onClick={() => setFleetEditor({ index: -1 })}>+ Ajouter une police fictive</button>
                     </div>
                     {fleetDrafts.length > 0 && (
                     <div className="pf-receipts-wrap">
                         <table className="pf-receipts">
-                            <thead><tr><th>N°</th><th>Immatriculation</th><th>Marque</th><th>Client</th><th>Entrée</th><th className="is-number">Prime totale</th><th /></tr></thead>
+                            <thead><tr><th>N°</th><th>Immatriculation</th><th>Marque</th><th>Client</th><th>Entrée</th><th className="is-number">Prime totale</th><th>Sinistre</th><th /></tr></thead>
                             <tbody>
                                 {fleetDrafts.map((item, index) => (
                                     <tr key={item.num_imat}>
                                         <td>{index + 1}</td>
                                         <td><b>{item.num_imat}</b></td>
                                         <td>{item.marque || "—"}</td>
-                                        <td>{item.code_client || values.code_client} {item.nom_client}</td>
+                                        <td>{item.code_client || "Nouveau"} {item.nom_client}</td>
                                         <td>{item.effet ? item.effet.split("-").reverse().join("/") : "—"}</td>
                                         <td className="is-number">{item.prime_total != null ? Number(item.prime_total).toFixed(3) : "—"}</td>
+                                    <td>{item.form.withClaim ? "À déclarer" : "—"}</td>
                                         <td className="pf-flotte-actions">
                                             <button type="button" className="pf-link-button" onClick={() => setFleetEditor({ index })}>Modifier</button>
                                             <button type="button" className="pf-link-button" onClick={() => setFleetDrafts(current => current.filter((_, position) => position !== index))}>Supprimer</button>
@@ -1149,6 +1170,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
             {errorCount > 0 && <div className="pf-error" role="alert">Corrigez {errorCount > 1 ? `les ${errorCount} champs signalés` : "le champ signalé"} pour continuer.</div>}
             {error && <div className="pf-error">{error}</div>}
+            {saved && !embedded && fleetDrafts.length > 0 && <div className="pf-error"><button type="button" className="pf-link-button" disabled={saving} onClick={retryFleet}>Réessayer les polices fictives refusées</button></div>}
             {message && <div className="pf-success">{message}{saved && values.flotte && fleetNumInt && <> · <button type="button" className="pf-link-button" onClick={() => setFleetOpen(true)}>Véhicules de la flotte</button></>}</div>}
             {fleetNumInt && fleetOpen && <FlotteDialog key={fleetNumInt} numInt={fleetNumInt} onClose={() => setFleetOpen(false)} />}
 
@@ -1166,8 +1188,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <button type="button" onClick={() => setStep(1)}>← Précédent</button>
                     )}
                     {step === 1 ? (
-                        <button type="button" className="pf-primary" onClick={goToReceipt} disabled={loadedExisting}>
-                            Suivant : quittance →
+                        <button type="button" className="pf-primary" onClick={goToReceipt} disabled={loadedExisting || saving || saved}>
+                            {!values.flotte ? "Suivant : quittance →" : onReceiptReady ? "Suivant : sinistre →" : saving ? "Enregistrement..." : finalLabel}
                         </button>
                     ) : (
                         <button
@@ -1182,16 +1204,14 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             )}
     </form>
 
-    {fleetEditor && createPortal(
-      <VehicleForm
-        draft
-        mode="add"
+    {fleetEditor && (
+      <PoliceFictiveWizard
         contract={{ code_client: values.code_client, nom_client: clientName || nomClient, num_police: values.num_police, effet: values.effet, expiration: values.expiration }}
-        vehicle={fleetEditor.index < 0 ? null : fleetDrafts[fleetEditor.index]}
+        draft={fleetEditor.index < 0 ? null : fleetDrafts[fleetEditor.index]}
+        otherPlates={fleetDrafts.filter((_, position) => position !== fleetEditor.index).map(item => item.num_imat)}
         onSubmit={storeFleetDraft}
         onClose={() => setFleetEditor(null)}
-      />,
-      document.body
+      />
     )}
 
     {showClientPolices && (

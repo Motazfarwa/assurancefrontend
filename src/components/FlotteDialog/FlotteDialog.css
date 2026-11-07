@@ -71,3 +71,14 @@
   .flt-actions { width: 100%; margin-left: 0; }
   .flt-actions button { flex: 1; }
 }
+
+/* Police fictive: the five steps of a client file, one vehicle at a time */
+.flt-wizard { width: min(100%, 1040px); }
+.flt-wizard .client-form-progress { flex: none; }
+.flt-client-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0 0 12px; }
+.flt-client-code { display: flex; align-items: flex-end; gap: 8px; }
+.flt-client-code label { display: grid; gap: 3px; font-size: 12px; }
+.flt-client-code input { height: 34px; padding: 0 10px; border: 1px solid #d2dfe5; border-radius: 8px; }
+.flt-client-form { padding: 0; }
+.flt-client-form .client-fields { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.flt-form-body .client-field-error { display: block; margin-top: 3px; }
