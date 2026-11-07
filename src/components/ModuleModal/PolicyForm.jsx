@@ -935,7 +935,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 <div className="pf-flotte-section">
                     <h4>Police flotte</h4>
                     <div className="pf-flotte-head">
-                        <p>{fleetDrafts.length ? `${fleetDrafts.length} police${fleetDrafts.length > 1 ? "s" : ""} fictive${fleetDrafts.length > 1 ? "s" : ""} · prime totale ${fleetDrafts.reduce((sum, item) => sum + Number(item.prime_total || 0), 0).toFixed(3)}` : "Ajoutez une à une les polices fictives de cette flotte : au moins une. Chacune a son client et sa quittance, à la place de la quittance de la police."}</p>
+                        {fleetDrafts.length > 0 && <p>{`${fleetDrafts.length} police${fleetDrafts.length > 1 ? "s" : ""} fictive${fleetDrafts.length > 1 ? "s" : ""} · prime totale ${fleetDrafts.reduce((sum, item) => sum + Number(item.prime_total || 0), 0).toFixed(3)}`}</p>}
                         <button type="button" className="pf-view-client-button" onClick={() => setFleetEditor({ index: -1 })}>+ Ajouter une police fictive</button>
                     </div>
                     {fleetDrafts.length > 0 && (
