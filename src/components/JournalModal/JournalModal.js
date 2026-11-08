@@ -7,6 +7,7 @@ import '../AcompteModal/AcompteModal.css';
 import '../ChequeInstanceModal/ChequeInstanceModal.css';
 import { CashSheet } from './FeuilleCaisse';
 import './JournalModal.css';
+import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt = (value) => money.format(Number(value || 0));
@@ -26,7 +27,6 @@ const receiptStatus = (row) => {
   if (row.a_s === 'A') return ['Acompte', `Paiement partiel : l’acompte de ${fmt(row.montant)} est à déclarer, il reste ${fmt(row.solde_quittance)} dû par le client.`];
   return ['Reste dû', `Les acomptes (${fmt(row.regle)}) sont déjà déclarés : la ligne déclarerait les ${fmt(row.solde_quittance)} que le client n’a pas encore payés.`];
 };
-const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 
 // Each journal: how its lines are read, keyed, pre-chosen, searched and comptabilisées.
 const KINDS = {
@@ -236,7 +236,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={() => window.print()}>Imprimer</button><button type="button" className="expert-cancel" onClick={() => setSheet(null)}>Fermer</button></div>
         <article className="jrn-sheet">
           <header className="jrn-sheet-head">
-            <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
+            <div className="jrn-agency">{AGENCY_PYRAMID.map((line) => <span key={line}>{line}</span>)}</div>
             <div className="jrn-sheet-title">
               <h1>{kind === 'encaissement' ? 'JOURNAL D’ENCAISSEMENT DES QUITTANCES' : 'LISTE DES DÉPENSES (SINISTRE, RISTOURNE)'}</h1>
               <p>{sheet.preview ? 'APERÇU · NON COMPTABILISÉ' : kind === 'encaissement' ? 'NON VALIDÉ' : `Pour la date du ${formatDate(date)}`}</p>

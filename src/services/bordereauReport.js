@@ -1,5 +1,6 @@
 // Printing and Excel export of the bordereau screens. A "section" is { title, columns: [{ key, label, kind? }], rows }.
 // kind: 'money' (3 decimals, right aligned) or 'date' (ISO -> dd/mm/yyyy).
+import { AGENCY_INFO } from '../data/agencyInfo';
 
 export const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 export const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
@@ -37,7 +38,7 @@ export function printReport({ title, lines = [], sections }) {
     .empty{text-align:center;color:#666}
     @media print{body{margin:8mm}}
   </style></head><body>
-    <div class="head"><div>Cabinet d'Assurance Jemmali</div><div>Date : ${new Date().toLocaleDateString('fr-FR')}</div></div>
+    <div class="head"><div>${escapeHtml(AGENCY_INFO.nom)}</div><div>Date : ${new Date().toLocaleDateString('fr-FR')}</div></div>
     <h1>${escapeHtml(title)}</h1>
     ${lines.map((line) => `<div class="meta">${escapeHtml(line)}</div>`).join('')}
     ${body}

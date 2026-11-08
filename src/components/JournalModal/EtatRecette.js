@@ -4,12 +4,12 @@ import { listCompanies } from '../../services/companyApi';
 import { getRecetteTechnique } from '../../services/journalApi';
 import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
 import './JournalModal.css';
+import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
-const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 
 // Choix d'impression: the order / grouping of the payments. Each group gets its sub-total.
 const CHOICES = {
@@ -62,7 +62,7 @@ function RecetteSheet({ params, choice, companyName, onClose }) {
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
-          <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
+          <div className="jrn-agency">{AGENCY_PYRAMID.map((line) => <span key={line}>{line}</span>)}</div>
           <div className="jrn-sheet-title"><h1>ETAT DE LA RECETTE TECHNIQUE</h1><p>Du {formatDate(params.debut)} au {formatDate(params.fin)}{companyName ? ` · Compagnie ${companyName}` : ''}</p><p>{CHOICES[choice].label}</p></div>
           <div className="jrn-agency jrn-printed"><span>Date : {formatDate(today())}</span></div>
         </header>

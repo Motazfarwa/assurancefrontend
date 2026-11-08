@@ -6,12 +6,12 @@ import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
 import './JournalModal.css';
+import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
-const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 
 const KINDS = {
   moins: {
@@ -47,7 +47,7 @@ function PercusSheet({ type, debut, fin, onClose }) {
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
-          <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
+          <div className="jrn-agency">{AGENCY_PYRAMID.map((line) => <span key={line}>{line}</span>)}</div>
           <div className="jrn-sheet-title"><h1>{kind.title}</h1><p>Période du {formatDate(debut)} au {formatDate(fin)}</p></div>
           <div className="jrn-agency jrn-printed"><span>Date : {formatDate(today())}</span></div>
         </header>

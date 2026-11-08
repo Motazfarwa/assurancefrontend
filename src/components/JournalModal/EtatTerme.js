@@ -7,10 +7,10 @@ import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
 import './JournalModal.css';
+import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
-const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 // The next month by default (January after December).
 const nextMonth = () => (new Date().getMonth() + 1) % 12 + 1;
@@ -53,7 +53,7 @@ export function TermeSheet({ params, month, companyName, onClose }) {
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={state.loading || Boolean(state.error)}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
-          <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
+          <div className="jrn-agency">{AGENCY_PYRAMID.map((line) => <span key={line}>{line}</span>)}</div>
           <div className="jrn-sheet-title"><h1>ETAT DE TERME DU MOIS {month}</h1>{companyName && <p>Compagnie : {companyName}</p>}</div>
           <div className="jrn-agency jrn-printed"><span>Date : {formatDate(today())}</span></div>
         </header>

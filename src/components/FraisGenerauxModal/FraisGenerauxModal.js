@@ -7,13 +7,13 @@ import '../CompanyManagementModal/CompanyManagementModal.css';
 import '../RistourneModal/RistourneModal.css';
 import '../JournalModal/JournalModal.css';
 import './FraisGenerauxModal.css';
+import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 8)}01`;
-const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '1002 - Tunis', 'Tél : 71 893 000', 'Fax : 71 891 891'];
 
 const entry = (nature = 'D', banque = '') => ({ nature, code_type: '', mode: 'C', date_dep: today(), num_piece: '', code_banque: banque, montant: '', observation: '' });
 
@@ -37,7 +37,7 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
-          <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
+          <div className="jrn-agency">{AGENCY_PYRAMID.map((line) => <span key={line}>{line}</span>)}</div>
           <div className="jrn-sheet-title"><h1>{natureLabel}</h1><p>Période du {formatDate(debut)} au {formatDate(fin)}</p></div>
           <div className="jrn-agency jrn-printed"><span>Date : {formatDate(today())}</span></div>
         </header>

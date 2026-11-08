@@ -308,3 +308,24 @@
   .workspace-actions .workspace-logout { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; margin: 0; padding: 0 12px; border-color: transparent; font-size: 14px; text-align: left; }
   .workspace-actions .workspace-logout:hover { background: #f1f8f6; }
 }
+
+/* ===== Desktop: every module readable, grouped by nature, nothing cut off =====
+   The list takes the height it needs (the page scrolls on a short screen instead of hiding the last rows),
+   the welcome panel is narrower so the cards get more room, and full names wrap instead of being cut. */
+@media (min-width: 901px) {
+  .workspace-window { max-height: none; overflow: visible; }
+  .workspace-window > * { flex-shrink: 0; }
+  .workspace-workbench { grid-template-columns: minmax(200px, .3fr) minmax(0, 1.7fr); }
+  .workspace-intro { align-self: start; position: sticky; top: 12px; }
+  .workspace-illustration { flex: 0 1 150px; max-height: 190px; }
+  .module-browser { grid-template-rows: auto auto auto; }
+  .module-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; overflow: visible; }
+  .module-row { align-items: center; padding: 8px 10px; }
+  .module-row-info strong { overflow: visible; white-space: normal; line-height: 1.25; }
+  .module-row-info small { display: -webkit-box; overflow: hidden; white-space: normal; line-height: 1.3; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+}
+.module-group-title { display: flex; grid-column: 1 / -1; align-items: center; gap: 8px; margin: 10px 0 0; color: #1f5f5a; font-size: 12px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+.module-group-title:first-child { margin-top: 0; }
+.module-group-title > span { display: grid; min-width: 22px; height: 20px; place-items: center; padding: 0 4px; border-radius: 6px; background: #e7f3f1; color: #278477; font-size: 10px; }
+.module-group-title > b { margin-left: 2px; color: #8aa0a6; font-size: 11px; font-weight: 700; }
+.module-group-title::after { flex: 1; height: 1px; background: #e3eaec; content: ''; }

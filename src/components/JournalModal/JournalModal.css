@@ -168,3 +168,6 @@
 .jrn-bank-confront button { min-height: 34px; padding: 0 14px; border: 1px solid #187d78; border-radius: 8px; background: #fff; color: #187d78; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .jrn-bank-confront button.expert-submit { background: #187d78; color: #fff; }
 .jrn-bank-confront button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Agency block of the reports: centered, 3 lines in a pyramid (the date block on the right keeps its alignment) */
+.jrn-sheet-head > .jrn-agency:not(.jrn-printed) { justify-items: center; align-content: start; text-align: center; }

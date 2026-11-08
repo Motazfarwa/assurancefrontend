@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { hasPermission, ROLES } from '../../auth/permissions';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
@@ -300,7 +300,14 @@ export default function ModulesWorkspace() {
             <label className="workspace-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4 4"/></svg><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher par numero ou nom..." aria-label="Rechercher un programme" />{search && <button type="button" onClick={() => setSearch('')} aria-label="Effacer la recherche">×</button>}</label>
             <div className="module-table-head"><span>N° PGM.</span><span>Nom du programme</span><span aria-hidden="true" /></div>
             <div className="module-list" role="region" aria-label="Programmes disponibles">
-              {filteredModules.map((module) => <button type="button" className={`module-row ${activeModuleId === module.id ? 'is-selected' : ''}`} key={`${module.category}-${module.id}`} onClick={() => openModule(module)} title={`${module.id} · ${module.title}\n${module.description}`}><span className="module-row-code">{module.id}</span><span className="module-row-info"><strong>{module.title}</strong><small>{activeCategory === 'all' ? `${MODULE_CATEGORIES.find((category) => category.id === module.category)?.label} · ` : ''}{module.description}</small></span><span className="module-row-action" aria-hidden="true">↗</span></button>)}
+              {/* "Tous" without a search: the modules under the title of their nature, in number order */}
+              {(activeCategory === 'all' && !search.trim()
+                ? MODULE_CATEGORIES.map((category) => ({ category, modules: filteredModules.filter((module) => module.category === category.id).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })) })).filter((group) => group.modules.length)
+                : [{ category: null, modules: filteredModules }]
+              ).map(({ category, modules }) => <Fragment key={category?.id || 'list'}>
+                {category && <h3 className="module-group-title"><span>{category.icon}</span>{category.label}<b>{modules.length}</b></h3>}
+                {modules.map((module) => <button type="button" className={`module-row ${activeModuleId === module.id ? 'is-selected' : ''}`} key={`${module.category}-${module.id}`} onClick={() => openModule(module)} title={`${module.id} · ${module.title}\n${module.description}`}><span className="module-row-code">{module.id}</span><span className="module-row-info"><strong>{module.title}</strong><small>{module.description}</small></span><span className="module-row-action" aria-hidden="true">↗</span></button>)}
+              </Fragment>)}
               {!filteredModules.length && <div className="module-list-empty"><span>⌕</span><strong>Aucun programme trouve</strong><small>Modifiez votre recherche ou choisissez une autre nature.</small></div>}
             </div>
             <div className="module-browser-footer"><span /><span>{filteredModules.length} resultats</span></div>

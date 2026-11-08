@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { AGENCY } from '../../data/agencyInfo';
+import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 import { getBankAccounts, getBankStatement } from '../../services/journalApi';
 import { BANK_COLUMNS, bankLines, confront, readBankFile } from '../../services/bankStatement';
 import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
@@ -25,7 +25,7 @@ function SheetFrame({ title, subtitle, onClose, children, ready = true }) {
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!ready}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
-          <div className="jrn-agency">{AGENCY.map((line) => <span key={line}>{line}</span>)}</div>
+          <div className="jrn-agency">{AGENCY_PYRAMID.map((line) => <span key={line}>{line}</span>)}</div>
           <div className="jrn-sheet-title"><h1>{title}</h1>{subtitle.map((line) => <p key={line}>{line}</p>)}</div>
           <div className="jrn-agency jrn-printed"><span>Date : {formatDate(iso(new Date()))}</span></div>
         </header>
