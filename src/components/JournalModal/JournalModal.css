@@ -144,3 +144,27 @@
   @page jrnA4 { size: A4; margin: 0; }
   .jrn-a4 { page: jrnA4; width: 210mm; min-height: 0; padding: 16mm 14mm; }
 }
+
+/* Etat détaillé des comptes */
+.jrn-bank-modal { width: min(860px, 100%); }
+.jrn-bank-filters { flex-wrap: wrap; align-items: flex-end; }
+.jrn-bank-mode { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 4px 10px 6px; border: 1px solid #d3dfe5; border-radius: 8px; }
+.jrn-bank-mode legend { padding: 0 4px; color: #587079; font-size: 10px; font-weight: 700; }
+.jrn-bank-confront { display: grid; gap: 10px; margin-top: 14px; padding: 12px 14px; border: 1px solid #d3dfe5; border-radius: 10px; background: #fbfdfd; }
+.jrn-bank-confront-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.jrn-bank-confront-head strong { display: block; color: #173247; font-size: 13px; }
+.jrn-bank-confront-head small { color: #587079; font-size: 11px; }
+.jrn-bank-confront > .expert-submit { justify-self: start; }
+.jrn-bank-mapping summary { cursor: pointer; color: #187d78; font-size: 11px; font-weight: 700; }
+.jrn-bank-mapping > div { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+.jrn-bank-mapping select, .jrn-bank-mapping input { width: 100%; }
+.jrn-bank-table { margin-top: 6px; }
+.jrn-bank-summary { min-width: 0; max-width: 640px; margin: 14px 0 4px; }
+.jrn-bank-summary tr.is-gap td { color: #b42318; font-weight: 700; }
+.jrn-bank-summary tr.is-ok td { color: #08765e; font-weight: 700; }
+.jrn-bank-note { margin: 4px 0 0; color: #555; font-size: 10px; }
+.jrn-bank-title { margin: 18px 0 2px; font-size: 13px; }
+.jrn-bank-title.is-missing { color: #b42318; }
+.jrn-bank-confront button { min-height: 34px; padding: 0 14px; border: 1px solid #187d78; border-radius: 8px; background: #fff; color: #187d78; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.jrn-bank-confront button.expert-submit { background: #187d78; color: #fff; }
+.jrn-bank-confront button:disabled { opacity: .55; cursor: not-allowed; }

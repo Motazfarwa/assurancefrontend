@@ -52,3 +52,6 @@ export const getCashSheet = (token, params) => request(`/api/journaux/feuille?${
 // The solde and montant à déclarer kept for the feuille of a company on a day (± 1 DT of the computed ones, with a remarque).
 export const getCashAdjustment = (token, params) => request(`/api/journaux/feuille/ajustement?${query(params)}`, token);
 export const saveCashAdjustment = (token, payload) => request('/api/journaux/feuille/ajustement', token, { method: 'PUT', body: JSON.stringify(payload) });
+// Etat détaillé des comptes: the agency accounts, and one account's movements between two dates with its balances.
+export const getBankAccounts = (token) => request('/api/journaux/comptes-banque/banques', token);
+export const getBankStatement = (token, params) => request(`/api/journaux/comptes-banque?${query(params)}`, token);

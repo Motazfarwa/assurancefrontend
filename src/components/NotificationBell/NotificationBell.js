@@ -97,12 +97,12 @@ export default function NotificationBell({ onOpenHistory }) {
           {incomplete?.total > 0 && <div className="notif-incomplete">
             <button type="button" className="notif-incomplete-head" aria-expanded={showIncomplete} onClick={() => setShowIncomplete((value) => !value)}>
               <span><strong>{incomplete.total} client{incomplete.total > 1 ? 's' : ''} à compléter</strong>
-                <small>Coordonnées manquantes : {incomplete.coordonnees} · Sans police : {incomplete.sans_police} · Police incomplète : {incomplete.polices}</small></span>
+                <small>Coordonnées manquantes : {incomplete.coordonnees} · Sans police : {incomplete.sans_police} · Police incomplète : {incomplete.polices}{incomplete.quittances != null && ` · Quittance incomplète : ${incomplete.quittances} · Sinistre incomplet : ${incomplete.sinistres}`}</small></span>
               <b aria-hidden="true">{showIncomplete ? '▴' : '▾'}</b>
             </button>
             {showIncomplete && <ul>
               {incomplete.items.map((item) => <li key={item.code_client}><button type="button" title="Ouvrir la fiche du client" onClick={() => openClient(item.code_client)}>
-                <strong>{item.code_client} · {item.nom_client || 'Client sans nom'}</strong><small>Manque : {item.manques.join(', ')}</small>
+                <strong>{item.code_client} · {item.nom_client || 'Client sans nom'}</strong><small>Manque : {item.manques.join(' · ')}</small>
               </button></li>)}
               {incomplete.total > incomplete.items.length && <li className="notif-incomplete-more">Les {incomplete.items.length} clients les plus récents sont affichés.</li>}
             </ul>}

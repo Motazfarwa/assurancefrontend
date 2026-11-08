@@ -26,6 +26,7 @@ import EtatPercusModal from '../JournalModal/EtatPercus';
 import EtatComptesClientsModal from '../JournalModal/EtatComptesClients';
 import RetourQuittancesModal from '../JournalModal/RetourQuittances';
 import EtatTermeModal from '../JournalModal/EtatTerme';
+import EtatComptesBanqueModal from '../JournalModal/EtatComptesBanque';
 import ReconciliationPoliceModal from '../JournalModal/ReconciliationPolice';
 import QuittancesModal from '../QuittancesModal/QuittancesModal';
 import OperationsJournalieresModal from '../JournalModal/OperationsJournalieres';
@@ -75,6 +76,7 @@ export default function ModulesWorkspace() {
   const [comptesModule, setComptesModule] = useState(null);
   const [retourModule, setRetourModule] = useState(null);
   const [termeModule, setTermeModule] = useState(null);
+  const [bankModule, setBankModule] = useState(null);
   const [reconciliationModule, setReconciliationModule] = useState(null);
   const [quittancesModule, setQuittancesModule] = useState(null);
   const [ristourneModule, setRistourneModule] = useState(null);
@@ -168,6 +170,10 @@ export default function ModulesWorkspace() {
     if (module.form === 'retour-quittances') {
       setActiveModuleId(module.id);
       setRetourModule(module);
+      return;
+    }
+    if (module.form === 'etat-comptes-banque') {
+      setBankModule(module);
       return;
     }
     if (module.form === 'etat-terme') {
@@ -324,6 +330,7 @@ export default function ModulesWorkspace() {
       {quittancesModule && <QuittancesModal moduleId={quittancesModule.id} onClose={() => setQuittancesModule(null)} />}
       {retourModule && <RetourQuittancesModal moduleId={retourModule.id} onClose={() => setRetourModule(null)} />}
       {termeModule && <EtatTermeModal moduleId={termeModule.id} onClose={() => setTermeModule(null)} />}
+      {bankModule && <EtatComptesBanqueModal moduleId={bankModule.id} onClose={() => setBankModule(null)} />}
       {reconciliationModule && <ReconciliationPoliceModal moduleId={reconciliationModule.id} onClose={() => setReconciliationModule(null)} />}
       {operationsModule && <OperationsJournalieresModal key={operationsModule.id} moduleId={operationsModule.id} familyKey={operationsModule.form === 'operations-financieres' ? 'financier' : 'production'} onClose={() => setOperationsModule(null)} />}
       {ristourneModule && <RistourneModal moduleId={ristourneModule.id} onClose={() => setRistourneModule(null)} />}
