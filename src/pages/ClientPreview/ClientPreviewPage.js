@@ -13,8 +13,8 @@ function Detail({ label, value }) {
   return <div className="client-detail"><span>{label}</span><strong>{value || 'Non renseigné'}</strong></div>;
 }
 
-function DetailSection({ title, children }) {
-  return <section className="client-detail-section"><h2>{title}</h2><div className="client-detail-grid">{children}</div></section>;
+function DetailSection({ title, children, className = '' }) {
+  return <section className={`client-detail-section${className ? ` ${className}` : ''}`}><h2>{title}</h2><div className="client-detail-grid">{children}</div></section>;
 }
 
 const POLICY_COLUMNS = [['num_police', 'N° police'], ['nom_compagnie', 'Compagnie'], ['risque', 'Risque'], ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['prime_total', 'Prime totale'], ['obser', 'Observation'], ['commission', 'Commission']];
@@ -358,11 +358,16 @@ export default function ClientPreviewPage() {
         </header>
         <div className="preview-document-title"><span>DOSSIER CLIENT</span><h1>Informations du client</h1><p>Fiche de renseignements</p></div>
         <section className="client-profile-card"><span className="client-profile-avatar">{fullName.charAt(0).toUpperCase()}</span><div><span className="client-profile-label">CLIENT</span><h2>{fullName}</h2><p>{client.profession || 'Profession non renseignée'} · {client.clientType || 'Particulier'}</p></div><span className="client-status-pill">Dossier client</span></section>
-        <DetailSection title="Identité"><Detail label="Code client" value={client.clientCode} /><Detail label="Date de création" value={client.createdAt} /><Detail label="Nom" value={client.lastName} /><Detail label="Prénom" value={client.firstName} /><Detail label="Nationalité" value={nationalityLabel(client)} /><Detail label="Pays" value={client.country} /><Detail label="Date de naissance" value={client.birthDate} /><Detail label="Lieu de naissance" value={client.birthPlace} /><Detail label="Profession" value={client.profession} /><Detail label="Situation familiale" value={client.civilStatus} /><Detail label="N° de pièce d’identité" value={client.identityNumber} /><Detail label="Lieu de délivrance" value={client.identityPlace} /><Detail label="N° de permis" value={client.licenseNumber} /></DetailSection>
+        {/* On a wide screen the sections sit side by side, so the whole fiche shows without scrolling */}
+        <div className="preview-sections">
+        <DetailSection title="Identité" className="preview-identity"><Detail label="Code client" value={client.clientCode} /><Detail label="Date de création" value={client.createdAt} /><Detail label="Nom" value={client.lastName} /><Detail label="Prénom" value={client.firstName} /><Detail label="Nationalité" value={nationalityLabel(client)} /><Detail label="Pays" value={client.country} /><Detail label="Date de naissance" value={client.birthDate} /><Detail label="Lieu de naissance" value={client.birthPlace} /><Detail label="Profession" value={client.profession} /><Detail label="Situation familiale" value={client.civilStatus} /><Detail label="N° de pièce d’identité" value={client.identityNumber} /><Detail label="Lieu de délivrance" value={client.identityPlace} /><Detail label="N° de permis" value={client.licenseNumber} /></DetailSection>
         <DetailSection title="Coordonnées"><Detail label="Adresse du domicile" value={client.homeAddress} /><Detail label="Ville / code postal" value={[client.homeCity, client.homePostalCode].filter(Boolean).join(' · ')} /><Detail label="Téléphone domicile" value={client.homePhone} /><Detail label="Adresse du bureau" value={client.officeAddress} /><Detail label="Téléphone bureau" value={client.officePhone} /><Detail label="Email" value={client.email} /><Detail label="Adresse de correspondance" value={client.correspondence} /></DetailSection>
         {/* Shown only when the client has a contact code or a quérabilité: a name alone is legacy filler (CAFETIER, S, X…). */}
+        <div className="preview-section-stack">
         {hasLien(client) && <DetailSection title="Lien"><Detail label="Code de contact" value={realValue(client.relatedCode)} /><Detail label="Nom du contact" value={realValue(client.relatedName)} /><Detail label="Quérabilité" value={realValue(client.relationship)} /></DetailSection>}
         <DetailSection title="Informations du dossier"><Detail label="Type client" value={client.clientType} /><Detail label="Exonéré" value={client.taxExempt ? 'Oui' : 'Non'} /><Detail label="Observation" value={client.notes} /></DetailSection>
+        </div>
+        </div>
       </article>
       {policiesOpen && <RecordsDialog kicker="DOSSIER CLIENT · MODULE 110" title="Polices du client" className="is-policies" columns={POLICY_COLUMNS} {...policiesState} filters={[
         { key: 'num_police', label: 'N° police', value: policyFilters.num_police, placeholder: 'Ex : 0522…' },

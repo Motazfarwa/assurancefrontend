@@ -15,7 +15,9 @@ const KINDS = {
 };
 const today = () => new Date().toISOString().slice(0, 10);
 const cleanNumber = (value) => String(value ?? '').trim().replace(/\.0+$/, '');
-const emptyLine = () => ({ num_police: '', code_client: '', nom_client: '', echeance: '', num_quittance: '', prime_net: '', commission: '', prime_total: '' });
+// A line typed by hand: the amounts start at 0.
+const emptyLine = () => ({ num_police: '', code_client: '', nom_client: '', echeance: '', num_quittance: '', prime_net: '0', commission: '0', prime_total: '0' });
+const toAmount = (value) => (value === '' || value == null ? null : Number(value));
 const GRID = [
   ['num_police', 'N° Police (num_int)'], ['code_client', 'Code Clt'], ['nom_client', 'Nom Client'], ['echeance', 'Échéance', 'date'],
   ['num_quittance', 'N° Quit.'], ['prime_net', 'P.Net+C.Q.', 'money'], ['commission', 'Com.', 'money'], ['prime_total', 'Prime Total', 'money'],
@@ -43,6 +45,8 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const skipLoad = useRef(false);
   const [selected, setSelected] = useState(-1);
   const [editing, setEditing] = useState(null);
+  const [draft, setDraft] = useState(null); // the line being typed at the bottom of the grid, with its client lookup
+  const draftNumber = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -80,6 +84,41 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken, kind.quittances]);
+
+  // The N° police typed in the new line -> the client of that police at the agency, once typing pauses.
+  const draftPolice = cleanNumber(draft?.num_police).replace(/\s/g, '');
+  useEffect(() => {
+    if (!draftPolice) return undefined;
+    let active = true;
+    const timer = setTimeout(() => {
+      setDraft((current) => (current ? { ...current, lookup: 'loading' } : current));
+      getBordereauClients(accessToken, [draftPolice])
+        .then((found) => {
+          if (!active) return;
+          const client = found?.[draftPolice];
+          setDraft((current) => (current ? { ...current, code_client: client?.code_client || '', nom_client: client?.nom_client || '', lookup: client ? 'found' : 'missing' } : current));
+        })
+        .catch(() => { if (active) setDraft((current) => (current ? { ...current, lookup: 'missing' } : current)); });
+    }, 400);
+    return () => { active = false; clearTimeout(timer); };
+  }, [accessToken, draftPolice]);
+
+  function startDraft() {
+    setDraft(emptyLine());
+    requestAnimationFrame(() => draftNumber.current?.focus());
+  }
+
+  // Adds the typed line and opens the next one, so several lines are entered one after the other.
+  function addDraft() {
+    const number = String(draft.num_police).replace(/\s/g, '');
+    if (!number) { setError('Saisissez le N° de police de la ligne.'); draftNumber.current?.focus(); return; }
+    setError('');
+    const { lookup, ...values } = draft;
+    setLines((current) => [...current, { ...values, num_police: number, echeance: values.echeance || null, prime_net: toAmount(values.prime_net), commission: toAmount(values.commission), prime_total: toAmount(values.prime_total) }]);
+    setDirty(true);
+    setNotice('Ligne ajoutée. Saisissez la suivante, ou enregistrez le bordereau.');
+    startDraft();
+  }
 
   // Company / type / period -> the bordereau already stored for them, if any.
   useEffect(() => {
@@ -200,7 +239,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     setNotice('');
     if (!form.code_compagnie) { setError('Choisissez la compagnie.'); return; }
     if (!periode) { setError('Choisissez la période (mois).'); return; }
-    if (!lines.length) { setError('Importez d’abord le fichier du siège.'); return; }
+    if (!lines.length) { setError('Importez le fichier du siège ou ajoutez des lignes.'); return; }
     setBusy(true);
     try {
       const payload = {
@@ -291,7 +330,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
         </header>
 
         <div className="bd-toolbar">
-          <button type="button" className="bd-tool" onClick={() => { setEditing({ index: -1, values: emptyLine() }); }}>Ajouter</button>
+          <button type="button" className="bd-tool" onClick={startDraft} disabled={Boolean(draft)}>Ajouter</button>
           <button type="button" className="bd-tool" disabled={selected < 0} onClick={() => editLine(selected)}>Modifier</button>
           <button type="button" className="bd-tool" disabled={selected < 0} onClick={removeLine}>Supprimer</button>
           <button type="button" className="bd-tool" disabled={!lines.length} onClick={preview}>Aperçu</button>
@@ -350,7 +389,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           <table className="bd-grid">
             <thead><tr><th>N°</th>{GRID.map(([key, label]) => <th key={key}>{label}</th>)}{fromQuittances && <th className="bd-valider">Valider</th>}</tr></thead>
             <tbody>
-              {lines.length === 0 ? (
+              {lines.length === 0 && !draft ? (
                 <tr><td colSpan={GRID.length + 2} className="bd-empty">{kind.quittances ? 'Aucune quittance comptant sans période.' : form.code_compagnie ? `Aucun bordereau pour cette période : cliquez sur « ${kind.importLabel} » et choisissez le fichier Excel reçu du siège.` : 'Choisissez la compagnie et la période, puis importez le fichier du siège.'}</td></tr>
               ) : shownLines.map((line, index) => (
                 <tr key={`${line.id_ligne || 'new'}-${index}`} className={[selected === index && 'is-selected', line.valide && 'is-validated'].filter(Boolean).join(' ') || undefined} onClick={() => setSelected(index)} onDoubleClick={() => { setSelected(index); editLine(index); }}>
@@ -366,11 +405,33 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
                   )}
                 </tr>
               ))}
+              {draft && (
+                <tr className="bd-draft" onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addDraft(); } if (event.key === 'Escape') { event.stopPropagation(); setDraft(null); } }}>
+                  <td>{lines.length + 1}</td>
+                  {GRID.map(([key, label, type]) => (
+                    <td key={key}>
+                      {key === 'nom_client' && draft.lookup !== 'found' && !draft.nom_client
+                        ? <input aria-label={label} value={draft.nom_client} placeholder={draft.lookup === 'loading' ? 'Recherche…' : draft.lookup === 'missing' ? 'Police introuvable' : 'Après le N° police'} onChange={(event) => setDraft((current) => ({ ...current, nom_client: event.target.value }))} />
+                        : <input
+                          ref={key === 'num_police' ? draftNumber : undefined}
+                          aria-label={label}
+                          type={type === 'date' ? 'date' : type === 'money' ? 'number' : 'text'}
+                          step={type === 'money' ? 'any' : undefined}
+                          className={type === 'money' ? 'is-number' : undefined}
+                          value={draft[key] ?? ''}
+                          onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value, ...(key === 'num_police' ? { lookup: '' } : {}) }))}
+                        />}
+                    </td>
+                  ))}
+                  {fromQuittances && <td />}
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         <footer className="bd-footer">
+          {draft && <span className="bd-draft-actions"><button type="button" className="bd-save" onClick={addDraft}>Ajouter la ligne (Entrée)</button><button type="button" className="bd-tool" onClick={() => setDraft(null)}>Terminer la saisie</button></span>}
           <span>{savedId ? `Bordereau n° ${savedId}${fichier ? ` · ${fichier}` : ''}` : fichier ? `Fichier : ${fichier} (non enregistré)` : ''}</span>
           <div>
             {savedId && <button type="button" className="bd-danger" onClick={removeBordereau} disabled={busy}>Supprimer le bordereau</button>}

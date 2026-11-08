@@ -71,7 +71,8 @@ const initialValues = {
 
     // Quittance
     date_saisie: new Date().toISOString().slice(0, 10),
-    date_emission: "",
+    date_emission: new Date().toISOString().slice(0, 10),
+    with_periode: false, // the Période is entered only once this box is ticked
     periode: "",
     prime_net: "",
     commission: "",
@@ -238,10 +239,21 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const [nomBranche, setNomBranche] = useState("");
     const [loadingBranche, setLoadingBranche] = useState(false);
     const [brancheError, setBrancheError] = useState("");
+    const [tauxComm, setTauxComm] = useState(null); // commission rate of the branche (0.1 = 10 %)
     const [showClientPolices, setShowClientPolices] = useState(false);
     const update = (key, value) => {
         setValues(prev => ({ ...prev, [key]: value }));
     };
+    // A code branche has the company's Nbr_Chiffre_Code characters (GAT 3, BIAT 4, MAGHREBIA 2).
+    const branchLength = Number(compagnies.find(item => String(item.code_compagnie) === String(values.code_compagnie))?.nbr_chiffre_code) || 3;
+    const commissionOf = (primeNette) => (primeNette === "" || tauxComm == null ? "" : String(Math.round(Number(primeNette) * tauxComm * 1000) / 1000));
+    // Prime totale is also the montant and the solde of the quittance; commission = prime nette × taux de la branche.
+    const updateLinked = (key, value) => setValues(prev => {
+        const next = { ...prev, [key]: value };
+        if (key === "prime_total") { next.montant_quittance = value; next.solde_quittance = value; }
+        if (key === "prime_net" && tauxComm != null) next.commission = commissionOf(value);
+        return next;
+    });
 
 
     useEffect(() => {
@@ -287,8 +299,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
         setNomBranche("");
         setBrancheError("");
+        setTauxComm(null);
 
-        if (!compagnie || !/^\d{3}$/.test(branche || "")) {
+        if (!compagnie || !new RegExp(`^[0-9A-Z]{${branchLength}}$`).test(branche || "")) {
             setLoadingBranche(false);
             return;
         }
@@ -329,6 +342,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
                 if (!controller.signal.aborted) {
                     setNomBranche(data.nom_branche || "");
+                    setTauxComm(data.taux_comm == null ? null : Number(data.taux_comm));
                 }
 
             } catch (error) {
@@ -346,10 +360,10 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
         return () => controller.abort();
 
-    }, [values.code_compagnie, values.code_branche]);
+    }, [values.code_compagnie, values.code_branche, branchLength]);
 
     const stepErrors = !isCreate ? {} : step === 1
-        ? policeErrors({ ...values, echeance: echeanceText(values.echeance) }, DC_GUARANTEES.map(([key]) => key))
+        ? policeErrors({ ...values, echeance: echeanceText(values.echeance) }, DC_GUARANTEES.map(([key]) => key), branchLength)
         : quittanceErrors(values);
     const errorCount = triedSteps[step] ? Object.keys(stepErrors).length : 0;
     const err = (name) => (triedSteps[step] && stepErrors[name] ? <small className="pf-field-error" role="alert">{stepErrors[name]}</small> : null);
@@ -383,7 +397,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     step={type === "number" ? "any" : undefined}
                     value={values[name]}
                     readOnly={name === "code_client" && Boolean(clientCode)}
-                    onChange={e => update(name, e.target.value)}
+                    onChange={e => updateLinked(name, e.target.value)}
                 />
             )}
             {err(name)}
@@ -401,17 +415,28 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         </label>
     );
 
+    // N° police: the year, the code branche, then any number of digits (15 characters in all); the code branche follows it.
     const handleNumberChange = (value) => {
-        const clean = value.replace(/\D/g, "").slice(0, 12);
+        const clean = value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15);
 
         setValues(prev => ({
             ...prev,
             num_police: clean,
             code_branche:
-                clean.length >= 7
-                    ? clean.substring(4, 7)
+                clean.length >= 4 + branchLength
+                    ? clean.substring(4, 4 + branchLength)
                     : prev.code_branche
         }));
+    };
+
+    // A complete code branche starts the N° police: the current year then the code, the rest is typed after it.
+    const handleBrancheChange = (value) => {
+        const code = value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, branchLength);
+        const year = String(new Date().getFullYear());
+        setValues(prev => {
+            const untouched = !prev.num_police || prev.num_police === year + prev.code_branche;
+            return { ...prev, code_branche: code, num_police: untouched ? (code.length === branchLength ? year + code : "") : prev.num_police };
+        });
     };
 
     const loadedExisting = loadedRef.current.num !== "" && loadedRef.current.num === values.num_police;
@@ -440,7 +465,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
         for (const [key, value] of Object.entries(values)) {
             if (key === "heure_effet" || key === "carte_verte" || key.startsWith("g_") || key.startsWith("cv_") || key.startsWith("dc_")) continue;
-            if (["revalorisation", "date_revalorisation", "date_envoi", "dommages_cumules"].includes(key)) continue;
+            if (["revalorisation", "date_revalorisation", "date_envoi", "dommages_cumules", "with_periode"].includes(key)) continue;
 
             let converted = value === "" ? null : value;
             if (DATE_FIELDS.includes(key)) converted = toTimestamp(value);
@@ -471,6 +496,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             : null;
         if (values.effet) police.heure_effet = `${values.effet}T${values.heure_effet}:00`;
         quittance.observation = values.observation || "";
+        if (!values.with_periode) quittance.periode = null;
 
         setSaving(true);
         try {
@@ -620,7 +646,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 date_revalorisation: asDate(reval?.date_revalorisation),
                 date_envoi: asDate(reval?.date_envoi)
             };
-            setValues(prev => ({ ...prev, ...loaded, ...guarantees, ...extras }));
+            // Within a client's file the client never changes: an existing police is only shown, and refused.
+            setValues(prev => ({ ...prev, ...loaded, ...guarantees, ...extras, ...(isCreate ? { code_client: clientCode } : {}) }));
             setNomBranche(data.nom_branche || '');
             if (data.nom_client) setNomClient(data.nom_client);
             setQuittances(Array.isArray(data.quittances) ? data.quittances.map(normalizeReceipt) : []);
@@ -630,7 +657,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         } catch (err) {
             if (err.name !== 'AbortError') {
                 setQuittances([]);
-                setError(err.message);
+                // A new police: its number is not found yet, which is expected.
+                if (!(isCreate && params.num_police)) setError(err.message);
             }
         } finally {
             if (!signal.aborted) setLoading(false);
@@ -659,12 +687,12 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         return () => { active = false; clearTimeout(timer); };
     }, [values.code_client, accessToken]);
 
-    // Policy number (12 digits) -> that policy and its receipts.
+    // Policy number (year + code branche + at least one digit) -> that policy and its receipts, once typing pauses.
     useEffect(() => {
         const number = values.num_police;
-        if (number.length !== 12 || number === loadedRef.current.num) return undefined;
+        if (number.length < 4 + branchLength + 1 || number === loadedRef.current.num) return undefined;
         const controller = new AbortController();
-        const timer = setTimeout(() => lookup({ num_police: number }, controller.signal), 400);
+        const timer = setTimeout(() => lookup({ num_police: number }, controller.signal), 600);
         return () => { controller.abort(); clearTimeout(timer); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [values.num_police]);
@@ -753,11 +781,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <input
                             type="text"
                             value={values.code_branche}
-                            maxLength={3}
-                            onChange={(e) =>
-                                update("code_branche", e.target.value.replace(/\D/g, "").slice(0, 3))
-                            }
-                            placeholder="Ex : 011"
+                            maxLength={branchLength}
+                            onChange={(e) => handleBrancheChange(e.target.value)}
+                            placeholder={`${branchLength} caractères`}
                         />
                         {err("code_branche")}
                     </label>
@@ -785,9 +811,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <span>N° Police *</span>
                         <input
                             value={values.num_police}
-                            maxLength={12}
+                            maxLength={15}
                             onChange={e => handleNumberChange(e.target.value)}
-                            placeholder="202601156895"
+                            placeholder={`${new Date().getFullYear()} + code branche + chiffres`}
                         />
                         {err("num_police")}
                     </label>
@@ -1103,9 +1129,19 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     </label>
                     {field("Date saisie", "date_saisie", "date")}
                     {field("Date émission", "date_emission", "date")}
-                    {field("Période", "periode")}
+                    {/* Période: its label from the start; the box opens the input beside it */}
+                    <div className="pf-field pf-periode-field">
+                        <span>Période{values.with_periode ? " *" : ""}</span>
+                        <div className="pf-periode-row">
+                            <input type="checkbox" aria-label="Saisir la période" checked={values.with_periode} onChange={e => update("with_periode", e.target.checked)} />
+                            {values.with_periode
+                                ? <input aria-label="Période" value={values.periode} placeholder="mm/aaaa" onChange={e => update("periode", e.target.value)} />
+                                : <small>Cochez pour saisir</small>}
+                        </div>
+                        {err("periode")}
+                    </div>
                     {field("Prime nette", "prime_net", "number")}
-                    {field("Commission", "commission", "number")}
+                    {field(tauxComm == null ? "Commission" : `Commission (${Math.round(tauxComm * 10000) / 100} % de la prime nette)`, "commission", "number")}
                     {field("Prime totale", "prime_total", "number")}
                     {field("Taxe", "taxe", "number")}
                     {field("Timbre", "timbre", "number")}

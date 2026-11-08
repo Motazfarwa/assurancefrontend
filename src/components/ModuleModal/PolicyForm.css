@@ -671,3 +671,41 @@
 .pf-flotte-actions .pf-link-button { margin-left: 10px; color: #187d78; }
 .policy-modal-expanded .pf-flotte-section .pf-receipts { width: 100%; }
 .policy-modal-expanded .pf-flotte-section .is-number { text-align: right; }
+
+/* Période of the quittance: label on top like the other fields, the box then the input on the line below */
+.policy-modal-expanded .pf-periode-row { display: flex; align-items: center; gap: 8px; min-height: clamp(24px, 4.1vh, 32px); }
+.policy-modal-expanded .pf-field .pf-periode-row input[type="checkbox"] { flex: none; width: 15px; height: 15px; min-height: 0; padding: 0; accent-color: #187d78; }
+.policy-modal-expanded .pf-periode-row input:not([type="checkbox"]) { flex: 1 1 auto; }
+.policy-modal-expanded .pf-periode-row small { color: #7a8d96; font-size: 11px; font-weight: 500; }
+
+/* ===== Desktop: sections keep their full height, whatever is ticked =====
+   Sections had min-height 0, so when ticking Tous risques / Dommages cumulés made the content taller than the window
+   their grid rows shrank and the sections overlapped. Now every row takes its content's height and the form scrolls. */
+@media (min-width: 901px) {
+  .policy-modal-expanded .policy-legacy-form.is-view,
+  .policy-modal-expanded .policy-legacy-form.is-create { grid-template-rows: none; grid-auto-rows: max-content; align-content: start; overflow-y: auto; }
+  .policy-modal-expanded .policy-legacy-form > *,
+  .policy-modal-expanded .policy-legacy-form .pf-info-row > *,
+  .policy-modal-expanded .policy-legacy-form .pf-right-column > * { min-height: auto; }
+  .policy-modal-expanded .is-view .pf-info-row > .pf-policy-info,
+  .policy-modal-expanded .is-create .pf-info-row > .pf-policy-info { align-self: start; }
+  .policy-modal-expanded .is-view > .pf-right-column,
+  .policy-modal-expanded .is-create > .pf-right-column { align-self: start; }
+  .policy-modal-expanded .is-view .pf-info-row > .pf-observation-side { align-self: start; }
+  .policy-modal-expanded .is-view .pf-observation-side .pf-observation { min-height: 60px; }
+  /* The buttons stay in view at the bottom while the form scrolls */
+  .policy-modal-expanded .policy-legacy-form.is-create > .pf-footer { position: sticky; bottom: calc(-1 * clamp(8px, 1.6vh, 16px)); z-index: 5; }
+
+  /* Identification: Immatriculation as wide as the other long fields */
+  .policy-modal-expanded .pf-grid-identification > .pf-field:last-child { grid-column: span 2; }
+
+  /* Renouvelable … Expiration: one row when there is room, otherwise the dates go to the next line */
+  .policy-modal-expanded .pf-term-row { grid-template-columns: auto auto repeat(4, minmax(110px, 1fr)); row-gap: 8px; }
+}
+@media (min-width: 901px) and (max-width: 1250px) {
+  .policy-modal-expanded .policy-legacy-form.is-view,
+  .policy-modal-expanded .policy-legacy-form.is-create { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .policy-modal-expanded .pf-term-row { grid-template-columns: auto auto repeat(2, minmax(110px, 1fr)); }
+  .policy-modal-expanded .is-view .pf-policy-info .pf-grid,
+  .policy-modal-expanded .is-create .pf-policy-info .pf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

@@ -25,7 +25,7 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [company, setCompany] = useState('');
-  const [tc, setTc] = useState('C');
+  const [tc, setTc] = useState('T'); // Terme by default
   const [month, setMonth] = useState(currentMonth);
   const [onlyReturned, setOnlyReturned] = useState(false);
   const [state, setState] = useState({ loading: false, error: '', items: [] });

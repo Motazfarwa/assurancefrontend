@@ -91,3 +91,11 @@
 }
 .bd-millimes { display: flex; align-items: center; gap: 8px; padding: 8px 0 2px; color: #233c4b; font-size: 12px; font-weight: 600; }
 .bd-millimes input { width: 15px; height: 15px; }
+
+/* Réception terme: a line typed directly at the bottom of the grid */
+.bd-grid tr.bd-draft { background: #f4faf8; }
+.bd-grid tr.bd-draft td { padding: 4px 6px; }
+.bd-grid tr.bd-draft input { box-sizing: border-box; width: 100%; min-width: 90px; height: 30px; padding: 3px 7px; border: 1px solid #b8ddd5; border-radius: 6px; background: #fff; font: inherit; font-size: 12px; }
+.bd-grid tr.bd-draft input.is-number { text-align: right; }
+.bd-grid tr.bd-draft input:focus { outline: none; border-color: #187d78; box-shadow: 0 0 0 2px rgba(24, 125, 120, .15); }
+.bd-draft-actions { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-right: auto; }

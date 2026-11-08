@@ -24,15 +24,18 @@ function checkRequired(values, names, errors) {
   names.forEach((name) => { if (!text(values[name])) errors[name] = REQUIRED_MESSAGE; });
 }
 
-// echeance is expected as "jj/mm".
-export function policeErrors(values, dcKeys = []) {
+// echeance is expected as "jj/mm". branchLength: the characters of a code branche at the chosen company (Nbr_Chiffre_Code).
+// N° police: the year (4 digits), the code branche, then as many digits as wanted, 15 characters at most.
+export function policeErrors(values, dcKeys = [], branchLength = 3) {
   const errors = {};
   checkRequired(values, ['code_compagnie', 'code_branche', 'num_police', 'date_creation', 'effet', 'heure_effet', 'echeance', 'expiration', 'etat'], errors);
   const number = text(values.num_police);
-  if (number && !/^\d{12}$/.test(number)) errors.num_police = 'Le numéro doit contenir 12 chiffres : année + branche + 5 chiffres.';
   const branch = text(values.code_branche);
-  if (branch && !/^\d{3}$/.test(branch)) errors.code_branche = 'Le code branche doit contenir 3 chiffres.';
-  else if (branch && !errors.num_police && number.slice(4, 7) !== branch) errors.code_branche = 'Le code branche ne correspond pas au numéro de police.';
+  if (branch && !new RegExp(`^[0-9A-Z]{${branchLength}}$`).test(branch)) errors.code_branche = `Le code branche de cette compagnie contient ${branchLength} caractères.`;
+  if (number.length > 15) errors.num_police = '15 caractères au maximum.';
+  else if (number && !/^\d{4}/.test(number)) errors.num_police = 'Le numéro commence par l’année (4 chiffres).';
+  else if (number && branch && !errors.code_branche && number.slice(4, 4 + branch.length) !== branch) errors.num_police = `Après l’année vient le code branche (${branch}).`;
+  else if (number && !/^\d+$/.test(number.slice(4 + branch.length))) errors.num_police = 'Après le code branche, saisissez au moins un chiffre.';
   if (text(values.echeance) && !validEcheance(values.echeance)) errors.echeance = 'Échéance invalide : un jour et un mois (jj/mm).';
   if (values.effet && values.expiration && values.expiration < values.effet) errors.expiration = 'L’expiration ne peut pas précéder la date d’effet.';
   if (text(values.etat) && !/^[A-Za-z]{2}$/.test(text(values.etat))) errors.etat = 'L’état contient 2 lettres (exemple : AN).';
@@ -50,8 +53,10 @@ export function policeErrors(values, dcKeys = []) {
 
 export function quittanceErrors(values) {
   const errors = {};
-  checkRequired(values, ['date_saisie', 'date_emission', 'periode', 'prime_net', 'prime_total', 'montant_quittance', 'solde_quittance'], errors);
-  const periode = text(values.periode);
+  // The Période is asked only when its box is ticked (with_periode false: not ticked; absent: always asked).
+  const withPeriode = values.with_periode !== false;
+  checkRequired(values, ['date_saisie', 'date_emission', ...(withPeriode ? ['periode'] : []), 'prime_net', 'prime_total', 'montant_quittance', 'solde_quittance'], errors);
+  const periode = withPeriode ? text(values.periode) : '';
   if (periode && !/^(0[1-9]|1[0-2])\/\d{4}$/.test(periode)) errors.periode = 'Période invalide : mois/année (exemple : 11/2026).';
   checkAmounts(values, ['prime_net', 'commission', 'prime_total', 'taxe', 'timbre', 'cout_attestation', 'montant_quittance', 'solde_quittance'], errors);
   if (text(values.num_attestation).length > 50) errors.num_attestation = '50 caractères maximum.';

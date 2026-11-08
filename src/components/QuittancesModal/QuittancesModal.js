@@ -68,6 +68,7 @@ export default function QuittancesModal({ moduleId, onClose }) {
   return <>
     <RecordsDialog
       wide
+      className="quittances-dialog"
       kicker={`PRODUCTION · MODULE ${moduleId}`}
       title="Gestion des quittances"
       columns={COLUMNS}

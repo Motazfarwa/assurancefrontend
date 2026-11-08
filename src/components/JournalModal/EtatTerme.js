@@ -14,18 +14,20 @@ const AGENCY = ['Cabinet d’Assurance Jemmali', '1, Rue d’Arabie Saoudite', '
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 // The next month by default (January after December).
 const nextMonth = () => (new Date().getMonth() + 1) % 12 + 1;
-// Current year minus birth year ends in 0 or 5: 20, 25, 40, 45. A client without a birth date is never marked.
-const hasRoundAge = (birthYear) => {
-  const age = new Date().getFullYear() - birthYear;
-  return Boolean(birthYear) && age > 0 && age % 5 === 0;
+// A CHAMEL policy whose échéance is in the chosen month (not one listed because it is paid every few months) and
+// whose client's age (current year minus birth year) ends in 0 or 5: 20, 25, 40, 45. No birth date: never marked.
+const echeanceMonth = (echeance) => Number((/^\d{1,2}[/-](\d{1,2})/.exec(String(echeance || '').trim()) || [])[1]);
+const isMarked = (row, month) => {
+  const age = new Date().getFullYear() - row.annee_naissance;
+  return String(row.nom_branche || '').toUpperCase() === 'CHAMEL' && echeanceMonth(row.echeance) === Number(month)
+    && Boolean(row.annee_naissance) && age > 0 && age % 5 === 0;
 };
-// The lines by branche, in alphabetical order, with the policies without a branche last. Codes are reused between
-// companies for different branches, so the name is what groups them; a code without a name stays as it is.
+// The lines by branche name, in alphabetical order, with the policies without a branche last.
 function groupByBranch(items) {
   const groups = new Map();
   items.forEach((row) => {
-    const label = row.nom_branche || (row.code_branche ? `Branche ${row.code_branche}` : 'Branche non renseignée');
-    if (!groups.has(label)) groups.set(label, { label, known: Boolean(row.code_branche), rows: [] });
+    const label = row.nom_branche || 'Branche non renseignée';
+    if (!groups.has(label)) groups.set(label, { label, known: Boolean(row.nom_branche), rows: [] });
     groups.get(label).rows.push(row);
   });
   return [...groups.values()].sort((a, b) => Number(b.known) - Number(a.known) || a.label.localeCompare(b.label, 'fr'));
@@ -59,7 +61,7 @@ export function TermeSheet({ params, month, companyName, onClose }) {
           <thead><tr><th>N° Police</th><th>Code Cli.</th><th>Nom Client</th>{!companyName && <th>Compagnie</th>}<th>Echéance</th><th>Unité</th><th>Durée</th><th>Tous Risque</th><th>Etat</th><th>Observation</th></tr></thead>
           {groupByBranch(state.items).map((group) => <tbody key={group.label}>
             <tr className="jrn-terme-branch"><td colSpan={columns}>{group.label} · {group.rows.length} police{group.rows.length > 1 ? 's' : ''}</td></tr>
-            {group.rows.map((row) => <tr key={row.num_police} className={[row.temporaire && 'is-temporary', hasRoundAge(row.annee_naissance) && 'is-round-age'].filter(Boolean).join(' ') || undefined}>
+            {group.rows.map((row) => <tr key={row.num_police} className={[row.temporaire && 'is-temporary', isMarked(row, params.mois) && 'is-round-age'].filter(Boolean).join(' ') || undefined}>
               <td>{row.num_police}</td><td>{row.code_client}</td><td>{row.nom_client}</td>{!companyName && <td>{row.nom_compagnie}</td>}
               <td>{row.echeance}</td><td className="jrn-center">{row.unite}</td><td className="jrn-center">{row.duree}</td><td className="jrn-center">{row.tous_risque ? 'X' : ''}</td>
               <td className="jrn-center">{row.etat}</td><td>{row.temporaire ? `Temporaire · expire le ${formatDate(row.expiration)}` : ''}</td>
@@ -127,7 +129,7 @@ export default function EtatTermeModal({ moduleId, onClose }) {
           <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={byCompany && !company}>Aperçu</button>
         </div>
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
-        <p className="jrn-hint">Polices en cours (état AN) dont l’échéance tombe dans le mois ; une police au mois (unité M) revient tous les « durée » mois. Une police avec une date d’expiration est notée « Temporaire » en observation. Les polices sont classées par branche ; la ligne est en rouge quand l’âge du client (année en cours moins année de naissance) se termine par 0 ou 5.</p>
+        <p className="jrn-hint">Polices en cours (état AN) dont l’échéance tombe dans le mois ; une police au mois (unité M) revient tous les « durée » mois. Une police avec une date d’expiration est notée « Temporaire » en observation. Les polices sont classées par branche ; une police CHAMEL dont l’échéance tombe dans le mois choisi est en rouge quand l’âge du client (année en cours moins année de naissance) se termine par 0 ou 5.</p>
       </div>
     </section>
     {report && <NewWindow popup={report.popup} title="Etat du terme" onClose={() => setReport(null)}>

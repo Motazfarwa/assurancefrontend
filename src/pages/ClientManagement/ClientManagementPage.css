@@ -372,3 +372,29 @@
 /* Input checks: the message under the field, and the field outlined */
 .client-field-error { display: block; margin-top: 3px; color: #b42318; font-size: 11px; font-weight: 500; line-height: 1.3; text-transform: none; }
 label:has(> .client-field-error) input, label:has(> .client-field-error) select, label:has(> .client-field-error) textarea { border-color: #d92d20 !important; }
+
+/* Gestion des quittances: the filters in even columns that wrap with the width, every one visible */
+.quittances-dialog .client-records-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: end; gap: 10px 14px; }
+.quittances-dialog .client-records-filters label { min-width: 0; }
+.quittances-dialog .client-records-filters input,
+.quittances-dialog .client-records-filters select { width: 100%; min-width: 0; }
+.quittances-dialog .client-records-filters .client-records-status { grid-column: span 2; justify-self: start; align-self: end; margin-left: 0; }
+@media (max-width: 560px) { .quittances-dialog .client-records-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quittances-dialog .client-records-filters .client-records-status { grid-column: 1 / -1; justify-self: stretch; } }
+
+/* Fiche client on a wide screen: a landscape sheet, Identité | Coordonnées | Lien + Dossier side by side, no scrolling.
+   (Screen only: the printed fiche stays an A4 portrait page, sections one under the other.) */
+@media screen and (min-width: 1000px) {
+  .preview-page { padding: 16px 24px; }
+  .preview-paper { width: min(100%, 1500px); min-height: 0; padding: 20px 32px 22px; }
+  .preview-document-header { padding-bottom: 10px; }
+  .preview-document-title { margin: 10px 0 10px; }
+  .preview-document-title h1 { margin: 3px 0; font-size: 19px; }
+  .preview-paper .client-profile-card { padding: 10px 14px; }
+  .preview-sections { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.1fr) minmax(0, .9fr); gap: 0 28px; margin-top: 10px; }
+  .preview-section-stack { display: grid; align-content: start; }
+  .preview-paper .preview-sections .client-detail-section { padding: 12px 0 4px; }
+  .preview-paper .preview-sections .client-detail-section h2 { margin-top: 0; }
+  .preview-paper .preview-sections .client-detail-grid { gap: 10px 18px; }
+  .preview-paper .preview-sections .preview-identity .client-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .preview-paper .preview-sections .preview-section-stack .client-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
