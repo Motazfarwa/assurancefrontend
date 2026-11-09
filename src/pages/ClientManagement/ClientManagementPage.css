@@ -398,3 +398,15 @@ label:has(> .client-field-error) input, label:has(> .client-field-error) select,
   .preview-paper .preview-sections .preview-identity .client-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .preview-paper .preview-sections .preview-section-stack .client-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ===== Coordonnees on a phone or tablet: phones and emails on their own full-width rows, each field wide enough to read =====
+   Phones 2 per row (1 on a very narrow screen), emails 1 per row on a phone; the address takes the whole line. */
+.client-contact-entry .client-field > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 820px) {
+  .client-page-modal .client-window-modal .client-fields > .client-field-wide, .client-page-modal .client-window-modal .client-fields > .client-contact-fields { grid-column: 1 / -1; }
+  .client-page-modal .client-window-modal .client-contact-group > .client-contact-phones { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
+  .client-page-modal .client-window-modal .client-contact-group > .client-contact-emails { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+  .client-page-modal .client-window-modal .client-contact-group > strong { font-size: 12px; }
+  .client-page-modal .client-window-modal .client-contact-entry .client-field input { width: 100%; min-width: 0; height: 38px; font-size: 14px; }
+  .client-page-modal .client-window-modal .client-contact-entry:has(.client-contact-label) { grid-template-columns: 1fr; }
+}

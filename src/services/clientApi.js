@@ -200,10 +200,12 @@ export const nationalityLabel = (client) => (client.nationality === 'Autre' ? St
 
 export function normalizeClientRecord(record) {
   const type = record.Type_Client;
-  const homePhones = record.telephones_domicile || [{ value: record.tel || '', label: '' }, ...Array.from({ length: 3 }, () => ({ value: '', label: '' }))];
-  const homeEmails = record.emails_domicile || Array.from({ length: 3 }, (_, index) => ({ value: '', label: '' }));
-  const officePhones = record.telephones_bureau || [{ value: record.tel_b || '', label: '' }, { value: record.tel_b2 || '', label: '' }, { value: '', label: '' }, { value: '', label: '' }];
-  const officeEmails = record.emails_bureau || [{ value: record.adresse_email || '', label: '' }, { value: '', label: '' }, { value: '', label: '' }];
+  // A client without a saved list: show what the old columns hold ("." is the old software's "nothing").
+  const stored = (...values) => values.map((value) => ({ value: /[0-9a-z]/i.test(value || '') ? String(value).trim() : '', label: '' }));
+  const homePhones = record.telephones_domicile || stored(record.tel, record.tel1, record.tel2, record.tel3);
+  const homeEmails = record.emails_domicile || stored(record.email1, record.email2, record.email3);
+  const officePhones = record.telephones_bureau || stored(record.tel_b, record.tel_b2, record.tel_b3, record.tel_b4);
+  const officeEmails = record.emails_bureau || stored(record.adresse_email, record.emailb2, record.emailb3);
   return {
     ...record,
     clientCode: record.code_client || record.clientCode || '',

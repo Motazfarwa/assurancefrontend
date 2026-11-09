@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { hasPermission, ROLES } from '../../auth/permissions';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
@@ -304,10 +304,10 @@ export default function ModulesWorkspace() {
               {(activeCategory === 'all' && !search.trim()
                 ? MODULE_CATEGORIES.map((category) => ({ category, modules: filteredModules.filter((module) => module.category === category.id).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })) })).filter((group) => group.modules.length)
                 : [{ category: null, modules: filteredModules }]
-              ).map(({ category, modules }) => <Fragment key={category?.id || 'list'}>
+              ).map(({ category, modules }) => <div className={`module-group${category ? '' : ' is-flat'}`} key={category?.id || 'list'} style={{ '--n': modules.length }}>
                 {category && <h3 className="module-group-title"><span>{category.icon}</span>{category.label}<b>{modules.length}</b></h3>}
                 {modules.map((module) => <button type="button" className={`module-row ${activeModuleId === module.id ? 'is-selected' : ''}`} key={`${module.category}-${module.id}`} onClick={() => openModule(module)} title={`${module.id} · ${module.title}\n${module.description}`}><span className="module-row-code">{module.id}</span><span className="module-row-info"><strong>{module.title}</strong><small>{module.description}</small></span><span className="module-row-action" aria-hidden="true">↗</span></button>)}
-              </Fragment>)}
+              </div>)}
               {!filteredModules.length && <div className="module-list-empty"><span>⌕</span><strong>Aucun programme trouve</strong><small>Modifiez votre recherche ou choisissez une autre nature.</small></div>}
             </div>
             <div className="module-browser-footer"><span /><span>{filteredModules.length} resultats</span></div>

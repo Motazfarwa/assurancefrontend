@@ -74,8 +74,8 @@ export function ContactFields({ client, onChange, kind }) {
     });
   }
   return <div className="client-contact-fields client-field-wide">
-    <div className="client-contact-group"><strong>Téléphones{kind === 'home' ? ' *' : ''}</strong><div>{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
-    <div className="client-contact-group"><strong>Emails</strong><div>{renderContacts(emailKey, 3, 'Email', 'email')}</div></div>
+    <div className="client-contact-group"><strong>Téléphones{kind === 'home' ? ' *' : ''}</strong><div className="client-contact-phones">{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
+    <div className="client-contact-group"><strong>Emails</strong><div className="client-contact-emails">{renderContacts(emailKey, 3, 'Email', 'email')}</div></div>
   </div>;
 }
 
