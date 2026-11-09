@@ -10,5 +10,5 @@ async function request(accessToken, path, method = 'GET') {
 // The latest actions: every user's for the administrator, one's own otherwise. { unread, items: [{ n, utilisateur, mvt, design, date, heure, unread }] }.
 export const listNotifications = (accessToken, limit = 30) => request(accessToken, `?limit=${limit}`);
 // Administrator: the clients to complete. { total, coordonnees, sans_police, polices, items: [{ code_client, nom_client, manques }] }.
-export const listIncompleteClients = (accessToken) => request(accessToken, '/clients-incomplets');
+export const listIncompleteClients = (accessToken, search = '') => request(accessToken, `/clients-incomplets${search ? `?q=${encodeURIComponent(search)}` : ''}`);
 export const markNotificationsRead = (accessToken) => request(accessToken, '/lu', 'PUT');

@@ -55,3 +55,10 @@
 .notif-incomplete li strong { display: block; color: #22394a; font-size: 12px; overflow-wrap: anywhere; }
 .notif-incomplete li small { color: #93683a; font-size: 11px; }
 .notif-incomplete-more { padding: 8px 14px; color: #93683a; font-size: 11px; }
+
+/* Search among the clients to complete */
+.notif-client-search { padding: 8px 14px; border-top: 1px solid #f6e4c8; }
+.notif-client-search input { box-sizing: border-box; width: 100%; height: 34px; padding: 0 10px; border: 1px solid #e8d3b2; border-radius: 7px; background: #fff; color: #22394a; font: inherit; font-size: 13px; }
+.notif-client-search input:focus { border-color: #c98f3f; outline: none; box-shadow: 0 0 0 3px rgba(201, 143, 63, .16); }
+.notif-client-search small { display: block; margin-top: 4px; color: #93683a; font-size: 11px; }
+@media (max-width: 760px) { .notif-client-search input { font-size: 16px; } } /* no zoom on focus on phones */

@@ -26,6 +26,8 @@ export default function NotificationBell({ onOpenHistory }) {
   const { setClient } = useClient();
   const [incomplete, setIncomplete] = useState(null); // administrator: the clients with missing information
   const [showIncomplete, setShowIncomplete] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [matches, setMatches] = useState(null); // the answer to the search, with the text it answers
   const rootRef = useRef(null);
 
   const load = useCallback(() => {
@@ -47,6 +49,22 @@ export default function NotificationBell({ onOpenHistory }) {
     listIncompleteClients(accessToken).then(setIncomplete).catch(() => setIncomplete(null));
   }, [accessToken, user.isAdmin]);
   useEffect(() => { loadIncomplete(); }, [loadIncomplete]);
+
+  // The search runs on the server: the panel only holds the latest clients, the one searched may be further down the list.
+  const searchText = clientSearch.trim();
+  useEffect(() => {
+    if (!searchText || !accessToken) { setMatches(null); return undefined; }
+    let outdated = false;
+    const timer = setTimeout(() => {
+      listIncompleteClients(accessToken, searchText)
+        .then((body) => { if (!outdated) setMatches({ ...body, search: searchText }); })
+        .catch((searchError) => { if (!outdated) setMatches({ items: [], search: searchText, error: searchError.message }); });
+    }, 350);
+    return () => { outdated = true; clearTimeout(timer); };
+  }, [searchText, accessToken]);
+  const answered = searchText && matches?.search === searchText ? matches : null;
+  const shownClients = searchText ? answered?.items || [] : incomplete?.items || [];
+  const foundCount = answered?.found ?? answered?.items.length ?? 0;
 
   async function openClient(code) {
     try {
@@ -100,11 +118,17 @@ export default function NotificationBell({ onOpenHistory }) {
                 <small>Coordonnées manquantes : {incomplete.coordonnees} · Sans police : {incomplete.sans_police} · Police incomplète : {incomplete.polices}{incomplete.quittances != null && ` · Quittance incomplète : ${incomplete.quittances} · Sinistre incomplet : ${incomplete.sinistres}`}</small></span>
               <b aria-hidden="true">{showIncomplete ? '▴' : '▾'}</b>
             </button>
+            {showIncomplete && <div className="notif-client-search">
+              <input type="search" value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Rechercher un client (code ou nom)" aria-label="Rechercher un client à compléter" autoComplete="off" />
+              {searchText && <small role="status">{!answered ? 'Recherche…' : answered.error || `${foundCount} client${foundCount > 1 ? 's' : ''} trouvé${foundCount > 1 ? 's' : ''}`}</small>}
+            </div>}
             {showIncomplete && <ul>
-              {incomplete.items.map((item) => <li key={item.code_client}><button type="button" title="Ouvrir la fiche du client" onClick={() => openClient(item.code_client)}>
+              {shownClients.map((item) => <li key={item.code_client}><button type="button" title="Ouvrir la fiche du client" onClick={() => openClient(item.code_client)}>
                 <strong>{item.code_client} · {item.nom_client || 'Client sans nom'}</strong><small>Manque : {item.manques.join(' · ')}</small>
               </button></li>)}
-              {incomplete.total > incomplete.items.length && <li className="notif-incomplete-more">Les {incomplete.items.length} clients les plus récents sont affichés.</li>}
+              {answered && !answered.error && !answered.items.length && <li className="notif-incomplete-more">Aucun client à compléter ne correspond à cette recherche.</li>}
+              {answered && foundCount > answered.items.length && <li className="notif-incomplete-more">Les {answered.items.length} premiers résultats sont affichés : précisez la recherche.</li>}
+              {!searchText && incomplete.total > incomplete.items.length && <li className="notif-incomplete-more">Les {incomplete.items.length} clients les plus récents sont affichés. Utilisez la recherche pour trouver les autres.</li>}
             </ul>}
           </div>}
           <div className="notif-list">

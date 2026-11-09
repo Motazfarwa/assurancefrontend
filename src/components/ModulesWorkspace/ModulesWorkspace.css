@@ -340,7 +340,7 @@
   .workspace-topbar { min-height: 56px; padding: 6px 20px; }
   .nature-selector { padding: 6px 20px 8px; }
   .nature-option { min-height: 34px; }
-  .workspace-workbench { flex: 1 1 auto; min-height: 0; grid-template-columns: minmax(180px, .22fr) minmax(0, 1.78fr); gap: 12px; padding: 10px 12px; }
+  .workspace-workbench { flex: 1 1 auto; min-height: 0; grid-template-columns: clamp(190px, 18vw, 260px) minmax(0, 1fr); gap: 12px; padding: 10px 12px; }
   .workspace-intro { position: relative; top: auto; align-self: stretch; padding: 18px 16px 12px; }
   .workspace-intro-copy h1 { font-size: clamp(24px, 2.2vw, 34px); }
   .workspace-illustration { flex: 1 1 0; min-height: 0; max-height: 170px; margin-top: 8px; }
@@ -368,16 +368,17 @@
 .module-group { display: contents; }
 @media (min-width: 901px) {
   .module-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px 16px; }
-  .module-group { display: grid; flex: 1 1 calc(var(--n) * 182px); min-width: min(100%, 182px); grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); align-content: start; gap: 6px; }
+  .module-group { display: grid; flex: 1 1 calc(var(--n) * 170px); min-width: min(100%, 170px); grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); align-content: start; gap: 6px; }
   .module-group.is-flat { flex-basis: 100%; }
   .module-group .module-group-title { margin: 4px 0 0; }
   .module-list-empty { flex-basis: 100%; }
 }
-/* Short screen: the welcome panel gives its room to the modules */
+/* Short screen: tighter, the welcome panel and its image stay on the side */
 @media (min-width: 901px) and (max-height: 800px) {
-  .workspace-workbench { grid-template-columns: minmax(0, 1fr); }
-  .workspace-intro { display: none; }
   .workspace-topbar { min-height: 50px; }
+  .workspace-intro { padding: 14px 16px 10px; }
+  .workspace-intro-copy h1 { margin: 8px 0 6px; }
+  .workspace-illustration { margin-top: 4px; }
   .module-browser-heading .dashboard-kicker { display: none; }
 }
 @media (min-width: 901px) {
@@ -394,4 +395,23 @@
   .module-row { min-height: 34px; padding: 4px 8px; }
   .module-row-info strong { font-size: 11.5px; line-height: 1.15; }
   .workspace-footer { display: none; }
+}
+
+/* Very short window (a laptop with the browser bars): same page, tighter spacing, so every module stays visible next to the image */
+@media (min-width: 901px) and (max-height: 680px) {
+  .workspace-topbar { min-height: 44px; padding-top: 4px; padding-bottom: 4px; }
+  .nature-selector { padding: 5px 20px 6px; }
+  .nature-option { min-height: 30px; }
+  .workspace-workbench { padding: 6px 10px; }
+  .module-browser { padding: 8px 14px 6px; }
+  .module-browser-heading { margin-bottom: 3px; }
+  .module-browser-heading h2 { font-size: 17px; }
+  .workspace-count { padding: 2px 8px; }
+  .workspace-search { height: 30px; margin-bottom: 3px; }
+  .module-list { gap: 2px 16px; }
+  .module-group { gap: 4px; }
+  .module-group .module-group-title { margin: 2px 0 0; }
+  .module-row { min-height: 30px; padding: 2px 7px; }
+  .module-row-code { padding: 2px 5px; }
+  .module-row-info strong { font-size: 11px; line-height: 1.12; }
 }
