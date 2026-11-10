@@ -55,3 +55,5 @@ export const saveCashAdjustment = (token, payload) => request('/api/journaux/feu
 // Etat détaillé des comptes: the agency accounts, and one account's movements between two dates with its balances.
 export const getBankAccounts = (token) => request('/api/journaux/comptes-banque/banques', token);
 export const getBankStatement = (token, params) => request(`/api/journaux/comptes-banque?${query(params)}`, token);
+// Etat des dépenses techniques: the technical payments of a company's policies in a month (mois: AAAA-MM).
+export const getTechnicalExpenses = (token, params) => request(`/api/journaux/depenses-techniques?${query(params)}`, token);

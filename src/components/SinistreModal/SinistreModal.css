@@ -235,3 +235,8 @@
   .snr-table.snr-claims td[data-label="Nom client"], .snr-table.snr-claims td[data-label="Observation"], .snr-table.snr-claims td[data-label="Expert"] { grid-column: 1 / -1; }
   .snr-claims-group h4 { position: static; width: auto; }
 }
+
+/* Règlement du sinistre: mode and type of the dépense side by side */
+.snr-pay .snr-pay-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.snr-pay select:disabled { background: #f3f6f7; color: #4a6370; opacity: 1; }
+.snr-pay .snr-pay-note { margin-top: -4px; color: #6b818b; font-size: 10px; line-height: 1.35; }

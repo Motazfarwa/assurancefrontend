@@ -13,7 +13,7 @@ const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximum
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
-// Journal d'encaissement: the 15th of the month until the 15th, then the last day of the month (28, 29, 30 or 31).
+// Both journals: the 15th of the month until the 15th, then the last day of the month (28, 29, 30 or 31).
 const journalDay = () => {
   const now = new Date();
   const day = now.getDate() <= 15 ? 15 : new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -36,8 +36,8 @@ const KINDS = {
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
-    // Fully paid receipts are proposed; unpaid ones are chosen by hand.
-    preselect: (row) => row.paye || row.a_s === 'A',
+    // Every quittance paid by a client (RDetRegCli) is chosen from the start; one is left out by unticking it.
+    preselect: () => true,
     text: (row) => `${row.num_quittance} ${row.num_police || ''} ${row.assure || ''} ${row.code_client || ''} ${row.nom_compagnie || ''}`,
     amount: 'montant',
     // Every company is listed until one is chosen.
@@ -68,7 +68,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [compagnie, setCompagnie] = useState('');
-  const [date, setDate] = useState(config.settled ? journalDay : today);
+  const [date, setDate] = useState(journalDay);
   // Encaissement: only the quittances a client paid something on (a règlement date and Réglé > 0).
   const settledParams = config.settled ? { regles: true } : {};
   const [nature, setNature] = useState(''); // dépense: '' | S | R
@@ -189,7 +189,6 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
             </select>
           </label>}
           <label className="acompte-field"><span>Rechercher</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={kind === 'depense' ? 'N° sinistre, police, immatriculation, assuré…' : 'N° quittance, police, assuré…'} /></label>
-          <label className="jrn-check"><input type="checkbox" checked={showDone} onChange={(event) => setShowDone(event.target.checked)} /> Comptabilisés du jour</label>
         </div>
 
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}

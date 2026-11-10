@@ -10,6 +10,8 @@ import SinistreSuivi from './SinistreSuivi';
 import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import './SinistreModal.css';
 
+// Mode de dépense of a claim settlement (TDepense.mod_dep).
+const DEPENSE_MODES = [['C', 'Chèque'], ['T', 'Traite'], ['V', 'Virement'], ['B', 'Carte bancaire']];
 const today = () => new Date().toISOString().slice(0, 10);
 const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
@@ -627,13 +629,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     if (!checked) { setReglement(null); change({ Regle: false }); return; }
     setPayDraft({
       num_piece: reglement?.num_piece || '', date_reglement: form.Date_Reglement || today(),
-      code_banque: reglement?.code_banque || companyAccount(accounts, form.Code_Compagnie_Assure), tried: false,
+      code_banque: reglement?.code_banque || companyAccount(accounts, form.Code_Compagnie_Assure),
+      mod_dep: reglement?.mod_dep || 'C', typ_dep: 'T', tried: false,
     });
   }
 
   function validatePay(event) {
     event.preventDefault();
-    const draft = { num_piece: payDraft.num_piece.trim(), date_reglement: payDraft.date_reglement, code_banque: payDraft.code_banque };
+    const draft = { num_piece: payDraft.num_piece.trim(), date_reglement: payDraft.date_reglement, code_banque: payDraft.code_banque, mod_dep: payDraft.mod_dep || 'C', typ_dep: 'T' };
     if (!draft.num_piece || !draft.date_reglement || !draft.code_banque) { setPayDraft((value) => ({ ...value, tried: true })); return; }
     setReglement(draft); setPayDraft(null);
     change({ Regle: true, Date_Reglement: draft.date_reglement, ...closeWhenSettled({ Regle: true, Date_Reglement: draft.date_reglement }) });
@@ -791,7 +794,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {flag('Clôturé', 'Cloture', 'Date_Cloture')}
             {reglement && form.Regle && (
               <p className="snr-span-6 snr-pay-note">
-                Règlement : pièce <b>{reglement.num_piece}</b> · compte <b>{reglement.code_banque}</b> · enregistré avec le dossier
+                Règlement : pièce <b>{reglement.num_piece}</b> · {DEPENSE_MODES.find(([code]) => code === reglement.mod_dep)?.[1] || 'Chèque'} · compte <b>{reglement.code_banque}</b> · enregistré avec le dossier
                 <button type="button" onClick={() => tickRegle(true)}>Modifier</button>
               </p>
             )}
@@ -825,6 +828,19 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 {accounts.map((row) => <option key={row.code_banque} value={row.code_banque}>{row.nom_banque && row.nom_banque !== row.code_banque ? `${row.code_banque} · ${row.nom_banque}` : row.code_banque}</option>)}
               </select>
             </label>
+            <div className="snr-pay-row">
+              <label>
+                <span>Mode de dépense <i>*</i></span>
+                <select value={payDraft.mod_dep} onChange={(event) => { const mod_dep = event.target.value; setPayDraft((value) => ({ ...value, mod_dep })); }}>
+                  {DEPENSE_MODES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Type de dépense</span>
+                <select value="T" disabled aria-describedby="snr-pay-type"><option value="T">Technique</option></select>
+              </label>
+            </div>
+            <small id="snr-pay-type" className="snr-pay-note">Le règlement est enregistré comme dépense technique ; il figure ensuite au Journal de dépense.</small>
             {payDraft.tried && <p className="snr-message is-error">Renseignez le N° pièce, la date de règlement et le compte banque.</p>}
             <footer>
               <button type="button" className="snr-tool" onClick={() => setPayDraft(null)}>Annuler</button>

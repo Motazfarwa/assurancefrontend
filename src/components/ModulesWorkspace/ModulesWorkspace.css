@@ -415,3 +415,56 @@
   .module-row-code { padding: 2px 5px; }
   .module-row-info strong { font-size: 11px; line-height: 1.12; }
 }
+
+/* ===== Cards: more air, clearer hierarchy (last, so it wins over the size blocks above) ===== */
+@media (min-width: 901px) {
+  .module-list { gap: 16px 24px; padding: 2px; }
+  .module-group { gap: 10px; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); }
+  .module-group .module-group-title { margin: 4px 0 2px; font-size: 12px; }
+  .module-row { min-height: 54px; gap: 10px; padding: 9px 12px; border: 1px solid #e1e9eb; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgba(20, 52, 64, .04); transition: transform .12s, box-shadow .12s, border-color .12s, background .12s; }
+  .module-row:last-child { border-bottom: 1px solid #e1e9eb; }
+  .module-row:hover { border-color: #9fd0c6; background: #fbfefd; box-shadow: 0 6px 16px rgba(24, 88, 80, .09); transform: translateY(-1px); }
+  .module-row:focus-visible { outline: 2px solid #67bdae; outline-offset: 2px; }
+  .module-row.is-selected { border-color: #4ba796; background: #f1faf7; }
+  .module-row-code { min-width: 40px; padding: 5px 7px; border: 1px solid #d4e9e4; border-radius: 7px; background: #eef7f5; color: #1f6f64; font-size: 11px; font-weight: 800; }
+  .module-row-info strong { color: #213d4b; font-size: 12.5px; line-height: 1.25; }
+  .module-row-action { font-size: 12px; }
+
+  /* One nature open (or a search): roomy cards with their description */
+  .module-list:has(> .module-group.is-flat) { gap: 0; }
+  .module-group.is-flat { grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; }
+  .module-group.is-flat .module-row { min-height: 88px; align-items: start; padding: 14px 16px; }
+  .module-group.is-flat .module-row-code { padding: 6px 8px; font-size: 12px; }
+  .module-group.is-flat .module-row-info { gap: 6px; }
+  .module-group.is-flat .module-row-info strong { font-size: 14px; }
+  .module-group.is-flat .module-row-info small { display: -webkit-box; overflow: hidden; color: #6c818a; font-size: 11.5px; line-height: 1.45; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .module-group.is-flat .module-row-action { align-self: center; }
+}
+/* "Tous" on a tall screen: room for one line of description too */
+@media (min-width: 901px) and (min-height: 1040px) {
+  .module-group:not(.is-flat) .module-row { min-height: 62px; }
+  .module-group:not(.is-flat) .module-row-info small { display: block; overflow: hidden; color: #7a8d95; font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* Shorter screens: the same cards, a little tighter, so "Tous" still fits without scrolling */
+@media (min-width: 901px) and (max-height: 820px) {
+  .module-list { gap: 8px 20px; }
+  .module-group .module-group-title { margin: 2px 0 0; }
+  .module-group { gap: 7px; }
+  .module-row { min-height: 44px; padding: 6px 10px; }
+  .module-group.is-flat .module-row { min-height: 76px; padding: 12px 14px; }
+}
+@media (min-width: 901px) and (max-height: 680px) {
+  .module-list { gap: 4px 16px; }
+  .module-group { gap: 5px; }
+  .module-row { min-height: 34px; padding: 3px 8px; }
+  .module-row-code { padding: 2px 5px; }
+  .module-row-info strong { font-size: 11px; line-height: 1.12; }
+  .module-group .module-group-title { margin: 2px 0 0; }
+}
+/* "Tous": the names get the width of the card (no arrow, a smaller number badge); wide screens use more of their width */
+@media (min-width: 901px) {
+  .module-group:not(.is-flat) .module-row { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+  .module-group:not(.is-flat) .module-row-action { display: none; }
+  .module-group:not(.is-flat) .module-row-code { min-width: 34px; padding: 4px 5px; font-size: 10.5px; }
+}
+@media (min-width: 1600px) { .workspace-window { width: min(100%, 1680px); } }

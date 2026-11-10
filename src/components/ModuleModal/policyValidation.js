@@ -25,17 +25,18 @@ function checkRequired(values, names, errors) {
 }
 
 // echeance is expected as "jj/mm". branchLength: the characters of a code branche at the chosen company (Nbr_Chiffre_Code).
-// N° police: the year (4 digits), the code branche, then as many digits as wanted, 15 characters at most.
+// N° police: the year (4 digits), the code branche, then as many digits as wanted, 15 characters at most. The code branche
+// is not typed: values.code_branche is the branch of the company found in the number (empty when none matches).
 export function policeErrors(values, dcKeys = [], branchLength = 3) {
   const errors = {};
-  checkRequired(values, ['code_compagnie', 'code_branche', 'num_police', 'date_creation', 'effet', 'heure_effet', 'echeance', 'expiration', 'etat'], errors);
+  checkRequired(values, ['code_compagnie', 'num_police', 'date_creation', 'effet', 'heure_effet', 'echeance', 'expiration', 'etat'], errors);
   const number = text(values.num_police);
   const branch = text(values.code_branche);
-  if (branch && !new RegExp(`^[0-9A-Z]{${branchLength}}$`).test(branch)) errors.code_branche = `Le code branche de cette compagnie contient ${branchLength} caractères.`;
   if (number.length > 15) errors.num_police = '15 caractères au maximum.';
   else if (number && !/^\d{4}/.test(number)) errors.num_police = 'Le numéro commence par l’année (4 chiffres).';
-  else if (number && branch && !errors.code_branche && number.slice(4, 4 + branch.length) !== branch) errors.num_police = `Après l’année vient le code branche (${branch}).`;
-  else if (number && !/^\d+$/.test(number.slice(4 + branch.length))) errors.num_police = 'Après le code branche, saisissez au moins un chiffre.';
+  else if (number && text(values.code_compagnie) && !branch) errors.num_police = `Après l’année, le code d’une branche de cette compagnie (${branchLength} caractères), puis des chiffres.`;
+  else if (number && branch && number.slice(4, 4 + branch.length) !== branch) errors.num_police = `Après l’année vient le code branche (${branch}).`;
+  else if (number && branch && !/^\d+$/.test(number.slice(4 + branch.length))) errors.num_police = 'Après le code branche, saisissez au moins un chiffre.';
   if (text(values.echeance) && !validEcheance(values.echeance)) errors.echeance = 'Échéance invalide : un jour et un mois (jj/mm).';
   if (values.effet && values.expiration && values.expiration < values.effet) errors.expiration = 'L’expiration ne peut pas précéder la date d’effet.';
   if (text(values.etat) && !/^[A-Za-z]{2}$/.test(text(values.etat))) errors.etat = 'L’état contient 2 lettres (exemple : AN).';

@@ -709,3 +709,10 @@
   .policy-modal-expanded .is-view .pf-policy-info .pf-grid,
   .policy-modal-expanded .is-create .pf-policy-info .pf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* N° police: the client's polices in a list, or a new number; the switch between the two under it */
+.pf-num-police { position: relative; }
+.pf-num-police select { width: 100%; min-width: 0; }
+.pf-num-count { color: #5f7a83; font-weight: 500; }
+.pf-num-switch { justify-self: start; margin-top: 2px; padding: 0; border: 0; background: none; color: #1d7a6b; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.policy-modal-expanded .is-create .pf-grid-identification > .pf-field-branche-nom { grid-column: span 2; }

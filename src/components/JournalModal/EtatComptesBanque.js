@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 import { getBankAccounts, getBankStatement } from '../../services/journalApi';
@@ -35,38 +35,89 @@ function SheetFrame({ title, subtitle, onClose, children, ready = true }) {
   </div>;
 }
 
-// Etat global: one line per day (crédit, débit, solde at the end of the day); détaillé: every movement.
+const dayLabel = (value) => new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+const plural = (count, word) => `${count} ${word}${count > 1 ? 's' : ''}`;
+
+// The movements of each day (with the day's totals and the solde at its end), and their totals per nature.
+export function accountBreakdown(items) {
+  const byDay = new Map();
+  const byNature = new Map();
+  items.forEach((item) => {
+    const side = item.sens === 'C' ? 'credit' : 'debit';
+    const day = byDay.get(item.date_mvt) || { date: item.date_mvt, items: [], credit: 0, debit: 0 };
+    day.items.push(item);
+    day[side] += Number(item.montant || 0);
+    day.solde = item.solde;
+    byDay.set(item.date_mvt, day);
+    const key = `${item.sens}|${item.libelle || ''}`;
+    const nature = byNature.get(key) || { libelle: item.libelle || 'Sans libellé', sens: item.sens, nombre: 0, credit: 0, debit: 0 };
+    nature.nombre += 1;
+    nature[side] += Number(item.montant || 0);
+    byNature.set(key, nature);
+  });
+  const natures = [...byNature.values()].sort((a, b) => (a.sens === b.sens ? (b.credit + b.debit) - (a.credit + a.debit) : a.sens === 'C' ? -1 : 1));
+  return { days: [...byDay.values()], natures };
+}
+
+// The four figures of the period, at the top of both états.
+function AccountCards({ data }) {
+  const credits = data.items.filter((item) => item.sens === 'C').length;
+  return <div className="jrn-bank-cards">
+    <div><span>Solde de départ au {formatDate(data.debut)}</span><strong>{money(data.solde_depart)}</strong></div>
+    <div className="is-credit"><span>Crédits · {plural(credits, 'mouvement')}</span><strong>+ {money(data.total_credit)}</strong></div>
+    <div className="is-debit"><span>Débits · {plural(data.items.length - credits, 'mouvement')}</span><strong>− {money(data.total_debit)}</strong></div>
+    <div className="is-final"><span>Solde final au {formatDate(data.fin)}</span><strong>{money(data.solde_final)}</strong></div>
+  </div>;
+}
+
+function NatureTable({ natures }) {
+  if (!natures.length) return null;
+  return <>
+    <h2 className="jrn-bank-title">Récapitulatif par nature</h2>
+    <table className="jrn-sheet-table jrn-bank-summary jrn-bank-natures">
+      <thead><tr><th>Nature</th><th>Mouvements</th><th>Crédit</th><th>Débit</th></tr></thead>
+      <tbody>{natures.map((nature) => <tr key={`${nature.sens}-${nature.libelle}`}><td>{nature.libelle}</td><td className="jrn-center">{nature.nombre}</td><td className="num">{nature.credit ? money(nature.credit) : ''}</td><td className="num">{nature.debit ? money(nature.debit) : ''}</td></tr>)}</tbody>
+    </table>
+  </>;
+}
+
+// Etat global: one line per day (crédit, débit, solde at the end of the day); détaillé: the movements day by day, each
+// day with its own totals. Both open on the four figures of the period and close on the totals per nature.
 function AccountSheet({ data, mode, onClose }) {
   const { banque, items } = data;
-  const days = useMemo(() => {
-    const byDay = new Map();
-    items.forEach((item) => {
-      const day = byDay.get(item.date_mvt) || { date: item.date_mvt, credit: 0, debit: 0, nombre: 0 };
-      day[item.sens === 'C' ? 'credit' : 'debit'] += item.montant;
-      day.nombre += 1;
-      day.solde = item.solde;
-      byDay.set(item.date_mvt, day);
-    });
-    return [...byDay.values()];
-  }, [items]);
+  const { days, natures } = useMemo(() => accountBreakdown(items), [items]);
   const detail = mode === 'detail';
+  const footer = <tfoot><tr><td colSpan={detail ? 3 : 2}>{plural(items.length, 'mouvement')} · Solde final au {formatDate(data.fin)}</td><td className="num">{money(data.total_credit)}</td><td className="num">{money(data.total_debit)}</td><td className="num">{money(data.solde_final)}</td></tr></tfoot>;
   return <SheetFrame title={`ETAT ${detail ? 'DÉTAILLÉ' : 'GLOBAL'} DU COMPTE ${banque.code_banque}`} subtitle={[`${banque.nom_banque || ''}${banque.num_compte ? ` · N° ${banque.num_compte}` : ''}`, `Du ${formatDate(data.debut)} au ${formatDate(data.fin)}`]} onClose={onClose}>
-    <table className="jrn-sheet-table jrn-bank-table">
-      <thead>{detail
-        ? <tr><th>Date</th><th>Référence</th><th>Libellé</th><th>Client</th><th>Crédit</th><th>Débit</th><th>Solde</th></tr>
-        : <tr><th>Date</th><th>Mouvements</th><th>Crédit</th><th>Débit</th><th>Solde</th></tr>}</thead>
+    <AccountCards data={data} />
+    <h2 className="jrn-bank-title">{detail ? 'Mouvements jour par jour' : 'Mouvements par jour'}</h2>
+    {detail ? <table className="jrn-sheet-table jrn-bank-table jrn-bank-days">
+      <thead><tr><th>Référence</th><th>Libellé</th><th>Client</th><th>Crédit</th><th>Débit</th><th>Solde</th></tr></thead>
       <tbody>
-        <tr className="jrn-group"><td colSpan={detail ? 6 : 4}>Solde de départ au {formatDate(data.debut)}</td><td className="num">{money(data.solde_depart)}</td></tr>
-        {detail ? items.map((item) => <tr key={item.id}>
-          <td>{formatDate(item.date_mvt)}</td><td>{item.reference}</td><td>{item.libelle}</td><td>{[item.code_client, item.nom_client].filter(Boolean).join(' · ')}</td>
-          <td className="num">{item.sens === 'C' ? money(item.montant) : ''}</td><td className="num">{item.sens === 'D' ? money(item.montant) : ''}</td><td className="num">{money(item.solde)}</td>
-        </tr>) : days.map((day) => <tr key={day.date}>
-          <td>{formatDate(day.date)}</td><td className="jrn-center">{day.nombre}</td><td className="num">{money(day.credit)}</td><td className="num">{money(day.debit)}</td><td className="num">{money(day.solde)}</td>
-        </tr>)}
-        {!items.length && <tr><td colSpan={detail ? 7 : 5} className="jrn-sheet-state">Aucun mouvement sur la période.</td></tr>}
+        <tr className="jrn-group"><td colSpan={5}>Solde de départ au {formatDate(data.debut)}</td><td className="num">{money(data.solde_depart)}</td></tr>
+        {days.map((day) => <Fragment key={day.date}>
+          <tr className="jrn-bank-day"><td colSpan={6}>{dayLabel(day.date)} <small>· {plural(day.items.length, 'mouvement')}</small></td></tr>
+          {day.items.map((item) => <tr key={item.id}>
+            <td>{item.reference}</td><td>{item.libelle}</td><td>{[item.code_client, item.nom_client].filter(Boolean).join(' · ')}</td>
+            <td className="num">{item.sens === 'C' ? money(item.montant) : ''}</td><td className="num">{item.sens === 'D' ? money(item.montant) : ''}</td><td className="num">{money(item.solde)}</td>
+          </tr>)}
+          <tr className="jrn-bank-daytotal"><td colSpan={3}>Total du {formatDate(day.date)}</td><td className="num">{day.credit ? money(day.credit) : ''}</td><td className="num">{day.debit ? money(day.debit) : ''}</td><td className="num">{money(day.solde)}</td></tr>
+        </Fragment>)}
+        {!items.length && <tr><td colSpan={6} className="jrn-sheet-state">Aucun mouvement sur la période.</td></tr>}
       </tbody>
-      <tfoot><tr><td colSpan={detail ? 4 : 2}>{items.length} mouvement{items.length > 1 ? 's' : ''} · Solde final au {formatDate(data.fin)}</td><td className="num">{money(data.total_credit)}</td><td className="num">{money(data.total_debit)}</td><td className="num">{money(data.solde_final)}</td></tr></tfoot>
-    </table>
+      {footer}
+    </table> : <table className="jrn-sheet-table jrn-bank-table">
+      <thead><tr><th>Date</th><th>Mouvements</th><th>Crédit</th><th>Débit</th><th>Solde</th></tr></thead>
+      <tbody>
+        <tr className="jrn-group"><td colSpan={4}>Solde de départ au {formatDate(data.debut)}</td><td className="num">{money(data.solde_depart)}</td></tr>
+        {days.map((day) => <tr key={day.date}>
+          <td>{formatDate(day.date)}</td><td className="jrn-center">{day.items.length}</td><td className="num">{money(day.credit)}</td><td className="num">{money(day.debit)}</td><td className="num">{money(day.solde)}</td>
+        </tr>)}
+        {!items.length && <tr><td colSpan={5} className="jrn-sheet-state">Aucun mouvement sur la période.</td></tr>}
+      </tbody>
+      {footer}
+    </table>}
+    <NatureTable natures={natures} />
   </SheetFrame>;
 }
 

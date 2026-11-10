@@ -7,7 +7,9 @@ test('a N° police is the year, the code branche of the company length, then any
   expect(policeErrors({ ...police, num_police: '20260111234567' }, [], 3)).toEqual({}); // 14 characters
   expect(policeErrors({ ...police, code_branche: '4001', num_police: '202640017' }, [], 4)).toEqual({}); // BIAT
   expect(policeErrors({ ...police, code_branche: '00', num_police: '2026001' }, [], 2)).toEqual({}); // MAGHREBIA
-  expect(policeErrors({ ...police, code_branche: '01' }, [], 3).code_branche).toMatch(/3 caractères/);
+  // no branch of the company found in the number (the form derives code_branche from it)
+  expect(policeErrors({ ...police, code_branche: '' }, [], 3).num_police).toMatch(/code d’une branche de cette compagnie \(3 caractères\)/);
+  expect(policeErrors({ ...police, code_branche: '' }, [], 3).code_branche).toBeUndefined();
   expect(policeErrors({ ...police, num_police: '2026012589' }, [], 3).num_police).toMatch(/code branche \(011\)/);
   expect(policeErrors({ ...police, num_police: '2026011' }, [], 3).num_police).toMatch(/au moins un chiffre/);
   expect(policeErrors({ ...police, num_police: '2026011123456789' }, [], 3).num_police).toMatch(/15 caractères/);

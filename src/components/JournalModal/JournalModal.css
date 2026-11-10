@@ -171,3 +171,31 @@
 
 /* Agency block of the reports: centered, 3 lines in a pyramid (the date block on the right keeps its alignment) */
 .jrn-sheet-head > .jrn-agency:not(.jrn-printed) { justify-items: center; align-content: start; text-align: center; }
+
+/* Etat détaillé des comptes: the four figures, the days, the natures */
+.jrn-bank-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 4px 0 10px; }
+.jrn-bank-cards > div { display: grid; gap: 3px; padding: 7px 10px; border: 1px solid #222; }
+.jrn-bank-cards span { font-size: 10px; }
+.jrn-bank-cards strong { font-size: 14px; text-align: right; }
+.jrn-bank-cards .is-credit strong { color: #17663a; }
+.jrn-bank-cards .is-debit strong { color: #9a2a1d; }
+.jrn-bank-cards .is-final { background: #f1f1f1; }
+.jrn-bank-days .jrn-bank-day td { padding-top: 7px; border-right: 0; border-left: 0; background: #f4f6f7; font-weight: 700; text-transform: capitalize; }
+.jrn-bank-days .jrn-bank-day small { font-weight: 400; text-transform: none; }
+.jrn-bank-days .jrn-bank-daytotal td { border-top: 1px solid #222; font-style: italic; font-weight: 700; }
+.jrn-bank-days tbody td:first-child { padding-left: 14px; }
+.jrn-bank-natures { width: min(100%, 620px); }
+@media (max-width: 700px) { .jrn-bank-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media print { .jrn-bank-days .jrn-bank-day td { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .jrn-bank-days tr { break-inside: avoid; } }
+
+/* Etat des dépenses techniques and Etat des comptes client (détail) */
+.jrn-depenses-table td { white-space: nowrap; }
+.jrn-depenses-table td:nth-child(3), .jrn-depenses-table td:nth-child(4) { white-space: normal; }
+.jrn-pending { font-style: italic; color: #8a5a00; }
+.jrn-account-client { margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px dashed #999; break-inside: avoid-page; }
+.jrn-account-client h2 { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 6px 0; font-size: 13px; }
+.jrn-account-client h3 { margin: 8px 0 4px; font-size: 12px; }
+.jrn-account-lines { width: min(100%, 560px); }
+.jrn-account-total { display: flex; width: min(100%, 560px); justify-content: space-between; margin: 6px 0 0; font-size: 12px; font-weight: 700; }
+.jrn-account-total.is-grand { margin-top: 10px; padding-top: 6px; border-top: 2px solid #222; font-size: 13px; }
+.jrn-account-lines { table-layout: fixed; }

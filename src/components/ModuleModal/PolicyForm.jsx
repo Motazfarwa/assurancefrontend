@@ -17,6 +17,8 @@ const tomorrowIso = (() => {
     return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
 })();
 const tomorrowEcheance = `${tomorrowIso.slice(8, 10)}/${tomorrowIso.slice(5, 7)}`;
+// The choice of the N° police list that switches to typing a new number.
+const NEW_POLICE = "__nouvelle__";
 
 // "Dommages cumulés" cover: each guarantee is ticked, then given an amount.
 const DC_GUARANTEES = [
@@ -236,10 +238,10 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const [error, setError] = useState("");
     const [compagnies, setCompagnies] = useState([]);
     const [compagniesError, setCompagniesError] = useState("");
-    const [nomBranche, setNomBranche] = useState("");
-    const [loadingBranche, setLoadingBranche] = useState(false);
-    const [brancheError, setBrancheError] = useState("");
-    const [tauxComm, setTauxComm] = useState(null); // commission rate of the branche (0.1 = 10 %)
+    const [nomBranche, setNomBranche] = useState(""); // the branch name the database gives with a loaded police
+    const [branchCandidates, setBranchCandidates] = useState(null); // companies / branches the N° police can belong to
+    const [clientPolices, setClientPolices] = useState(null); // the client's polices, the latest first
+    const [newPolice, setNewPolice] = useState(false); // a client with polices: a new number is being typed instead
     const [showClientPolices, setShowClientPolices] = useState(false);
     const update = (key, value) => {
         setValues(prev => ({ ...prev, [key]: value }));
@@ -293,79 +295,25 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         return () => controller.abort();
     }, []);
 
+    // N° police -> the companies and branches it can belong to: read from the number (year + code branche + digits, or the
+    // older code branche + year + digits) and checked against the branches of each company. Nothing is typed for it.
     useEffect(() => {
-        const compagnie = values.code_compagnie;
-        const branche = values.code_branche;
-
-        setNomBranche("");
-        setBrancheError("");
-        setTauxComm(null);
-
-        if (!compagnie || !new RegExp(`^[0-9A-Z]{${branchLength}}$`).test(branche || "")) {
-            setLoadingBranche(false);
-            return;
-        }
-
+        const number = values.num_police;
+        setBranchCandidates(null);
+        if (number.length < 6) return undefined;
         const controller = new AbortController();
-
-        const loadBranche = async () => {
-            setLoadingBranche(true);
-
+        const timer = setTimeout(async () => {
             try {
-
-                const params = new URLSearchParams({
-                    code_compagnie: String(compagnie),
-                    code_branche: branche
-                });
-
-                const response = await fetch(
-                    `${API_URL}/api/polices/branche?${params}`,
-                    {
-                        credentials: "include",
-                        signal: controller.signal
-                    }
-                );
-
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        throw new Error(
-                            "Branche introuvable pour cette compagnie"
-                        );
-                    }
-
-                    throw new Error(
-                        "Erreur lors de la recherche de la branche"
-                    );
-                }
-
-                const data = await response.json();
-
-                if (!controller.signal.aborted) {
-                    setNomBranche(data.nom_branche || "");
-                    setTauxComm(data.taux_comm == null ? null : Number(data.taux_comm));
-                }
-
-            } catch (error) {
-                if (!controller.signal.aborted) {
-                    setBrancheError(error.message);
-                }
-            } finally {
-                if (!controller.signal.aborted) {
-                    setLoadingBranche(false);
-                }
+                const response = await fetch(`${API_URL}/api/polices/numero-branche?${new URLSearchParams({ num_police: number })}`, { credentials: "include", signal: controller.signal });
+                const data = await response.json().catch(() => ({}));
+                if (!controller.signal.aborted) setBranchCandidates(response.ok && Array.isArray(data.candidates) ? data.candidates : []);
+            } catch (err) {
+                if (err.name !== "AbortError") setBranchCandidates([]);
             }
-        };
+        }, 350);
+        return () => { controller.abort(); clearTimeout(timer); };
+    }, [values.num_police]);
 
-        loadBranche();
-
-        return () => controller.abort();
-
-    }, [values.code_compagnie, values.code_branche, branchLength]);
-
-    const stepErrors = !isCreate ? {} : step === 1
-        ? policeErrors({ ...values, echeance: echeanceText(values.echeance) }, DC_GUARANTEES.map(([key]) => key), branchLength)
-        : quittanceErrors(values);
-    const errorCount = triedSteps[step] ? Object.keys(stepErrors).length : 0;
     const err = (name) => (triedSteps[step] && stepErrors[name] ? <small className="pf-field-error" role="alert">{stepErrors[name]}</small> : null);
 
     // Shows the messages of the step and goes to its first wrong field.
@@ -415,31 +363,92 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         </label>
     );
 
-    // N° police: the year, the code branche, then any number of digits (15 characters in all); the code branche follows it.
+    // N° police: the year, the code branche, then any number of digits (15 characters in all). The company and the branch
+    // are read from it (see branchCandidates).
     const handleNumberChange = (value) => {
         const clean = value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15);
-
-        setValues(prev => ({
-            ...prev,
-            num_police: clean,
-            code_branche:
-                clean.length >= 4 + branchLength
-                    ? clean.substring(4, 4 + branchLength)
-                    : prev.code_branche
-        }));
-    };
-
-    // A complete code branche starts the N° police: the current year then the code, the rest is typed after it.
-    const handleBrancheChange = (value) => {
-        const code = value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, branchLength);
-        const year = String(new Date().getFullYear());
-        setValues(prev => {
-            const untouched = !prev.num_police || prev.num_police === year + prev.code_branche;
-            return { ...prev, code_branche: code, num_police: untouched ? (code.length === branchLength ? year + code : "") : prev.num_police };
-        });
+        setValues(prev => ({ ...prev, num_police: clean }));
     };
 
     const loadedExisting = loadedRef.current.num !== "" && loadedRef.current.num === values.num_police;
+
+    // The branch of the chosen company written in the number. A new number is the year then the code branche; a police
+    // already stored keeps its own code when it has one (older numbers start with the code branche).
+    const offeredCompany = (code) => {
+        const company = compagnies.find(item => String(item.code_compagnie) === String(code));
+        return Boolean(company) && isOfferedCompany(company) && !HIDDEN_COMPANIES.has(Number(company.code_compagnie));
+    };
+    const storedBranch = loadedExisting ? String(values.code_branche || "").trim() : "";
+    const companyCandidates = (branchCandidates || []).filter(item => String(item.code_compagnie) === String(values.code_compagnie));
+    const branch = companyCandidates.find(item => storedBranch && item.code_branche === storedBranch)
+        || companyCandidates.find(item => item.forme === "annee")
+        || (loadedExisting ? companyCandidates[0] : null)
+        || null;
+    const tauxComm = branch?.taux_comm == null ? null : Number(branch.taux_comm); // commission rate (0.1 = 10 %)
+    const nomBrancheShown = branch?.nom_branche || (loadedExisting ? nomBranche : "");
+    const branchMissing = Boolean(values.code_compagnie) && branchCandidates !== null && values.num_police.length >= 6 && !branch && !(loadedExisting && nomBranche);
+
+    // No company chosen yet: the number names only one of the offered companies -> that company.
+    useEffect(() => {
+        if (values.code_compagnie || !branchCandidates?.length) return;
+        const companies = [...new Set(branchCandidates
+            .filter(item => offeredCompany(item.code_compagnie) && (item.forme === "annee" || loadedExisting))
+            .map(item => String(item.code_compagnie)))];
+        if (companies.length === 1) update("code_compagnie", companies[0]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [branchCandidates, compagnies]);
+
+    // The client's polices: one goes straight into N° police (which loads it), several are offered in a list.
+    useEffect(() => {
+        const code = values.code_client.trim();
+        setClientPolices(null);
+        setNewPolice(false);
+        if (!code) return undefined;
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/polices/client/${encodeURIComponent(code)}`, { credentials: "include", signal: controller.signal });
+                const rows = await response.json().catch(() => []);
+                if (controller.signal.aborted) return;
+                const list = response.ok && Array.isArray(rows)
+                    ? rows.map(row => ({ ...row, num_police: String(row.num_police || "").trim() })).filter(row => row.num_police)
+                    : [];
+                setClientPolices(list);
+                if (list.length) setValues(prev => (prev.num_police ? prev : { ...prev, num_police: list[0].num_police }));
+            } catch (err) {
+                if (err.name !== "AbortError") setClientPolices([]);
+            }
+        }, 300);
+        return () => { controller.abort(); clearTimeout(timer); };
+    }, [values.code_client]);
+
+    // A client with polices, in the "Saisir police" step: leave them for a new number, or come back to them.
+    const startNewPolice = () => {
+        setNewPolice(true);
+        loadedRef.current = { num: "", client: "" };
+        setValues({ ...initialValues, ...(prefill || {}), code_client: clientCode, num_police: "" });
+        setQuittances([]);
+        setNomBranche("");
+        setMessage("");
+        setError("");
+    };
+    const backToClientPolices = () => {
+        setNewPolice(false);
+        if (clientPolices?.length) handleNumberChange(clientPolices[0].num_police);
+    };
+    const policeLabel = (item) => [
+        item.num_police,
+        item.nom_compagnie,
+        item.nom_branche || item.risque,
+        item.etat && `état ${String(item.etat).trim()}`,
+        item.effet && `effet ${String(item.effet).slice(0, 10).split("-").reverse().join("/")}`
+    ].filter(Boolean).join(" · ");
+
+    // The input errors of the step (shown once its "Suivant" was clicked); the code branche is the one read from the number.
+    const stepErrors = !isCreate ? {} : step === 1
+        ? policeErrors({ ...values, code_branche: branch?.code_branche || "", echeance: echeanceText(values.echeance) }, DC_GUARANTEES.map(([key]) => key), branchLength)
+        : quittanceErrors(values);
+    const errorCount = triedSteps[step] ? Object.keys(stepErrors).length : 0;
 
     function goToReceipt() {
         setError("");
@@ -494,6 +503,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         const revalorisation = values.revalorisation
             ? { date_revalorisation: values.date_revalorisation || null, date_envoi: values.date_envoi || null }
             : null;
+        police.code_branche = branch?.code_branche || null;
         if (values.effet) police.heure_effet = `${values.effet}T${values.heure_effet}:00`;
         quittance.observation = values.observation || "";
         if (!values.with_periode) quittance.periode = null;
@@ -776,46 +786,44 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         )}
                     </label>
 
-                    <label className="pf-field pf-field-code-branche">
-                        <span>Code branche *</span>
-                        <input
-                            type="text"
-                            value={values.code_branche}
-                            maxLength={branchLength}
-                            onChange={(e) => handleBrancheChange(e.target.value)}
-                            placeholder={`${branchLength} caractères`}
-                        />
-                        {err("code_branche")}
-                    </label>
+                    <div className="pf-field pf-field-wide pf-num-police">
+                        <span>N° Police *{clientPolices?.length > 0 && <small className="pf-num-count"> · {clientPolices.length} police{clientPolices.length > 1 ? "s" : ""} pour ce client</small>}</span>
+                        {clientPolices?.length > 1 && !newPolice ? (
+                            <select
+                                aria-label="N° Police"
+                                value={clientPolices.some(item => item.num_police === values.num_police) ? values.num_police : ""}
+                                onChange={e => (e.target.value === NEW_POLICE ? startNewPolice() : handleNumberChange(e.target.value))}
+                            >
+                                <option value="" disabled>Choisir une police du client…</option>
+                                {clientPolices.map(item => <option key={item.num_int || item.num_police} value={item.num_police}>{policeLabel(item)}</option>)}
+                                {isCreate && <option value={NEW_POLICE}>＋ Nouvelle police (saisir le numéro)</option>}
+                            </select>
+                        ) : (
+                            <input
+                                aria-label="N° Police"
+                                value={values.num_police}
+                                maxLength={15}
+                                onChange={e => handleNumberChange(e.target.value)}
+                                placeholder={`${new Date().getFullYear()} + code branche + chiffres`}
+                            />
+                        )}
+                        {isCreate && clientPolices?.length > 0 && (newPolice
+                            ? <button type="button" className="pf-link-button pf-num-switch" onClick={backToClientPolices}>← Polices du client</button>
+                            : clientPolices.length === 1 && <button type="button" className="pf-link-button pf-num-switch" onClick={startNewPolice}>＋ Nouvelle police</button>)}
+                        {err("num_police")}
+                    </div>
 
                     <label className="pf-field pf-field-branche-nom">
                         <span>Nom branche</span>
                         <input
                             type="text"
-                            value={
-                                loadingBranche
-                                    ? "Recherche..."
-                                    : nomBranche
-                            }
-                            placeholder="Détecté automatiquement"
+                            value={nomBrancheShown || (values.num_police.length >= 6 && branchCandidates === null ? "Recherche..." : "")}
+                            placeholder="Déduit du N° police"
                             readOnly
                         />
-                        {brancheError && (
-                            <small className="pf-branch-error">
-                                {brancheError}
-                            </small>
+                        {branchMissing && (
+                            <small className="pf-branch-error">Aucune branche de cette compagnie ne correspond à ce numéro.</small>
                         )}
-                    </label>
-
-                    <label className="pf-field pf-field-wide">
-                        <span>N° Police *</span>
-                        <input
-                            value={values.num_police}
-                            maxLength={15}
-                            onChange={e => handleNumberChange(e.target.value)}
-                            placeholder={`${new Date().getFullYear()} + code branche + chiffres`}
-                        />
-                        {err("num_police")}
                     </label>
 
                     {!isCreate && (
@@ -1212,7 +1220,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
             {loading && <div className="pf-success">Recherche en cours…</div>}
             {isCreate && !saved && loadedExisting && step === 1 && (
-                <div className="pf-error">Cette police existe déjà : modification impossible ici.</div>
+                <div className="pf-error">Police existante du client : ses informations sont affichées, elle ne peut pas être modifiée ici. Pour en saisir une autre, choisissez « Nouvelle police ».</div>
             )}
 
             {isCreate && (
