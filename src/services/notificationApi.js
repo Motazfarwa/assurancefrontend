@@ -12,3 +12,5 @@ export const listNotifications = (accessToken, limit = 30) => request(accessToke
 // Administrator: the clients to complete. { total, coordonnees, sans_police, polices, items: [{ code_client, nom_client, manques }] }.
 export const listIncompleteClients = (accessToken, search = '') => request(accessToken, `/clients-incomplets${search ? `?q=${encodeURIComponent(search)}` : ''}`);
 export const markNotificationsRead = (accessToken) => request(accessToken, '/lu', 'PUT');
+// Module "Clients à compléter" (administrator): { categorie, q, offset, limit } -> the same body, with each client's details.
+export const listIncompleteClientsPage = (accessToken, params) => request(accessToken, `/clients-incomplets?${new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null))}`);

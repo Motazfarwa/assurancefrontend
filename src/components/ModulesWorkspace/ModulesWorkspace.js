@@ -25,6 +25,7 @@ import FeuilleCaisseModal from '../JournalModal/FeuilleCaisse';
 import EtatPercusModal from '../JournalModal/EtatPercus';
 import EtatComptesClientsModal from '../JournalModal/EtatComptesClients';
 import EtatDepensesTechniquesModal from '../JournalModal/EtatDepensesTechniques';
+import ClientsIncompletsModal from '../ClientsIncompletsModal/ClientsIncompletsModal';
 import RetourQuittancesModal from '../JournalModal/RetourQuittances';
 import EtatTermeModal from '../JournalModal/EtatTerme';
 import EtatComptesBanqueModal from '../JournalModal/EtatComptesBanque';
@@ -79,6 +80,7 @@ export default function ModulesWorkspace() {
   const [termeModule, setTermeModule] = useState(null);
   const [bankModule, setBankModule] = useState(null);
   const [depensesTechModule, setDepensesTechModule] = useState(null);
+  const [incompleteModule, setIncompleteModule] = useState(null);
   const [reconciliationModule, setReconciliationModule] = useState(null);
   const [quittancesModule, setQuittancesModule] = useState(null);
   const [ristourneModule, setRistourneModule] = useState(null);
@@ -176,6 +178,12 @@ export default function ModulesWorkspace() {
     }
     if (module.form === 'etat-comptes-banque') {
       setBankModule(module);
+      return;
+    }
+    if (module.form === 'clients-incomplets') {
+      if (!user.isAdmin) return;
+      setActiveModuleId(module.id);
+      setIncompleteModule(module);
       return;
     }
     if (module.form === 'depenses-techniques') {
@@ -345,6 +353,7 @@ export default function ModulesWorkspace() {
       {retourModule && <RetourQuittancesModal moduleId={retourModule.id} onClose={() => setRetourModule(null)} />}
       {termeModule && <EtatTermeModal moduleId={termeModule.id} onClose={() => setTermeModule(null)} />}
       {bankModule && <EtatComptesBanqueModal moduleId={bankModule.id} onClose={() => setBankModule(null)} />}
+      {incompleteModule && user.isAdmin && <ClientsIncompletsModal moduleId={incompleteModule.id} onClose={() => { setIncompleteModule(null); setActiveModuleId(null); }} />}
       {depensesTechModule && <EtatDepensesTechniquesModal moduleId={depensesTechModule.id} onClose={() => { setDepensesTechModule(null); setActiveModuleId(null); }} />}
       {reconciliationModule && <ReconciliationPoliceModal moduleId={reconciliationModule.id} onClose={() => setReconciliationModule(null)} />}
       {operationsModule && <OperationsJournalieresModal key={operationsModule.id} moduleId={operationsModule.id} familyKey={operationsModule.form === 'operations-financieres' ? 'financier' : 'production'} onClose={() => setOperationsModule(null)} />}

@@ -10,6 +10,7 @@ export const MODULE_CATEGORIES = [
 
 export const INSURANCE_MODULES = [
   { id: '100', category: 'production', title: 'Gestion des clients', description: 'Creer et mettre a jour les dossiers clients.', permission: P.USERS_MANAGE, form: 'client' },
+  { id: '105', category: 'production', title: 'Clients a completer', description: 'Administrateur : les clients dont il manque des informations (coordonnees, polices, quittances, sinistres), avec le detail.', permission: P.USERS_MANAGE, adminOnly: true, form: 'clients-incomplets' },
   { id: '110', category: 'production', title: 'Gestion des polices', description: 'Consulter et administrer les contrats.', permission: P.POLICIES_VIEW_ALL, form: 'policy' },
   { id: '120', category: 'production', title: 'Gestion des quittances', description: 'Consulter les quittances de tous les clients par client, police, compagnie, echeance ou date de saisie, et les modifier.', permission: P.POLICIES_VIEW_ALL, form: 'quittances' },
   { id: '130', category: 'production', title: 'Operations journalieres (production)', description: 'Polices ou quittances ajoutees, modifiees ou supprimees entre deux dates (production).', permission: P.REPORTS_VIEW, form: 'operations-journalieres' },
