@@ -45,3 +45,5 @@ export async function extractCheque(token, file) {
   const image = pdf ? await fileToBase64(file) : await toJpegBase64(file);
   return request('/api/cheques/extract', token, { method: 'POST', body: JSON.stringify({ image_base64: image, media_type: pdf ? 'application/pdf' : 'image/jpeg' }) });
 }
+// The client of a cheque's account holder: { client: { code_client, nom, exact } | null, candidats: [...] } (existing clients only).
+export const findDrawer = (token, nom) => request(`/api/cheques/tireur?${query({ nom })}`, token);

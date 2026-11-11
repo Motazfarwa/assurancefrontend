@@ -254,7 +254,7 @@ export default function RecetteModal({ onClose }) {
           <button type="button" className="rct-tool" onClick={leave}>Quitter transaction</button>
         </footer>
       </section>
-      {importFile && <DocumentImportDialog file={importFile} kicker="RECOUVREMENT · RECETTE · IMPORT" title="Importer une pièce de règlement" read={(onProgress) => scanPayment(importFile, { accessToken, banks, onProgress })} summarize={({ found }) => ({ rows: found.map((item) => [item.label, item.value]), empty: "Aucune information reconnue dans le document. Saisissez les champs manuellement." })} applyLabel="Appliquer à la recette" onApply={applyImport} onClose={() => setImportFile(null)} />}
+      {importFile && <DocumentImportDialog file={importFile} kicker="RECOUVREMENT · RECETTE · IMPORT" title="Importer une pièce de règlement" read={(onProgress) => scanPayment(importFile, { accessToken, banks, onProgress })} summarize={({ found, warnings }) => ({ rows: found.map((item) => [item.label, item.value]), warnings, empty: "Aucune information reconnue dans le document. Saisissez les champs manuellement." })} applyLabel="Appliquer à la recette" onApply={applyImport} onClose={() => setImportFile(null)} />}
     </div>
   );
 }

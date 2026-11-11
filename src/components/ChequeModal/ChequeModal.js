@@ -296,8 +296,8 @@ export default function ChequeModal({ onClose }) {
         if (!next) break;
         updateBatchItem(next.id, { status: 'lecture' });
         try {
-          const { values, found } = await scanPayment(next.file, { accessToken, banks });
-          updateBatchItem(next.id, { status: found.length ? 'lu' : 'erreur', values, found, error: found.length ? '' : 'Aucune information lisible.' });
+          const { values, found, warnings } = await scanPayment(next.file, { accessToken, banks });
+          updateBatchItem(next.id, { status: found.length ? 'lu' : 'erreur', values, found, warnings: warnings || [], error: found.length ? '' : 'Aucune information lisible.' });
         } catch (scanError) {
           updateBatchItem(next.id, { status: 'erreur', error: scanError.message });
         }
@@ -544,7 +544,7 @@ export default function ChequeModal({ onClose }) {
           </section>
         </div>
       )}
-      {importFile && <DocumentImportDialog file={importFile} kicker="RECOUVREMENT · PIÈCES · IMPORT" title="Importer une pièce (chèque, traite, bordereau)" read={(onProgress) => scanPayment(importFile, { accessToken, banks, onProgress })} summarize={({ found }) => ({ rows: found.map((item) => [item.label, item.value]), empty: "Aucune information lisible : renseignez les champs à la main." })} applyLabel="Appliquer à la pièce" onApply={applyImport} onClose={() => setImportFile(null)} />}
+      {importFile && <DocumentImportDialog file={importFile} kicker="RECOUVREMENT · PIÈCES · IMPORT" title="Importer une pièce (chèque, traite, bordereau)" read={(onProgress) => scanPayment(importFile, { accessToken, banks, onProgress })} summarize={({ found, warnings }) => ({ rows: found.map((item) => [item.label, item.value]), warnings, empty: "Aucune information lisible : renseignez les champs à la main." })} applyLabel="Appliquer à la pièce" onApply={applyImport} onClose={() => setImportFile(null)} />}
     </div>
   );
 }
@@ -577,12 +577,13 @@ function BatchStrip({ batch, onShow, onClose }) {
             <button type="button" className={`chq-batch-item is-${entry.status}${index === current ? ' is-current' : ''}`} disabled={entry.status === 'ajoute'} onClick={() => onShow(index)} aria-current={index === current ? 'true' : undefined} title={entry.name}>
               <b>{index + 1}</b>
               <span>{entry.values?.nump || entry.name}</span>
-              <small>{entry.values?.montant && entry.status !== 'erreur' ? `${money(entry.values.montant)} · ${BATCH_STATES[entry.status]}` : BATCH_STATES[entry.status]}</small>
+              <small>{entry.values?.montant && entry.status !== 'erreur' ? `${money(entry.values.montant)} · ${BATCH_STATES[entry.status]}` : BATCH_STATES[entry.status]}{entry.status === 'lu' && entry.warnings?.length ? ' · ⚠' : ''}</small>
             </button>
           </li>
         ))}
       </ol>
       {item?.status === 'lu' && <p className="chq-batch-found"><b>Lu sur le chèque {current + 1} :</b> {item.found.map((field) => `${field.label} ${field.value}`).join(' · ')}</p>}
+      {item?.status === 'lu' && item.warnings?.length > 0 && <ul className="chq-batch-warnings">{item.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
       {item && ['attente', 'lecture'].includes(item.status) && <p className="chq-batch-found">Chèque {current + 1} en cours de lecture : le formulaire se remplit dès qu’il est lu.</p>}
     </section>
   );

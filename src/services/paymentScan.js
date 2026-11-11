@@ -1,6 +1,8 @@
 // Full reading of a payment document (cheque, bill of exchange, transfer slip, receipt) from an image or a
 // PDF, shared by "Gestion des chèques" and "Recette technique": the whole text of the document read by OCR (no AI):
 // the server OCR (printed and handwritten) when configured, else OCR in the browser (PDF text layer / every page).
+import { findDrawer } from './chequeApi';
+import { isBankCheque, readChequeAll } from './chequeReading';
 import { searchClients } from './clientApi';
 import { readText } from './documentReading';
 import { isPdf, toIsoDate } from './ficheOcr';
@@ -82,7 +84,7 @@ export function extractPayment(rawText, banks = []) {
   set('nump', valueAfter(lines, 'n[°o]\\s*(?:de\\s+)?(?:pi[èe]ce|ch[èe]que|traite|virement|lettre\\s+de\\s+change)|ch[èe]que\\s+n[°o]?|traite\\s+n[°o]?|r[ée]f[ée]rence(?:\\s+virement)?', VALUE.piece));
   set('nump', (flat.match(/\|\s*(\d{5,10})\s*\|/) || [])[1]); // cheque line at the bottom: |0001234|
 
-  const labelled = valueAfter(lines, 'montant|somme|total|net\\s+[àa]\\s+payer|la\\s+somme\\s+de', VALUE.amount);
+  const labelled = valueAfter(lines, 'montant(?!\\s*max)|somme|total|net\\s+[àa]\\s+payer|la\\s+somme\\s+de', VALUE.amount);
   const framed = (flat.match(/#\s*(\d[\d .,]*\d)\s*(?:DT|TND|dinars?)?\s*#/i) || [])[1];
   const amounts = (flat.match(AMOUNT_RE) || []).map(toAmount).filter((n) => n > 0);
   const amount = toAmount(labelled || framed || 0) || (amounts.length ? Math.max(...amounts) : 0);
@@ -91,10 +93,11 @@ export function extractPayment(rawText, banks = []) {
   set('echeance', toIsoDate(valueAfter(lines, '[ée]ch[ée]ance|payable\\s+le|[àa]\\s+payer\\s+le|date\\s+(?:d[\'’]\\s*)?[ée]ch[ée]ance', VALUE.date)));
   set('dateEmission', toIsoDate(valueAfter(lines, "date\\s+(?:d['’]\\s*)?[ée]mission|date\\s+de\\s+cr[ée]ation|le", VALUE.date)));
   set('dateSaisie', toIsoDate(valueAfter(lines, 'date\\s+(?:de\\s+)?saisie', VALUE.date)));
-  if (!result.echeance) set('echeance', result.dateEmission || toIsoDate((flat.match(new RegExp(DATE_SOURCE)) || [''])[0]));
+  const firstDate = lines.filter((line) => !/validit/i.test(line)).join(' ').match(new RegExp(DATE_SOURCE));
+  if (!result.echeance) set('echeance', result.dateEmission || toIsoDate((firstDate || [''])[0]));
 
   // Bank: its code ("Code banque : 10", "Banque 10 - ..."), else its name written as a whole word.
-  const bankCode = valueAfter(lines, 'code\\s+banque|banque|bank', VALUE.bankCode);
+  const bankCode = valueAfter(lines, 'code\\s+banque|banque', VALUE.bankCode);
   const byCode = bankCode && banks.find((bank) => Number(bank.code_banque) === Number(bankCode) || bank.code_banque === bankCode);
   const byName = [...banks].filter((bank) => String(bank.nom_banque || '').trim().length >= 3)
     .sort((a, b) => b.nom_banque.length - a.nom_banque.length).find((bank) => nameWord(bank.nom_banque.trim()).test(flat));
@@ -143,13 +146,35 @@ async function findClientCode(accessToken, name) {
 }
 
 
-// Scans the document and returns { values, found, text }: `values` uses the Recette field names,
+// Scans the document and returns { values, found, warnings, text }: `values` uses the Recette field names,
 // `found` lists every value read ({ key, label, value }) for display.
 export async function scanPayment(file, { accessToken, banks = [], onProgress } = {}) {
   const texts = await readTexts(file, accessToken, onProgress).catch(() => []);
   if (!texts.some((text) => text.trim())) throw new Error('aucun texte n’a pu être lu (vérifiez la qualité du document).');
 
   const values = extractPaymentAll(texts, banks);
+  const warnings = [];
+  // A bank cheque: its printed values (number, RIB, bank, account holder) and its checked amount and date replace the
+  // generic reading; what cannot be read for sure is left empty with a warning.
+  if (isBankCheque(texts.join('\n'))) {
+    const cheque = readChequeAll(texts, banks);
+    ['nump', 'rib', 'banqueLue', 'code_banque', 'tireur', 'typeReglement'].forEach((key) => { if (cheque.values[key]) values[key] = cheque.values[key]; });
+    ['montant', 'echeance'].forEach((key) => { if (cheque.values[key]) values[key] = cheque.values[key]; else delete values[key]; });
+    warnings.push(...cheque.warnings);
+  }
+  // The client is the account holder of the cheque (never the payee): found among the existing clients only.
+  if (!values.code && values.tireur && accessToken) {
+    const match = await findDrawer(accessToken, values.tireur).catch(() => null);
+    if (match?.client) {
+      values.code = match.client.code_client;
+      values.clientTrouve = match.client.nom;
+      if (!match.client.exact) warnings.push(`Client ${match.client.code_client} ${match.client.nom} retenu pour le titulaire « ${values.tireur} » (nom proche) : vérifiez.`);
+    } else if (match?.candidats?.length) {
+      warnings.push(`Titulaire « ${values.tireur} » : plusieurs clients possibles (${match.candidats.slice(0, 4).map((item) => `${item.code_client} ${item.nom}`).join(', ')}) : choisissez le client.`);
+    } else if (match) {
+      warnings.push(`Titulaire « ${values.tireur} » : aucun client à ce nom, choisissez le client.`);
+    }
+  }
   if (!values.code && values.nomClient && accessToken) {
     const code = await findClientCode(accessToken, values.nomClient);
     if (code) values.code = code;
@@ -159,8 +184,10 @@ export async function scanPayment(file, { accessToken, banks = [], onProgress } 
     if (key === 'code_banque') return `${value} - ${banks.find((bank) => bank.code_banque === value)?.nom_banque || ''}`;
     if (['echeance', 'dateEmission', 'dateSaisie'].includes(key)) return value.split('-').reverse().join('/');
     if (key === 'quittances') return value.join(', ');
+    if (key === 'code' && values.clientTrouve) return `${value} - ${values.clientTrouve}`;
+    if (key === 'montant') return Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
     return value;
   };
   const found = Object.keys(PAYMENT_LABELS).filter((key) => values[key]).map((key) => ({ key, label: PAYMENT_LABELS[key], value: shown(key, values[key]) }));
-  return { values, found, text: texts[0] || '' };
+  return { values, found, warnings, text: texts[0] || '' };
 }

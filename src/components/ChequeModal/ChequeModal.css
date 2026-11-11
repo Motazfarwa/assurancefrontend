@@ -91,3 +91,4 @@
   .chq-batch { padding: 8px 12px; }
   .chq-batch-head .chq-tool { flex: 1 1 auto; }
 }
+.chq-batch-warnings { display: grid; gap: 3px; margin: 0; padding: 7px 10px 7px 26px; border: 1px solid #f0dcb4; border-radius: 8px; background: #fff8ec; color: #8a5a10; font-size: 11.5px; }
