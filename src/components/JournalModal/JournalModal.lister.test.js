@@ -37,12 +37,12 @@ test('the journal days: the 15th and the last day of the month', () => {
   expect(isJournalDay('2026-11-11')).toBe(false);
 });
 
-test('encaissement: listed as it opens, on the date de règlement of today', async () => {
+test('encaissement: listed as it opens, on the journal day (the 15th, or the last day of the month after the 15th)', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
-  const today = new Date().toLocaleDateString('sv-SE');
-  expect(screen.getByLabelText('Date')).toHaveValue(today);
+  const day = journalDay();
+  expect(screen.getByLabelText('Date')).toHaveValue(day);
   expect(await screen.findByText('02026017527')).toBeInTheDocument();
-  expect(getReceiptsJournal).toHaveBeenCalledWith('t', expect.objectContaining({ date: today, regles: true, debut: today, fin: today, comptabilises: true }));
+  expect(getReceiptsJournal).toHaveBeenCalledWith('t', expect.objectContaining({ date: day, regles: true, debut: day, fin: day, comptabilises: true }));
 });
 
 test('encaissement: the quittances settled on the date chosen, every line ticked, no validation column, red when declared off the 15th / end of month', async () => {

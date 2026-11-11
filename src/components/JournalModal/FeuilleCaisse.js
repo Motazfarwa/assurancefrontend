@@ -43,7 +43,7 @@ export function cashSheetLines(journals, expenses) {
   const commission = jeqCommission - rebateCommission;
   const lines = [
     ...journals.flatMap((day) => [
-      { label: `Règlements clients du ${formatDate(day.jour)} (${day.quittances} quittance${day.quittances > 1 ? 's' : ''})`, primes: Number(day.primes || 0), tq: Number(day.tq || 0), commission: Number(day.commission || 0), depenses: 0 },
+      { label: `Encaissements déclarés le ${formatDate(day.jour)} (${day.quittances} quittance${day.quittances > 1 ? 's' : ''})`, primes: Number(day.primes || 0), tq: Number(day.tq || 0), commission: Number(day.commission || 0), depenses: 0 },
       ...(Number(day.frais || 0) ? [{ label: `FSSR ${compact(day.jour)}`, primes: Number(day.frais), tq: 0, commission: 0, depenses: 0 }] : []),
     ]),
     ...expenses.map((row) => ({
@@ -291,7 +291,7 @@ export function CashSheet({ company, date, debut = date, fin = date, selection, 
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
           <div className="jrn-cash-company"><strong>{company.nom_compagnie}</strong><strong>{periodTitle(debut, fin)}</strong></div>
-          <div className="jrn-sheet-title"><h1>AGENCE : {company.code_agent}</h1><p>Règlements clients et dépenses du jour</p></div>
+          <div className="jrn-sheet-title"><h1>AGENCE : {company.code_agent}</h1><p>Encaissements et dépenses déclarés au journal</p></div>
           <div className="jrn-agency jrn-printed"><span>Date impression : {formatDate(today())}</span></div>
         </header>
         {state.loading ? <p className="jrn-sheet-state">Chargement…</p> : state.error ? <p className="jrn-sheet-state" role="alert">{state.error}</p> : <table className="jrn-sheet-table jrn-cash-table">
@@ -407,7 +407,7 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
         {jour && !isJournalDay(jour) && <p className="jrn-cash-warn">Le {formatDate(jour)} n’est ni le 15 ni le dernier jour du mois.</p>}
         {lines && <CashLines lines={lines} />}
-        <p className="jrn-hint">La feuille reprend les règlements des clients de ce jour-là (montants payés, commission des quittances soldées) et les sinistres et ristournes payés ce jour-là. « Valider » déclare à cette date les encaissements et les dépenses encore à déclarer, qui passent alors dans cette feuille. « Détails » ouvre la page A4, où le solde et le montant à déclarer peuvent être arrondis de 1 DT au plus.</p>
+        <p className="jrn-hint">La feuille reprend ce qui est déclaré à cette date dans le journal d’encaissement (montants réglés par les clients, commission des quittances soldées) et dans le journal de dépense (sinistres et ristournes), quel que soit le jour du paiement. « Valider » déclare à cette date les encaissements et les dépenses encore à déclarer, qui passent alors dans cette feuille. « Détails » ouvre la page A4, où le solde et le montant à déclarer peuvent être arrondis de 1 DT au plus.</p>
       </div>
     </section>
     {open && company && <CashSheet company={company} date={jour} onValidated={() => { setSheetValidated((value) => value + 1); refresh(); }} onClose={() => setOpen(false)} />}

@@ -42,7 +42,7 @@ const KINDS = {
     amount: 'montant',
     // Every company is listed until one is chosen.
     allCompanies: true,
-    // The quittances whose date de règlement (TRegCli) is the date chosen; the date is today when the journal opens.
+    // The quittances whose date de règlement (TRegCli) is the date chosen (the journal day when the journal opens).
     settled: true,
     // No "Comptabiliser": the lines chosen are declared by the validation of the feuille de caisse ("Valider").
     readOnly: true,
@@ -75,8 +75,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [compagnie, setCompagnie] = useState('');
-  // Encaissement: today, its règlements are listed; dépense: the journal day (the 15th or the end of the month).
-  const [date, setDate] = useState(() => (config.settled ? new Date().toLocaleDateString('sv-SE') : journalDay()));
+  // The journal day: the 15th until the 15th, then the last day of the month (11/11 -> 15/11, 16/11 -> 30/11).
+  const [date, setDate] = useState(journalDay);
   // Encaissement: only the quittances a client paid something on, with a date de règlement on the date (Réglé > 0).
   const settledParams = (day) => (config.settled ? { regles: true, periode: true, debut: day, fin: day } : {});
   const [nature, setNature] = useState(''); // dépense: '' | S | R
