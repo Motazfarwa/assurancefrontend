@@ -27,6 +27,9 @@ const query = (params) => new URLSearchParams(Object.entries(params).filter(([, 
 export const listJournalCompanies = (token) => request('/api/journaux/compagnies', token);
 // Journal d'encaissement: receipts of a company to declare on a date (and, with comptabilises, those declared that day).
 export const getReceiptsJournal = (token, params) => request(`/api/journaux/encaissement?${query(params)}`, token);
+// The ticks kept for the journal d'encaissement of a date: { choix: { num_quittance: ticked } } (absent: ticked).
+export const getReceiptChoices = (token, date) => request(`/api/journaux/encaissement/choix?${query({ date })}`, token);
+export const saveReceiptChoices = (token, date, items) => request('/api/journaux/encaissement/choix', token, { method: 'PUT', body: JSON.stringify({ date, items }) });
 export const postReceipts = (token, payload) => request('/api/journaux/encaissement/comptabiliser', token, { method: 'POST', body: JSON.stringify(payload) });
 // One encaissement validated on the day of the validation: { num_quittance, date_validation, montant, a_s, code_compagnie, valide_par }.
 export const validateReceipt = (token, numQuittance) => request('/api/journaux/encaissement/valider', token, { method: 'POST', body: JSON.stringify({ num_quittance: numQuittance }) });

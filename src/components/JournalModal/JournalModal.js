@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getExpensesJournal, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts } from '../../services/journalApi';
+import { getExpensesJournal, getReceiptChoices, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts, saveReceiptChoices } from '../../services/journalApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
@@ -28,18 +28,6 @@ const receiptStatus = (row) => {
   return ['Reste dû', `Les acomptes (${fmt(row.regle)}) sont déjà déclarés : la ligne déclarerait les ${fmt(row.solde_quittance)} que le client n’a pas encore payés.`];
 };
 
-// The lines unticked in a journal, per journal and date, kept in this browser (a private window keeps nothing).
-const untickedKey = (kind, day) => `jrn-unticked:${kind}:${day}`;
-function readUnticked(kind, day) {
-  try { return new Set(JSON.parse(window.localStorage.getItem(untickedKey(kind, day)) || '[]')); } catch { return new Set(); }
-}
-function writeUnticked(kind, day, keys) {
-  try {
-    if (keys.length) window.localStorage.setItem(untickedKey(kind, day), JSON.stringify(keys));
-    else window.localStorage.removeItem(untickedKey(kind, day));
-  } catch { /* storage blocked: the choice lasts while the journal is open */ }
-}
-
 // Each journal: how its lines are read, keyed, pre-chosen, searched and comptabilisées.
 const KINDS = {
   encaissement: {
@@ -62,6 +50,10 @@ const KINDS = {
     showDone: true,
     // The feuille de caisse validates the quittances chosen here.
     selection: (keys) => ({ quittances: keys }),
+    // Every line, declared or not, is ticked and can be unticked; the ticks of a date are kept on the server, so the
+    // journal of that date shows the same choice when it is opened again. "Valider" on the feuille of the date declares
+    // the ticked lines and takes the unticked ones out of the date.
+    choices: { load: getReceiptChoices, save: saveReceiptChoices },
   },
   depense: {
     title: 'Journal de dépense',
@@ -91,6 +83,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [date, setDate] = useState(journalDay);
   // Encaissement: only the quittances a client paid something on (a date de règlement and Réglé > 0).
   const settledParams = () => (config.settled ? { regles: true, periode: true } : {});
+  // A line that can be ticked / unticked: every line of the journal d'encaissement, the ones not comptabilisées elsewhere.
+  const editable = (row) => Boolean(config.choices) || !row.comptabilise;
   const [nature, setNature] = useState(''); // dépense: '' | S | R
   const [showDone, setShowDone] = useState(Boolean(config.showDone));
   const [search, setSearch] = useState('');
@@ -118,19 +112,22 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     if (!listedFor) { setState({ loading: false, error: '', items: [] }); setChosen(new Set()); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
-    config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams(listedFor.date) })
-      .then((body) => {
+    Promise.all([
+      config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams(listedFor.date) }),
+      config.choices ? config.choices.load(accessToken, listedFor.date).catch(() => ({ choix: {} })) : Promise.resolve({ choix: {} }),
+    ])
+      .then(([body, kept]) => {
         if (!active) return;
         const items = body.items || [];
+        const choix = kept.choix || {};
         setState({ loading: false, error: '', items });
-        // The lines unticked on this date stay unticked (remembered per journal and date); the others are ticked.
-        const unticked = readUnticked(kind, listedFor.date);
-        setChosen(new Set(items.filter((row) => !row.comptabilise && config.preselect(row) && !unticked.has(config.key(row))).map(config.key)));
+        // Ticked from the start, unless unticked on this date before.
+        setChosen(new Set(items.filter((row) => editable(row) && config.preselect(row) && choix[config.key(row)] !== false).map(config.key)));
       })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [] }); });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config
-  }, [accessToken, config, kind, listedFor, showDone]);
+  }, [accessToken, config, listedFor, showDone]);
   const list = () => setListedFor({ compagnie, date, nature, at: Date.now() });
 
   useEffect(() => {
@@ -146,26 +143,35 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     const text = search.trim().toLocaleLowerCase();
     return text ? state.items.filter((row) => config.text(row).toLocaleLowerCase().includes(text)) : state.items;
   }, [state.items, search, config]);
-  const pending = shown.filter((row) => !row.comptabilise);
-  const selected = state.items.filter((row) => !row.comptabilise && chosen.has(config.key(row)));
+  const pending = shown.filter(editable);
+  const selected = state.items.filter((row) => editable(row) && chosen.has(config.key(row)));
   const done = state.items.filter((row) => row.comptabilise);
   const allChosen = pending.length > 0 && pending.every((row) => chosen.has(config.key(row)));
 
-  // A tick or untick is kept for the date of the journal: the journal opened again on that date shows the same choice.
-  const remember = (next) => {
-    if (listedFor) writeUnticked(kind, listedFor.date, state.items.filter((row) => !row.comptabilise && !next.has(config.key(row))).map(config.key));
-    return next;
+  // A tick or untick is kept on the server for the date of the journal: opened again on that date, the journal shows it.
+  const remember = (rows, ticked) => {
+    if (!config.choices || !listedFor || !rows.length) return;
+    config.choices.save(accessToken, listedFor.date, rows.map((row) => ({ num_quittance: config.key(row), coche: ticked })))
+      .catch((requestError) => setState((current) => ({ ...current, error: `Choix non enregistré : ${requestError.message}` })));
   };
-  const toggle = (row) => setChosen((current) => {
-    const next = new Set(current);
-    if (next.has(config.key(row))) next.delete(config.key(row)); else next.add(config.key(row));
-    return remember(next);
-  });
-  const toggleAll = () => setChosen((current) => {
-    const next = new Set(current);
-    pending.forEach((row) => (allChosen ? next.delete(config.key(row)) : next.add(config.key(row))));
-    return remember(next);
-  });
+  const toggle = (row) => {
+    const ticked = !chosen.has(config.key(row));
+    setChosen((current) => {
+      const next = new Set(current);
+      if (ticked) next.add(config.key(row)); else next.delete(config.key(row));
+      return next;
+    });
+    remember([row], ticked);
+  };
+  const toggleAll = () => {
+    const ticked = !allChosen;
+    setChosen((current) => {
+      const next = new Set(current);
+      pending.forEach((row) => (ticked ? next.add(config.key(row)) : next.delete(config.key(row))));
+      return next;
+    });
+    remember(pending, ticked);
+  };
 
   async function comptabiliser() {
     if (!selected.length) return;
@@ -199,13 +205,15 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   }
 
   // The feuille de caisse validates the lines ticked here (once listed); otherwise every line still to declare.
-  const cashSelection = listed && config.selection ? config.selection(state.items.filter((row) => !row.comptabilise && chosen.has(config.key(row))).map(config.key)) : undefined;
+  const cashSelection = listed && config.selection ? config.selection(selected.filter((row) => !row.comptabilise).map(config.key)) : undefined;
   // After its validation the journal is read again: the lines declared stay listed, ticked.
   const afterCashValidation = () => { if (listed) setListedFor((current) => ({ ...current, at: Date.now() })); };
 
   // The feuille: what is comptabilisé on the date, or else a preview of the chosen lines.
   function openSheet() {
-    if (showDone && done.length) setSheet({ rows: done, preview: false });
+    // Encaissement: the lines ticked (a preview while some are still to declare).
+    if (config.choices) setSheet({ rows: selected, preview: selected.some((row) => !row.comptabilise) });
+    else if (showDone && done.length) setSheet({ rows: done, preview: false });
     else setSheet({ rows: selected, preview: true });
   }
 
@@ -253,12 +261,12 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               </tr></thead>
               <tbody>{shown.map((row) => {
                 const key = config.key(row);
-                const on = row.comptabilise || chosen.has(key);
+                const on = editable(row) ? chosen.has(key) : row.comptabilise;
                 const red = kind === 'encaissement' && offDay(row, listedFor.date);
                 const status = kind === 'encaissement' ? receiptStatus(row) : null;
-                return <tr key={key} className={`${row.comptabilise ? 'is-done' : on ? 'is-chosen' : ''}${red ? ' is-offday' : ''}`} onClick={() => { if (!row.comptabilise) toggle(row); }}
+                return <tr key={key} className={`${!editable(row) ? 'is-done' : on ? 'is-chosen' : ''}${red ? ' is-offday' : ''}`} onClick={() => { if (editable(row)) toggle(row); }}
                   title={status ? `${status[0]} : ${status[1]}${row.comptabilise && row.date_comptabilise ? ` Déclarée le ${formatDate(row.date_comptabilise)}.` : ''}` : undefined}>
-                  <td className="cqi-verser"><input type="checkbox" checked={on} disabled={row.comptabilise} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
+                  <td className="cqi-verser"><input type="checkbox" checked={on} disabled={!editable(row)} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
                   {kind === 'encaissement'
                     ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.a_s}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>

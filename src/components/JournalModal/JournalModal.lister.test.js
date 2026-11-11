@@ -6,13 +6,16 @@ import { getExpensesJournal, getReceiptsJournal } from '../../services/journalAp
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Sami' } }) }));
 jest.mock('../../services/journalApi', () => ({
   getReceiptsJournal: jest.fn(), getExpensesJournal: jest.fn(), listJournalCompanies: jest.fn(), postReceipts: jest.fn(), postExpenses: jest.fn(),
+  getReceiptChoices: jest.fn(), saveReceiptChoices: jest.fn(),
 }));
 jest.mock('./FeuilleCaisse', () => ({
   ...jest.requireActual('./FeuilleCaisse'),
   CashSheet: jest.fn(() => null),
 }));
 
-const { listJournalCompanies } = jest.requireMock('../../services/journalApi');
+const { listJournalCompanies, getReceiptChoices, saveReceiptChoices } = jest.requireMock('../../services/journalApi');
+// The ticks kept on the server, per date (as dbo.TJournalChoix).
+let mockKept = {};
 const line = (number, extra) => ({
   num_quittance: number, tc: 'T', echeance: '2026-01-01', num_police: '6320245109', code_agence: '00', code_compagnie: 4, nom_compagnie: 'CARTE',
   montant: 100, a_s: 'S', frais: 0, timbre: 0, comm: 2.5, assure: 'MIDANI NEJLA', regle: 100, date_reglement: '2026-02-17T00:00:00',
@@ -22,6 +25,12 @@ const line = (number, extra) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   listJournalCompanies.mockResolvedValue([{ code_compagnie: 4, nom_compagnie: 'CARTE' }]);
+  mockKept = {};
+  getReceiptChoices.mockImplementation((token, date) => Promise.resolve({ choix: { ...(mockKept[date] || {}) } }));
+  saveReceiptChoices.mockImplementation((token, date, items) => {
+    mockKept[date] = { ...(mockKept[date] || {}), ...Object.fromEntries(items.map((item) => [item.num_quittance, item.coche])) };
+    return Promise.resolve({ enregistres: items.length });
+  });
   getReceiptsJournal.mockResolvedValue({ items: [
     line('02026017527'),
     line('02026000001', { comptabilise: true, date_comptabilise: '2026-11-11' }),
@@ -100,26 +109,32 @@ test('dépense: listed as it opens for every company; "Lister" lists again with 
   await waitFor(() => expect(getExpensesJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ compagnie: '', nature: 'S' })));
 });
 
-test('a line unticked on a date stays unticked when the journal of that date is opened again; declared lines stay ticked', async () => {
-  window.localStorage.clear();
+test('every line, declared ones included, is ticked and can be unticked; the ticks of a date are kept on the server for that date', async () => {
   const first = render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15' })));
-  const box = await screen.findByLabelText('Choisir 02026017527');
-  await waitFor(() => expect(box).toBeChecked());
-  fireEvent.click(box);
-  expect(box).not.toBeChecked();
-  expect(screen.getByLabelText('Choisir 02026000002')).toBeChecked();
-  expect(screen.getByLabelText('Choisir 02026000002')).toBeDisabled();
+  const declared = await screen.findByLabelText('Choisir 02026000002');
+  await waitFor(() => expect(declared).toBeChecked());
+  expect(declared).not.toBeDisabled();
+  fireEvent.click(declared);
+  fireEvent.click(screen.getByLabelText('Choisir 02026017527'));
+  expect(declared).not.toBeChecked();
+  expect(saveReceiptChoices).toHaveBeenCalledWith('t', '2026-11-15', [{ num_quittance: '02026000002', coche: false }]);
+  expect(saveReceiptChoices).toHaveBeenCalledWith('t', '2026-11-15', [{ num_quittance: '02026017527', coche: false }]);
+  // ticked again: kept as ticked
+  fireEvent.click(screen.getByLabelText('Choisir 02026017527'));
+  expect(saveReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-15', [{ num_quittance: '02026017527', coche: true }]);
   first.unmount();
 
+  // opened again on that date: the same choice
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
-  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15' })));
-  await waitFor(() => expect(screen.getByLabelText('Choisir 02026017527')).not.toBeChecked());
+  await waitFor(() => expect(getReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-15'));
+  await waitFor(() => expect(screen.getByLabelText('Choisir 02026000002')).not.toBeChecked());
+  expect(screen.getByLabelText('Choisir 02026017527')).toBeChecked();
+  expect(screen.getByLabelText('Choisir 02026000001')).toBeChecked();
   // another date: its own choice (every line ticked)
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-30' } });
-  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-30' })));
-  await waitFor(() => expect(screen.getByLabelText('Choisir 02026017527')).toBeChecked());
-  window.localStorage.clear();
+  await waitFor(() => expect(getReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-30'));
+  await waitFor(() => expect(screen.getByLabelText('Choisir 02026000002')).toBeChecked());
 });
