@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getClientLinks, getUnpaidStatement, listStatementCompanies } from '../../services/unpaidApi';
+import { getClientLinks, getRecoveryRate, getUnpaidStatement, listStatementCompanies } from '../../services/unpaidApi';
 import { getClientReglements } from '../../services/reglementClientApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -24,11 +24,21 @@ const daysLate = (row) => Math.floor((Date.parse(today()) - Date.parse(String(ro
 const termOf = (row) => (row.tc === 'T' && row.periode ? `T${row.periode}` : row.tc || '');
 const total = (rows) => rows.reduce((sum, row) => sum + amount(row.solde), 0);
 const sumOf = (rows, key) => rows.reduce((sum, row) => sum + amount(row[key]), 0);
-// summary: [label, amount] lines printed under the date (the mise en demeure totals, on its first page).
-const letterhead = (title, summary) => <div className="eti-letterhead">
+const percent = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Taux de recouvrement = encaissements de l'année en cours / primes de l'année en cours exigibles.
+export const RecoveryRate = ({ rate }) => <div className="eti-recovery" aria-label="Taux de recouvrement">
+  <span>Taux de recouvrement {rate.annee}</span>
+  <strong>{rate.taux == null ? '—' : `${percent.format(rate.taux)} %`}</strong>
+  <small>Encaissements : {money.format(rate.encaissements)} TND</small>
+  <small>Primes exigibles au {formatDate(rate.au)} : {money.format(rate.primes_exigibles)} TND</small>
+</div>;
+// summary: [label, amount] lines printed under the date (the mise en demeure totals, on its first page);
+// recovery: the taux de recouvrement of the statement's scope.
+const letterhead = (title, summary, recovery) => <div className="eti-letterhead">
   <address>{AGENCY.map((line) => <span key={line}>{line}</span>)}</address>
   <div className="eti-head-side">
     <span className="eti-date">Date : <b>{formatDate(today())}</b></span>
+    {recovery && <RecoveryRate rate={recovery} />}
     {summary && <table className="eti-summary"><tbody>{summary.map(([label, value], index) => <tr key={label} className={index === summary.length - 1 ? 'is-total' : ''}><td>{label}</td><td>{money.format(value)} TND</td></tr>)}</tbody></table>}
   </div>
   <h3>{title}</h3>
@@ -125,7 +135,12 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
     setLoading(true);
     setError('');
     try {
-      const body = await getUnpaidStatement(accessToken, query());
+      const params = query();
+      // The taux de recouvrement of the same client / company / type of client (the report is shown without it if it fails).
+      const [body, recovery] = await Promise.all([
+        getUnpaidStatement(accessToken, params),
+        getRecoveryRate(accessToken, { code_client: params.code_client, type_client: params.type_client, code_compagnie: params.code_compagnie }).catch(() => null),
+      ]);
       // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
       // société) past "jours_autres" days. "Entre deux dates" only narrows the échéances: the delays still apply.
       const autoParticulier = (row) => row.type_client === 'P' && row.automobile;
@@ -141,7 +156,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       // One client asked for by code: its mémoire de règlement, then those of its liens, each in its own dossier.
       const dossiers = !relance && filters.code_client.trim() ? await linkedDossiers(filters.code_client.trim(), items) : null;
       if (dossiers ? !dossiers.some((dossier) => dossier.items.length) : !items.length) setError('Aucune quittance impayée ne correspond aux critères.');
-      else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups, dossiers });
+      else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups, dossiers, recovery });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -213,11 +228,11 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
 // The preview page (as the legacy report viewer): a toolbar, then the report on paper sheets; "Imprimer" prints only them.
 // One "Etat des impayées" sheet: the quittances by client, with what the client already paid on them (its règlements) and
 // client and general totals. "Avec pièce": a line whose pièces leave a solde to pay is shown in red.
-function StatementPage({ title, rows, sans, summary }) {
+function StatementPage({ title, rows, sans, summary, recovery }) {
   const clients = useMemo(() => byClient(rows), [rows]);
   const span = sans ? 2 : 3;
   return <article className="eti-page">
-    {letterhead(title, summary)}
+    {letterhead(title, summary, recovery)}
     {rows.length ? <div className="eti-scroll"><table className="eti-table">
       <thead><tr><th>N° Police</th><th>TC</th><th>Échéance</th><th className="eti-num">Prime</th><th className="eti-num">Réglé</th><th className="eti-num">Solde</th><th>N° quittance</th>{!sans && <th>Pièce(s)</th>}<th>Observation</th></tr></thead>
       {clients.map((client) => <tbody key={client.code_client}>
@@ -264,7 +279,7 @@ function MemoirePage({ client }) {
 
 const RELATIONS = { client: 'Client recherché', lien: 'Son lien', lie: 'Client lié' };
 
-function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossiers, onBack, onClose }) {
+function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossiers, recovery, onBack, onClose }) {
   // A client searched by code: one dossier at a time (the client, then its liens), "◀ / ▶" to move between them.
   const [current, setCurrent] = useState(0);
   const dossier = dossiers ? dossiers[current] : null;
@@ -308,8 +323,9 @@ function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossi
       {dossier ? (items.length ? clients.map((client) => <MemoirePage key={client.code_client} client={client} />)
         : <article className="eti-page">{letterhead('MÉMOIRE DE RÈGLEMENT')}<p className="eti-empty">Aucune quittance impayée pour le client {dossier.code_client} {dossier.nom_client} : voyez ses liens.</p></article>)
         : groups ? groups.map((group, index) => <StatementPage key={group.title} title={group.title} rows={group.rows} sans={sans}
-          summary={index === 0 ? [['Total automobile particuliers', total(groups[0].rows)], ['Total autres', total(groups[1].rows)], ['Total général', grandTotal]] : undefined} />)
-          : !detail ? <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} />
+          summary={index === 0 ? [['Total automobile particuliers', total(groups[0].rows)], ['Total autres', total(groups[1].rows)], ['Total général', grandTotal]] : undefined}
+          recovery={index === 0 ? recovery : undefined} />)
+          : !detail ? <StatementPage title="ETAT DES IMPAYÉES" rows={items} sans={sans} recovery={recovery} />
             : clients.map((client) => <MemoirePage key={client.code_client} client={client} />)}
     </div>
   </div>;

@@ -101,6 +101,9 @@ async function getJson(path, accessToken, filters = {}) {
   return body;
 }
 export const getUnpaidStatement = (accessToken, filters) => getJson('/api/impayes-agence/etat', accessToken, filters);
+// Taux de recouvrement = encaissements de l'année / primes exigibles de l'année (same client / company / type of client):
+// { annee, du, au, encaissements, primes_exigibles, quittances_exigibles, taux }.
+export const getRecoveryRate = (accessToken, filters) => getJson('/api/impayes-agence/taux-recouvrement', accessToken, filters);
 export const listStatementCompanies = (accessToken) => getJson('/api/impayes-agence/etat/compagnies', accessToken);
 // The clients linked to a client (its Lien, and the clients whose Lien it is): { client, liens: [{ code_client, nom_client, relation }] }.
 export const getClientLinks = (accessToken, code) => getJson(`/api/impayes-agence/etat/liens/${encodeURIComponent(code)}`, accessToken);

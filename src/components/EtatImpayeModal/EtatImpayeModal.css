@@ -136,3 +136,11 @@
 
 /* "Avec pièce": the lines whose pièces leave a solde to pay, in red (printed in colour too) */
 .eti-table tr.is-due td { border-color: #f1c4c4; background: #fbdcdc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* Taux de recouvrement, under the date */
+.eti-recovery { display: grid; justify-items: end; gap: 2px; min-width: 210px; padding: 8px 12px; border: 1px solid #b9c7cd; border-radius: 8px; background: #f6faf9; color: #3a4f5c; text-align: right; }
+.eti-recovery span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.eti-recovery strong { color: #12232e; font-size: 20px; font-variant-numeric: tabular-nums; }
+.eti-recovery small { font-size: 9.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media print { .eti-recovery { background: none; } }
+@media (max-width: 640px) { .eti-recovery { justify-items: start; text-align: left; } }
