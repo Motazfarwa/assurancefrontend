@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getExpensesJournal, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts, validateReceipt } from '../../services/journalApi';
+import { getExpensesJournal, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts } from '../../services/journalApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
 import '../ChequeInstanceModal/ChequeInstanceModal.css';
-import { CashSheet } from './FeuilleCaisse';
+import { CashSheet, isJournalDay, journalDay } from './FeuilleCaisse';
 import './JournalModal.css';
 import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 
@@ -13,16 +13,14 @@ const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximum
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const today = () => new Date().toISOString().slice(0, 10);
-// Both journals: the 15th of the month until the 15th, then the last day of the month (28, 29, 30 or 31).
-const journalDay = () => {
-  const now = new Date();
-  const day = now.getDate() <= 15 ? 15 : new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-};
 const sum = (rows, key) => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
 // What the journal line of a quittance is: [label, explanation shown on hover].
-// An encaissement can be validated once the client has paid something not declared yet (all of it, or an acompte).
-export const canValidate = (row) => !row.comptabilise && (row.paye || row.a_s === 'A');
+// An encaissement is declared (by the validation of the feuille de caisse) once the client has paid something not
+// declared yet: all of it, or an acompte.
+export const canDeclare = (row) => !row.comptabilise && (row.paye || row.a_s === 'A');
+// The day a line is (or will be) declared: the day it was comptabilisée, else the journal date. Journals are made on the
+// 15th and the last day of the month: a line declared on another day is shown in red.
+export const offDay = (row, date) => !isJournalDay(row.comptabilise ? row.date_comptabilise : date);
 const receiptStatus = (row) => {
   if (row.comptabilise) return ['Déjà déclarée', `Comptabilisée au journal (${row.a_s === 'A' ? 'acompte' : 'solde'}).`];
   if (row.paye) return ['Payée intégralement', 'Le client a tout réglé : la quittance est déclarée pour son montant.'];
@@ -34,7 +32,7 @@ const receiptStatus = (row) => {
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES RÉGLÉES · « VALIDER » DÉCLARE L’ENCAISSEMENT LE JOUR MÊME ET L’AJOUTE À LA FEUILLE DE CAISSE',
+    heading: 'QUITTANCES RÉGLÉES · COCHÉES PAR DÉFAUT · « VALIDER » DANS LA FEUILLE DE CAISSE LES DÉCLARE À SA DATE',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
@@ -46,11 +44,12 @@ const KINDS = {
     allCompanies: true,
     // The date: the 15th, then the end of the month.
     settled: true,
-    // No "Comptabiliser" for all the lines: each encaissement is validated on its own ("Valider").
+    // No "Comptabiliser": the lines chosen are declared by the validation of the feuille de caisse ("Valider").
     readOnly: true,
-    // The encaissements validated in the period of the date (1st-15th, 16th-end of the month) stay listed, validated.
+    // The encaissements declared in the period of the date (1st-15th, 16th-end of the month) stay listed, ticked.
     showDone: true,
-    validate: true,
+    // The feuille de caisse validates the quittances chosen here.
+    selection: (keys) => ({ quittances: keys }),
   },
   depense: {
     title: 'Journal de dépense',
@@ -63,6 +62,9 @@ const KINDS = {
     amount: 'montant',
     // As the legacy journal: the dépenses comptabilisées on the date are listed (and printed) from the start.
     showDone: true,
+    // "Lister" without a company: the dépenses of every company.
+    allCompanies: true,
+    selection: (keys) => ({ depenses: keys.map(Number) }),
   },
 };
 
@@ -85,8 +87,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [notice, setNotice] = useState('');
   const [sheet, setSheet] = useState(null); // the journal printout: { rows, preview }
   const [cashSheet, setCashSheet] = useState(false); // the feuille de caisse of the company on the date
-  const [confirming, setConfirming] = useState(null); // the encaissement whose validation is asked
-  const [validating, setValidating] = useState(false);
+  // The lines are read when "Lister" is pressed: { compagnie, date, nature } listed (a change of filter clears the list).
+  const [listedFor, setListedFor] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -96,11 +98,13 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     return () => { active = false; };
   }, [accessToken]);
 
+  useEffect(() => { setListedFor(null); }, [compagnie, date, nature]);
+
   useEffect(() => {
-    if ((!compagnie && !config.allCompanies) || !date) { setState({ loading: false, error: '', items: [] }); return undefined; }
+    if (!listedFor) { setState({ loading: false, error: '', items: [] }); setChosen(new Set()); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
-    config.load(accessToken, { compagnie, date, nature, comptabilises: showDone, ...settledParams })
+    config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams })
       .then((body) => {
         if (!active) return;
         const items = body.items || [];
@@ -110,17 +114,18 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [] }); });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config
-  }, [accessToken, config, compagnie, date, nature, showDone]);
+  }, [accessToken, config, listedFor, showDone]);
+  const list = () => setListedFor({ compagnie, date, nature, at: Date.now() });
 
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') { if (confirming) { if (!validating) setConfirming(null); } else if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else onClose(); } };
+    const onKey = (event) => { if (event.key === 'Escape') { if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else onClose(); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sheet, cashSheet, confirming, validating, onClose]);
+  }, [sheet, cashSheet, onClose]);
 
   const company = companies.find((item) => String(item.code_compagnie) === String(compagnie));
-  const listed = Boolean(compagnie) || Boolean(config.allCompanies);
-  const allListed = !compagnie && listed;
+  const listed = Boolean(listedFor);
+  const allListed = listed && !listedFor.compagnie;
   const shown = useMemo(() => {
     const text = search.trim().toLocaleLowerCase();
     return text ? state.items.filter((row) => config.text(row).toLocaleLowerCase().includes(text)) : state.items;
@@ -172,24 +177,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     }
   }
 
-  // "Valider" (after the confirmation): the encaissement is declared today and counted in today's feuille de caisse.
-  async function validate() {
-    const row = confirming;
-    setValidating(true);
-    try {
-      const result = await validateReceipt(accessToken, row.num_quittance);
-      setState((current) => ({ ...current, error: '', items: current.items.map((item) => (item.num_quittance === row.num_quittance
-        ? { ...item, comptabilise: true, date_comptabilise: result.date_validation, valide_par: result.valide_par } : item)) }));
-      setChosen((current) => { const next = new Set(current); next.delete(row.num_quittance); return next; });
-      setNotice(`Encaissement de la quittance ${row.num_quittance} (${fmt(result.montant)} TND) validé le ${formatDate(result.date_validation)} : déclaré et ajouté à la feuille de caisse de ce jour.`);
-      setConfirming(null);
-    } catch (requestError) {
-      setConfirming(null);
-      setState((current) => ({ ...current, error: requestError.message }));
-    } finally {
-      setValidating(false);
-    }
-  }
+  // The feuille de caisse validates the lines ticked here (once listed); otherwise every line still to declare.
+  const cashSelection = listed && config.selection ? config.selection(state.items.filter((row) => !row.comptabilise && chosen.has(config.key(row))).map(config.key)) : undefined;
+  // After its validation the journal is read again: the lines declared stay listed, ticked.
+  const afterCashValidation = () => { if (listed) setListedFor((current) => ({ ...current, at: Date.now() })); };
 
   // The feuille: what is comptabilisé on the date, or else a preview of the chosen lines.
   function openSheet() {
@@ -215,44 +206,44 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
             </select>
           </label>}
           <label className="acompte-field"><span>Rechercher</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={kind === 'depense' ? 'N° sinistre, police, immatriculation, assuré…' : 'N° quittance, police, assuré…'} /></label>
+          <button type="button" className="expert-submit jrn-open" onClick={list} disabled={!date || state.loading}>{state.loading ? 'Chargement…' : 'Lister'}</button>
         </div>
 
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
         <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez une compagnie' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
+            <div><span>{config.heading}</span><h3>{!listed ? `Choisissez la compagnie (ou toutes) et la date, puis « Lister »` : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
               <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(selected, config.amount))} TND</strong></div>
-              <button type="button" className="expert-cancel" onClick={openSheet} disabled={!compagnie || (!selected.length && !(showDone && done.length))} title={compagnie ? undefined : 'Choisissez une compagnie'}>Imprimer le journal</button>
+              <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (!selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
               <button type="button" className="expert-cancel" onClick={() => setCashSheet(true)} disabled={!company} title={company ? undefined : 'Choisissez une compagnie'}>Feuille de caisse</button>
               {!config.readOnly && <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>}
             </div>
           </div>
-          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">Aucune quittance réglée à déclarer {allListed ? '' : 'pour cette compagnie '}à cette date.</div>
+          {kind === 'encaissement' && listed && shown.some((row) => offDay(row, listedFor.date)) && <p className="jrn-offday-legend"><i aria-hidden="true" /> En rouge : quittance déclarée (ou à déclarer) un autre jour que le 15 ou le dernier jour du mois.</p>}
+          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">{kind === 'depense' ? 'Aucune dépense' : 'Aucune quittance réglée'} à déclarer {allListed ? '' : 'pour cette compagnie '}à cette date.</div>
             : listed && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
                 {kind === 'encaissement'
-                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th><th>Validation</th></>
-                  : <><th>N° sinistre / ristourne</th><th>Type</th><th>Date</th><th>N° contrat</th><th>Immatriculation</th><th className="cqi-number">Montant</th><th>Assuré</th><th>Chèque</th><th>Comptabilisé</th></>}
+                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th></>
+                  : <>{allListed && <th>Compagnie</th>}<th>N° sinistre / ristourne</th><th>Type</th><th>Date</th><th>N° contrat</th><th>Immatriculation</th><th className="cqi-number">Montant</th><th>Assuré</th><th>Chèque</th><th>Comptabilisé</th></>}
               </tr></thead>
               <tbody>{shown.map((row) => {
                 const key = config.key(row);
                 const on = row.comptabilise || chosen.has(key);
-                return <tr key={key} className={row.comptabilise ? 'is-done' : on ? 'is-chosen' : ''} onClick={() => { if (!row.comptabilise) toggle(row); }}>
+                const red = kind === 'encaissement' && offDay(row, listedFor.date);
+                const status = kind === 'encaissement' ? receiptStatus(row) : null;
+                return <tr key={key} className={`${row.comptabilise ? 'is-done' : on ? 'is-chosen' : ''}${red ? ' is-offday' : ''}`} onClick={() => { if (!row.comptabilise) toggle(row); }}
+                  title={status ? `${status[0]} : ${status[1]}${row.comptabilise && row.date_comptabilise ? ` Déclarée le ${formatDate(row.date_comptabilise)}.` : ''}` : undefined}>
                   <td className="cqi-verser"><input type="checkbox" checked={on} disabled={row.comptabilise} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
                   {kind === 'encaissement'
                     ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.a_s}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
                       <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}</td>
-                      <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td>
-                      <td className="jrn-validate-cell" onClick={(event) => event.stopPropagation()}>
-                        {row.comptabilise
-                          ? <span className="jrn-validated" title={receiptStatus(row)[1]}>✓ Validé le {formatDate(row.date_comptabilise)}{row.valide_par ? <small>par {row.valide_par}</small> : null}</span>
-                          : <button type="button" className="jrn-validate" disabled={!canValidate(row) || validating} onClick={() => setConfirming(row)} title={canValidate(row) ? `${receiptStatus(row)[0]} : ${receiptStatus(row)[1]}` : receiptStatus(row)[1]}>Valider</button>}
-                      </td></>
-                    : <><td><strong>{row.numero}</strong></td><td>{row.nature === 'R' ? 'Ristourne' : 'Sinistre'}</td><td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.num_imat}</td>
+                      <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td></>
+                    : <>{allListed && <td>{row.nom_compagnie}</td>}<td><strong>{row.numero}</strong></td><td>{row.nature === 'R' ? 'Ristourne' : 'Sinistre'}</td><td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.num_imat}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.assure}</td><td>{row.num_cheq}</td><td>{row.comptabilise ? `Oui · ${formatDate(row.date_comptabilise)}` : 'Non'}</td></>}
                 </tr>;
               })}</tbody>
@@ -306,22 +297,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         </article>
       </div>
     </div>}
-    {confirming && <div className="jrn-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !validating) setConfirming(null); }}>
-      <section className="jrn-confirm" role="alertdialog" aria-modal="true" aria-labelledby="jrn-confirm-title" aria-describedby="jrn-confirm-text">
-        <h3 id="jrn-confirm-title">Valider cet encaissement ?</h3>
-        <p id="jrn-confirm-text">Êtes-vous sûr de vouloir valider l’encaissement de la quittance <strong>{confirming.num_quittance}</strong> ? Il sera déclaré aujourd’hui, le <strong>{formatDate(new Date().toLocaleDateString('sv-SE'))}</strong>, et ajouté à la feuille de caisse de ce jour.</p>
-        <dl>
-          <div><dt>Compagnie</dt><dd>{confirming.nom_compagnie}</dd></div>
-          <div><dt>Assuré</dt><dd>{confirming.assure || confirming.code_client}</dd></div>
-          <div><dt>Montant</dt><dd>{fmt(confirming.montant)} TND <small>({confirming.a_s === 'A' ? 'acompte' : 'solde'})</small></dd></div>
-          <div><dt>Réglé par le client</dt><dd>{fmt(confirming.regle)} TND{confirming.date_reglement ? ` · le ${formatDate(confirming.date_reglement)}` : ''}</dd></div>
-        </dl>
-        <footer>
-          <button type="button" className="jrn-confirm-cancel" onClick={() => setConfirming(null)} disabled={validating}>Annuler</button>
-          <button type="button" className="jrn-confirm-ok" onClick={validate} disabled={validating} autoFocus>{validating ? 'Validation…' : 'Oui, valider'}</button>
-        </footer>
-      </section>
-    </div>}
-    {cashSheet && company && <CashSheet company={company} date={date} onClose={() => setCashSheet(false)} />}
+    {cashSheet && company && <CashSheet company={company} date={date} selection={listedFor?.compagnie === compagnie && listedFor?.date === date ? cashSelection : undefined}
+      onValidated={afterCashValidation} onClose={() => setCashSheet(false)} />}
   </div>;
 }

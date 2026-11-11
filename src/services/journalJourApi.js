@@ -31,3 +31,15 @@ export const reopenJournal = (accessToken, name, day) => request(accessToken, `/
 export const saveWhatsappNumber = (accessToken, numero) => request(accessToken, '/parametres', 'PUT', { whatsapp_admin: numero });
 // Where the submitted days go: { whatsapp_admin, email_admin } (only the keys given are changed).
 export const saveJournalParams = (accessToken, params) => request(accessToken, '/parametres', 'PUT', params);
+
+// Client requests. The employee: those assigned to them ({ items: [{ id, client, canaux, demande, observation, statut,
+// reponse, date_traitement, cree_par, date_creation }] }), marked "traitée" with a reply.
+export const getMyRequests = (accessToken) => request(accessToken, '/moi/demandes');
+export const handleRequest = (accessToken, id, reponse) => request(accessToken, `/moi/demandes/${id}/traiter`, 'POST', { reponse });
+// The administrator: who can receive one ({ utilisateurs: [{ nom, agence }], agences: [{ agence, utilisateurs }] }), the
+// requests recorded ({ items: [... affectations: [{ utilisateur, statut, reponse, date_traitement }]] }), a new one
+// ({ client, canaux, demande, observation, cible_type: utilisateur | agence, utilisateurs, agence }), and its removal.
+export const getRequestTargets = (accessToken) => request(accessToken, '/demandes/destinataires');
+export const listRequests = (accessToken) => request(accessToken, '/demandes');
+export const createRequest = (accessToken, demande) => request(accessToken, '/demandes', 'POST', demande);
+export const deleteRequest = (accessToken, id) => request(accessToken, `/demandes/${id}`, 'DELETE');

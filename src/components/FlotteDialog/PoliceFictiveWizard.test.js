@@ -23,6 +23,8 @@ function fillIdentity() {
   next();
 }
 function fillCoordinates() {
+  // the home address is the one for correspondence: only its coordinates are required
+  fireEvent.click(screen.getByRole('radio', { name: 'Domicile' }));
   type('Adresse *', '4 Rue Ohod');
   type('Ville *', 'Tunis');
   type('Code postal *', '1082');

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { searchClients } from '../../services/clientApi';
-import { REQUIRED_CLIENT_FIELDS } from './clientValidation';
+import { correspondenceSide, requiredClientFields } from './clientValidation';
 import './ClientManagementPage.css';
 
 // The fields of a client file, used by Gestion des clients and by each police fictive of a police flotte.
@@ -13,7 +13,7 @@ const FieldError = ({ name }) => {
 
 export function ClientField({ client, onChange, name, label, type = 'text', options, wide = false, required = false, maxLength, disabled = false, readOnly = false }) {
   const className = `client-field${wide ? ' client-field-wide' : ''}${readOnly ? ' client-field-readonly' : ''}`;
-  return <label className={className}><span>{label}{REQUIRED_CLIENT_FIELDS.has(name) ? ' *' : ''}</span>{type === 'select' ? <select required={required} disabled={disabled} value={client[name]} onChange={(event) => onChange(name, event.target.value)}><option value="">Selectionner</option>{options.map((option) => <option key={option}>{option}</option>)}</select> : <input required={required} disabled={disabled} readOnly={readOnly} maxLength={maxLength} type={type} value={client[name] || ''} onChange={(event) => onChange(name, event.target.value)} />}<FieldError name={name} /></label>;
+  return <label className={className}><span>{label}{requiredClientFields(client).has(name) ? ' *' : ''}</span>{type === 'select' ? <select required={required} disabled={disabled} value={client[name]} onChange={(event) => onChange(name, event.target.value)}><option value="">Selectionner</option>{options.map((option) => <option key={option}>{option}</option>)}</select> : <input required={required} disabled={disabled} readOnly={readOnly} maxLength={maxLength} type={type} value={client[name] || ''} onChange={(event) => onChange(name, event.target.value)} />}<FieldError name={name} /></label>;
 }
 
 // Nom / Prénom input that looks for existing clients while typing, to avoid creating duplicates.
@@ -74,7 +74,7 @@ export function ContactFields({ client, onChange, kind }) {
     });
   }
   return <div className="client-contact-fields client-field-wide">
-    <div className="client-contact-group"><strong>Téléphones{kind === 'home' ? ' *' : ''}</strong><div className="client-contact-phones">{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
+    <div className="client-contact-group"><strong>Téléphones{kind === correspondenceSide(client) ? ' *' : ''}</strong><div className="client-contact-phones">{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
     <div className="client-contact-group"><strong>Emails</strong><div className="client-contact-emails">{renderContacts(emailKey, 3, 'Email', 'email')}</div></div>
   </div>;
 }
@@ -120,7 +120,7 @@ export function CoordinatesFields({ client, updateField }) {
           <FormSection title="Domicile">
             <ClientField client={client} onChange={updateField} name="homeAddress" label="Adresse" wide />
             <ClientField client={client} onChange={updateField} name="homeCity" label="Ville" />
-            <ClientField client={client} onChange={updateField} name="homePostalCode" label="Code postal" type="number" required />
+            <ClientField client={client} onChange={updateField} name="homePostalCode" label="Code postal" type="number" />
             <ContactFields client={client} onChange={updateField} kind="home" />
           </FormSection>
 

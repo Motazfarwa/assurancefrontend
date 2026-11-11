@@ -16,7 +16,7 @@ beforeEach(() => {
   listIncompleteClientsPage.mockImplementation((token, params) => Promise.resolve(params.categorie === 'sinistres'
     ? { ...counters, found: 1, items: [client('4914', 'BEN ALI', { sinistres: ['202609006 : N° sinistre compagnie'] })] }
     : { ...counters, found: 2, items: [
-      client('5064', 'CAMBONI IGNAZIO', { coordonnees: ['email (domicile)'], polices: ['011202654898 : code branche'] }),
+      client('5064', 'CAMBONI IGNAZIO', { coordonnees: ['email (domicile)'], polices: ['011202654898 : risque'] }),
       client('5063', 'BEN AISSA ASMA', { sans_police: true }),
     ] }));
 });

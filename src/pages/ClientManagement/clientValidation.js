@@ -5,7 +5,13 @@ const MAX_LENGTHS = {
   licenseNumber: 50, licensePlace: 50, relatedName: 50, homeAddress: 50, homeCity: 15, officeAddress: 50, officeCity: 15, notes: 200,
 };
 const REQUIRED_MESSAGE = 'Ce champ est obligatoire.';
-export const REQUIRED_CLIENT_FIELDS = new Set(['lastName', 'firstName', 'homeAddress', 'homeCity', 'homePostalCode']);
+// The coordinates checked are those of the address chosen for correspondence ("Bureau": the office; "Domicile", or none
+// chosen on an old record: home, as the notifications read it); the other address is optional and not checked.
+export const correspondenceSide = (client) => (client?.correspondence === 'Bureau' ? 'office' : 'home');
+export const requiredClientFields = (client) => {
+  const side = correspondenceSide(client);
+  return new Set(['lastName', 'firstName', `${side}Address`, `${side}City`, `${side}PostalCode`]);
+};
 
 const text = (value) => String(value ?? '').trim();
 const isInteger = (value) => /^\d+$/.test(text(value));
@@ -51,14 +57,14 @@ export function identityErrors(client) {
 
 export function coordinatesErrors(client) {
   const errors = {};
-  if (!text(client.homeAddress)) errors.homeAddress = REQUIRED_MESSAGE;
-  if (!text(client.homeCity)) errors.homeCity = REQUIRED_MESSAGE;
-  if (!text(client.homePostalCode)) errors.homePostalCode = REQUIRED_MESSAGE;
-  else if (!isInteger(client.homePostalCode)) errors.homePostalCode = 'Le code postal doit être numérique.';
-  if (text(client.officePostalCode) && !isInteger(client.officePostalCode)) errors.officePostalCode = 'Le code postal doit être numérique.';
-  if (!(client.homePhones || []).some((contact) => text(contact?.value))) errors['homePhones.0'] = 'Renseignez au moins un téléphone.';
-  checkContacts(client, 'home', errors);
-  checkContacts(client, 'office', errors);
+  const side = correspondenceSide(client);
+  if (!text(client[`${side}Address`])) errors[`${side}Address`] = REQUIRED_MESSAGE;
+  if (!text(client[`${side}City`])) errors[`${side}City`] = REQUIRED_MESSAGE;
+  if (!text(client[`${side}PostalCode`])) errors[`${side}PostalCode`] = REQUIRED_MESSAGE;
+  else if (!isInteger(client[`${side}PostalCode`])) errors[`${side}PostalCode`] = 'Le code postal doit être numérique.';
+  if (!(client[`${side}Phones`] || []).some((contact) => text(contact?.value))) errors[`${side}Phones.0`] = 'Renseignez au moins un téléphone.';
+  checkContacts(client, side, errors);
+  // Both addresses still fit the columns of TClient (the record could not be saved otherwise).
   checkLengths(client, ['homeAddress', 'homeCity', 'officeAddress', 'officeCity', 'notes'], errors);
   return errors;
 }

@@ -207,7 +207,7 @@
 .jrn-validate:disabled { border-color: #cfdcdf; background: #f0f3f4; color: #8fa3aa; cursor: not-allowed; }
 .jrn-validated { display: inline-grid; color: #17705f; font-size: 11.5px; font-weight: 700; }
 .jrn-validated small { color: #7c8f96; font-size: 10.5px; font-weight: 600; }
-.jrn-confirm-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(15, 33, 44, .45); }
+.jrn-confirm-backdrop { position: fixed; inset: 0; z-index: 160; display: grid; place-items: center; padding: 16px; background: rgba(15, 33, 44, .45); }
 .jrn-confirm { width: min(460px, 100%); padding: 20px 22px; border-radius: 14px; background: #fff; box-shadow: 0 24px 60px rgba(15, 33, 44, .3); }
 .jrn-confirm h3 { margin: 0 0 8px; color: #173247; font-size: 17px; }
 .jrn-confirm p { margin: 0 0 12px; color: #4f6873; font-size: 13px; line-height: 1.5; }
@@ -222,3 +222,23 @@
 .jrn-confirm-ok { border: 1px solid #187d78; background: #187d78; color: #fff; }
 .jrn-confirm-ok:hover:not(:disabled) { background: #12665f; }
 .jrn-confirm-cancel:disabled, .jrn-confirm-ok:disabled { opacity: .6; cursor: wait; }
+
+/* Journal d'encaissement: lines declared (or to declare) on another day than the 15th or the end of the month */
+.jrn-table tbody tr.is-offday, .jrn-table tbody tr.is-offday.is-chosen, .jrn-table tbody tr.is-offday.is-done { background: #fde3e1; color: #8f1d17; }
+.jrn-table tbody tr.is-offday:hover { background: #fbd3cf; }
+.jrn-offday-legend { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: #8f1d17; font-size: 11px; }
+.jrn-offday-legend i { width: 14px; height: 14px; border: 1px solid #e9a39d; border-radius: 3px; background: #fde3e1; }
+
+/* Feuille de caisse: validation */
+.jrn-cash-bar { display: inline-flex; align-items: center; gap: 8px; align-self: flex-end; }
+.jrn-cash-validate { min-height: 35px; padding: 0 18px; }
+.jrn-cash-validated { display: inline-grid; align-self: center; gap: 1px; color: #17705f; font-size: 12px; font-weight: 700; }
+.jrn-cash-validated small { color: #6c7f87; font-size: 10.5px; font-weight: 600; }
+.jrn-cash-error { color: #b42318; font-size: 11.5px; font-weight: 600; }
+.jrn-cash-warn { margin: 8px 0 0; padding: 7px 10px; border: 1px solid #f1c27d; border-radius: 8px; background: #fff6e8; color: #8a5a10; font-size: 11.5px; }
+.jrn-sheet-tools .jrn-cash-validated { margin-right: auto; }
+.jrn-cash-lines { margin-top: 14px; }
+.jrn-cash-lines h4 { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 6px; color: #173247; font-size: 13px; }
+.jrn-cash-lines h4 small { color: #587079; font-size: 11px; font-weight: 600; }
+.jrn-cash-lines .unpaid-table-scroll { max-height: 34vh; }
+@media print { .jrn-cash-validate, .jrn-cash-error { display: none; } }

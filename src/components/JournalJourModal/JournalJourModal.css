@@ -118,3 +118,53 @@
 .jdj-person > header .jdj-btn { padding: 5px 10px; font-size: 11.5px; }
 .jdj-number input[type="email"] { width: 230px; }
 @media (max-width: 560px) { .jdj-number { flex-wrap: wrap; } .jdj-number input, .jdj-number input[type="email"] { width: 100%; } .jdj-number label { flex: 1 1 100%; } }
+
+/* Client requests */
+.jdj-requests { display: grid; gap: 10px; }
+.jdj-request { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid #e3eaec; border-radius: 9px; background: #fbfdfd; }
+.jdj-request-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.jdj-channels, .jdj-target { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0; padding: 0; border: 0; }
+.jdj-channels legend, .jdj-target legend { float: left; margin-right: 6px; color: #4f6873; font-size: 11px; font-weight: 700; }
+.jdj-channels label, .jdj-target label, .jdj-users label { display: inline-flex; align-items: center; gap: 5px; color: #233c4b; font-size: 12.5px; cursor: pointer; }
+.jdj-channels input, .jdj-target input, .jdj-users input { width: 15px; height: 15px; accent-color: #187d78; }
+.jdj-field { display: grid; gap: 5px; color: #4f6873; font-size: 11px; font-weight: 700; }
+.jdj-field input, .jdj-field textarea, .jdj-field select, .jdj-assigned-reply input { min-width: 0; padding: 8px 10px; border: 1px solid #cfdcdf; border-radius: 8px; background: #fff; color: #233c4b; font: inherit; font-size: 13px; font-weight: 400; }
+.jdj-field textarea { resize: vertical; }
+.jdj-field input:focus, .jdj-field textarea:focus, .jdj-field select:focus, .jdj-assigned-reply input:focus { border-color: #67bdae; outline: 2px solid rgba(103, 189, 174, .25); }
+
+.jdj-read-requests, .jdj-assigned ul, .jdj-request-log { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: #233c4b; }
+.jdj-read-requests li { padding: 6px 0; border-top: 1px solid #edf2f3; }
+.jdj-read-requests li:first-child { border-top: 0; }
+.jdj-read-requests p { margin: 3px 0 0; color: #587079; white-space: pre-wrap; }
+.jdj-via { margin-left: 8px; padding: 2px 7px; border-radius: 999px; background: #eef4f5; color: #4f6873; font-size: 10.5px; font-weight: 700; }
+.jdj-subtitle { margin: 10px 0 4px; color: #4f6873; font-size: 11.5px; }
+
+.jdj-assigned { border-color: #f1d49c; background: #fffcf5; }
+.jdj-count { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #fff1d9; color: #8a5a10; font-size: 11px; }
+.jdj-assigned li, .jdj-request-log li { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #e3eaec; border-radius: 9px; background: #fff; }
+.jdj-assigned li.is-done { opacity: .75; }
+.jdj-assigned-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+.jdj-assigned-head small { margin-left: 10px; color: #8fa3aa; font-size: 11px; }
+.jdj-assigned-head .jdj-via:first-of-type { margin-left: 10px; }
+.jdj-assigned-reply { display: flex; gap: 8px; }
+.jdj-assigned-reply input { flex: 1; }
+.jdj-assigned .jdj-text, .jdj-request-log .jdj-text { margin: 0; }
+
+.jdj-tabs { display: flex; gap: 6px; border-bottom: 1px solid #e3eaec; }
+.jdj-tabs button { padding: 9px 14px; border: 0; border-bottom: 3px solid transparent; background: none; color: #587079; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.jdj-tabs button.is-on { border-bottom-color: #187d78; color: #173247; }
+.jdj-requests-admin { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.jdj-assign { display: grid; gap: 10px; }
+.jdj-assign h3 { margin-bottom: 0; }
+.jdj-assign-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.jdj-users { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 12px; border: 1px solid #e3eaec; border-radius: 9px; background: #fbfdfd; }
+.jdj-users small { color: #8fa3aa; font-size: 10.5px; }
+.jdj-agency { max-width: 320px; }
+.jdj-assign .jdj-actions { padding-top: 0; }
+.jdj-assignees { display: flex; flex-wrap: wrap; gap: 6px; }
+.jdj-assignees .jdj-state { min-width: 0; }
+@media (max-width: 900px) {
+  .jdj-requests-admin, .jdj-assign-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.jdj-request-log li { position: relative; padding-right: 42px; }
+.jdj-request-log li .jdj-remove { position: absolute; top: 6px; right: 6px; }

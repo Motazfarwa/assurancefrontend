@@ -19,7 +19,7 @@ export const CATEGORIES = [
   ['sinistres', 'Sinistres'],
 ];
 
-// "011202651268 : code branche, risque" -> { ref: "011202651268", what: "code branche, risque" }
+// "011202651268 : date effet, risque" -> { ref: "011202651268", what: "date effet, risque" }
 function entry(text) {
   const at = text.indexOf(' : ');
   return at < 0 ? { ref: text, what: '' } : { ref: text.slice(0, at), what: text.slice(at + 3) };
@@ -118,7 +118,7 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
           </table>
         </div>
         {items.length < found && <button type="button" className="expert-cancel cim-more" onClick={more} disabled={loadingMore}>{loadingMore ? 'Chargement…' : `Afficher ${Math.min(PAGE, found - items.length)} clients de plus`}</button>}
-        <p className="cim-hint">Coordonnées : adresse, ville, code postal, et au moins un téléphone et un email du côté choisi pour la correspondance. Polices en cours : compagnie, code branche, date d’effet, risque, échéance ou expiration. Quittances des polices en cours et sinistres non clôturés : leurs informations obligatoires.</p>
+        <p className="cim-hint">Coordonnées : adresse, ville, code postal, et au moins un téléphone et un email du côté choisi pour la correspondance. Polices en cours : compagnie, date d’effet, risque, échéance ou expiration. Quittances des polices en cours et sinistres non clôturés : leurs informations obligatoires.</p>
       </div>
     </section>
   </div>;

@@ -59,3 +59,8 @@ export const getBankAccounts = (token) => request('/api/journaux/comptes-banque/
 export const getBankStatement = (token, params) => request(`/api/journaux/comptes-banque?${query(params)}`, token);
 // Etat des dépenses techniques: the technical payments of a company's policies in a month (mois: AAAA-MM).
 export const getTechnicalExpenses = (token, params) => request(`/api/journaux/depenses-techniques?${query(params)}`, token);
+// Validation of the feuille de caisse of a company on a day: { validation: null | { jour, quittances, encaissements,
+// depenses, montant_depenses, utilisateur, date_saisie } }. Validating declares on that day the encaissements and the
+// dépenses still to declare (quittances / depenses: the lines chosen in a journal; omitted: all of them).
+export const getCashValidation = (token, params) => request(`/api/journaux/feuille/validation?${query(params)}`, token);
+export const validateCashSheet = (token, payload) => request('/api/journaux/feuille/valider', token, { method: 'POST', body: JSON.stringify(payload) });
