@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getExpensesJournal, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts } from '../../services/journalApi';
+import { getExpensesJournal, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts, validateReceipt } from '../../services/journalApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
@@ -21,6 +21,8 @@ const journalDay = () => {
 };
 const sum = (rows, key) => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
 // What the journal line of a quittance is: [label, explanation shown on hover].
+// An encaissement can be validated once the client has paid something not declared yet (all of it, or an acompte).
+export const canValidate = (row) => !row.comptabilise && (row.paye || row.a_s === 'A');
 const receiptStatus = (row) => {
   if (row.comptabilise) return ['Déjà déclarée', `Comptabilisée au journal (${row.a_s === 'A' ? 'acompte' : 'solde'}).`];
   if (row.paye) return ['Payée intégralement', 'Le client a tout réglé : la quittance est déclarée pour son montant.'];
@@ -32,7 +34,7 @@ const receiptStatus = (row) => {
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES RÉGLÉES À DÉCLARER · COCHEZ « CHOIX » POUR LES IMPRIMER',
+    heading: 'QUITTANCES RÉGLÉES · « VALIDER » DÉCLARE L’ENCAISSEMENT LE JOUR MÊME ET L’AJOUTE À LA FEUILLE DE CAISSE',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
@@ -44,8 +46,11 @@ const KINDS = {
     allCompanies: true,
     // The date: the 15th, then the end of the month.
     settled: true,
-    // No "Comptabiliser" here: the journal is only consulted and printed.
+    // No "Comptabiliser" for all the lines: each encaissement is validated on its own ("Valider").
     readOnly: true,
+    // The encaissements validated in the period of the date (1st-15th, 16th-end of the month) stay listed, validated.
+    showDone: true,
+    validate: true,
   },
   depense: {
     title: 'Journal de dépense',
@@ -70,7 +75,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [compagnie, setCompagnie] = useState('');
   const [date, setDate] = useState(journalDay);
   // Encaissement: only the quittances a client paid something on (a règlement date and Réglé > 0).
-  const settledParams = config.settled ? { regles: true } : {};
+  const settledParams = config.settled ? { regles: true, periode: true } : {};
   const [nature, setNature] = useState(''); // dépense: '' | S | R
   const [showDone, setShowDone] = useState(Boolean(config.showDone));
   const [search, setSearch] = useState('');
@@ -80,6 +85,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [notice, setNotice] = useState('');
   const [sheet, setSheet] = useState(null); // the journal printout: { rows, preview }
   const [cashSheet, setCashSheet] = useState(false); // the feuille de caisse of the company on the date
+  const [confirming, setConfirming] = useState(null); // the encaissement whose validation is asked
+  const [validating, setValidating] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -106,10 +113,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   }, [accessToken, config, compagnie, date, nature, showDone]);
 
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') { if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else onClose(); } };
+    const onKey = (event) => { if (event.key === 'Escape') { if (confirming) { if (!validating) setConfirming(null); } else if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else onClose(); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sheet, cashSheet, onClose]);
+  }, [sheet, cashSheet, confirming, validating, onClose]);
 
   const company = companies.find((item) => String(item.code_compagnie) === String(compagnie));
   const listed = Boolean(compagnie) || Boolean(config.allCompanies);
@@ -165,6 +172,25 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     }
   }
 
+  // "Valider" (after the confirmation): the encaissement is declared today and counted in today's feuille de caisse.
+  async function validate() {
+    const row = confirming;
+    setValidating(true);
+    try {
+      const result = await validateReceipt(accessToken, row.num_quittance);
+      setState((current) => ({ ...current, error: '', items: current.items.map((item) => (item.num_quittance === row.num_quittance
+        ? { ...item, comptabilise: true, date_comptabilise: result.date_validation, valide_par: result.valide_par } : item)) }));
+      setChosen((current) => { const next = new Set(current); next.delete(row.num_quittance); return next; });
+      setNotice(`Encaissement de la quittance ${row.num_quittance} (${fmt(result.montant)} TND) validé le ${formatDate(result.date_validation)} : déclaré et ajouté à la feuille de caisse de ce jour.`);
+      setConfirming(null);
+    } catch (requestError) {
+      setConfirming(null);
+      setState((current) => ({ ...current, error: requestError.message }));
+    } finally {
+      setValidating(false);
+    }
+  }
+
   // The feuille: what is comptabilisé on the date, or else a preview of the chosen lines.
   function openSheet() {
     if (showDone && done.length) setSheet({ rows: done, preview: false });
@@ -208,7 +234,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
                 {kind === 'encaissement'
-                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th><th>Statut</th></>
+                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th><th>Validation</th></>
                   : <><th>N° sinistre / ristourne</th><th>Type</th><th>Date</th><th>N° contrat</th><th>Immatriculation</th><th className="cqi-number">Montant</th><th>Assuré</th><th>Chèque</th><th>Comptabilisé</th></>}
               </tr></thead>
               <tbody>{shown.map((row) => {
@@ -220,7 +246,12 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                     ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.a_s}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
                       <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}</td>
-                      <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td><td title={receiptStatus(row)[1]}>{receiptStatus(row)[0]}</td></>
+                      <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td>
+                      <td className="jrn-validate-cell" onClick={(event) => event.stopPropagation()}>
+                        {row.comptabilise
+                          ? <span className="jrn-validated" title={receiptStatus(row)[1]}>✓ Validé le {formatDate(row.date_comptabilise)}{row.valide_par ? <small>par {row.valide_par}</small> : null}</span>
+                          : <button type="button" className="jrn-validate" disabled={!canValidate(row) || validating} onClick={() => setConfirming(row)} title={canValidate(row) ? `${receiptStatus(row)[0]} : ${receiptStatus(row)[1]}` : receiptStatus(row)[1]}>Valider</button>}
+                      </td></>
                     : <><td><strong>{row.numero}</strong></td><td>{row.nature === 'R' ? 'Ristourne' : 'Sinistre'}</td><td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.num_imat}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.assure}</td><td>{row.num_cheq}</td><td>{row.comptabilise ? `Oui · ${formatDate(row.date_comptabilise)}` : 'Non'}</td></>}
                 </tr>;
@@ -274,6 +305,22 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
           <p className="jrn-grand-total">Total général : <b>{fmt(sum(sheet.rows, 'montant'))}</b></p>
         </article>
       </div>
+    </div>}
+    {confirming && <div className="jrn-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !validating) setConfirming(null); }}>
+      <section className="jrn-confirm" role="alertdialog" aria-modal="true" aria-labelledby="jrn-confirm-title" aria-describedby="jrn-confirm-text">
+        <h3 id="jrn-confirm-title">Valider cet encaissement ?</h3>
+        <p id="jrn-confirm-text">Êtes-vous sûr de vouloir valider l’encaissement de la quittance <strong>{confirming.num_quittance}</strong> ? Il sera déclaré aujourd’hui, le <strong>{formatDate(new Date().toLocaleDateString('sv-SE'))}</strong>, et ajouté à la feuille de caisse de ce jour.</p>
+        <dl>
+          <div><dt>Compagnie</dt><dd>{confirming.nom_compagnie}</dd></div>
+          <div><dt>Assuré</dt><dd>{confirming.assure || confirming.code_client}</dd></div>
+          <div><dt>Montant</dt><dd>{fmt(confirming.montant)} TND <small>({confirming.a_s === 'A' ? 'acompte' : 'solde'})</small></dd></div>
+          <div><dt>Réglé par le client</dt><dd>{fmt(confirming.regle)} TND{confirming.date_reglement ? ` · le ${formatDate(confirming.date_reglement)}` : ''}</dd></div>
+        </dl>
+        <footer>
+          <button type="button" className="jrn-confirm-cancel" onClick={() => setConfirming(null)} disabled={validating}>Annuler</button>
+          <button type="button" className="jrn-confirm-ok" onClick={validate} disabled={validating} autoFocus>{validating ? 'Validation…' : 'Oui, valider'}</button>
+        </footer>
+      </section>
     </div>}
     {cashSheet && company && <CashSheet company={company} date={date} onClose={() => setCashSheet(false)} />}
   </div>;

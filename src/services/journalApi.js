@@ -28,6 +28,8 @@ export const listJournalCompanies = (token) => request('/api/journaux/compagnies
 // Journal d'encaissement: receipts of a company to declare on a date (and, with comptabilises, those declared that day).
 export const getReceiptsJournal = (token, params) => request(`/api/journaux/encaissement?${query(params)}`, token);
 export const postReceipts = (token, payload) => request('/api/journaux/encaissement/comptabiliser', token, { method: 'POST', body: JSON.stringify(payload) });
+// One encaissement validated on the day of the validation: { num_quittance, date_validation, montant, a_s, code_compagnie, valide_par }.
+export const validateReceipt = (token, numQuittance) => request('/api/journaux/encaissement/valider', token, { method: 'POST', body: JSON.stringify({ num_quittance: numQuittance }) });
 // Journal de dépense: claim (S) and rebate (R) payments of a company.
 export const getExpensesJournal = (token, params) => request(`/api/journaux/depense?${query(params)}`, token);
 export const postExpenses = (token, payload) => request('/api/journaux/depense/comptabiliser', token, { method: 'POST', body: JSON.stringify(payload) });
