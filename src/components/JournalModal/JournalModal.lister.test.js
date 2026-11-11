@@ -6,14 +6,20 @@ import { getExpensesJournal, getReceiptsJournal } from '../../services/journalAp
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Sami' } }) }));
 jest.mock('../../services/journalApi', () => ({
   getReceiptsJournal: jest.fn(), getExpensesJournal: jest.fn(), listJournalCompanies: jest.fn(), postReceipts: jest.fn(), postExpenses: jest.fn(),
-  getReceiptChoices: jest.fn(), saveReceiptChoices: jest.fn(),
+  getReceiptChoices: jest.fn(), saveReceiptChoices: jest.fn(), getJournalPeriods: jest.fn(), validateJournal: jest.fn(),
 }));
 jest.mock('./FeuilleCaisse', () => ({
   ...jest.requireActual('./FeuilleCaisse'),
   CashSheet: jest.fn(() => null),
 }));
 
-const { listJournalCompanies, getReceiptChoices, saveReceiptChoices } = jest.requireMock('../../services/journalApi');
+const { listJournalCompanies, getReceiptChoices, saveReceiptChoices, getJournalPeriods, validateJournal } = jest.requireMock('../../services/journalApi');
+const period = (jour, debut, extra) => ({ jour, debut, declarees: 2, montant_declare: 200, a_declarer: 1, montant_a_declarer: 100, lignes: 3, montant: 300, validation: null, ...extra });
+// "Lister" shows the journals; "Détails" opens the lines of the first one (the journal of the date).
+async function openDetails() {
+  fireEvent.click((await screen.findAllByRole('button', { name: 'Détails' }))[0]);
+  await screen.findByRole('button', { name: '← Tous les journaux' });
+}
 // The ticks kept on the server, per date (as dbo.TJournalChoix).
 let mockKept = {};
 const line = (number, extra) => ({
@@ -36,6 +42,7 @@ beforeEach(() => {
     line('02026000001', { comptabilise: true, date_comptabilise: '2026-11-11' }),
     line('02026000002', { comptabilise: true, date_comptabilise: '2026-11-15' }),
   ] });
+  getJournalPeriods.mockImplementation((token, params) => Promise.resolve({ items: [period(params.date, '2026-11-01'), period('2026-10-31', '2026-10-16', { a_declarer: 0, montant_a_declarer: 0, montant: 200 })], anterieur: null }));
   getExpensesJournal.mockResolvedValue({ items: [{ num_dep: 9037, numero: '2020007074', nature: 'S', montant: 184.111, code_compagnie: 6, nom_compagnie: 'ASTREE', comptabilise: false }] });
 });
 
@@ -50,13 +57,16 @@ test('encaissement: listed as it opens, on the journal day (the 15th, or the las
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   const day = journalDay();
   expect(screen.getByLabelText('Date')).toHaveValue(day);
+  await openDetails();
   expect(await screen.findByText('02026017527')).toBeInTheDocument();
   expect(getReceiptsJournal).toHaveBeenCalledWith('t', expect.objectContaining({ date: day, regles: true, periode: true, comptabilises: true }));
+  expect(getReceiptsJournal.mock.lastCall[1]).toMatchObject({ journal: true });
   expect(getReceiptsJournal.mock.lastCall[1]).not.toHaveProperty('debut');
 });
 
 test('encaissement: the quittances declared on the date and those to declare, every line ticked, no validation column, red when declared off the 15th / end of month', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15', regles: true, periode: true, comptabilises: true })));
   const row = (await screen.findByText('02026017527')).closest('tr');
@@ -71,21 +81,24 @@ test('encaissement: the quittances declared on the date and those to declare, ev
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-12' } });
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-12' })));
   await waitFor(() => expect(screen.getByText('02026017527').closest('tr')).toHaveClass('is-offday'));
-  // "Lister" reads them again
-  const calls = getReceiptsJournal.mock.calls.length;
+  // "Lister": back to the journals of the half months
+  const calls = getJournalPeriods.mock.calls.length;
   fireEvent.click(await screen.findByRole('button', { name: 'Lister' }));
-  await waitFor(() => expect(getReceiptsJournal.mock.calls.length).toBe(calls + 1));
+  await waitFor(() => expect(getJournalPeriods.mock.calls.length).toBeGreaterThan(calls));
+  expect(screen.queryByRole('button', { name: '← Tous les journaux' })).not.toBeInTheDocument();
 });
 
 test('encaissement: nothing declared or to declare at the date', async () => {
   getReceiptsJournal.mockResolvedValue({ items: [] });
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
   expect(await screen.findByText('Aucune quittance déclarée ou à déclarer au 15/11/2026.')).toBeInTheDocument();
 });
 
 test('the feuille de caisse opened from the journal validates the quittances ticked in it', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
   await screen.findByRole('option', { name: 'CARTE' });
   fireEvent.change(screen.getByLabelText('Compagnie'), { target: { value: '4' } });
@@ -98,19 +111,21 @@ test('the feuille de caisse opened from the journal validates the quittances tic
   expect(CashSheet.mock.lastCall[0].selection).toEqual({ quittances: [] });
 });
 
-test('dépense: listed as it opens for every company; "Lister" lists again with the filters', async () => {
+test('dépense: the journal opened lists every company; "Lister" lists the journals again with the filters', async () => {
   render(<JournalModal kind="depense" moduleId="585" onClose={() => {}} />);
+  await openDetails();
   expect(await screen.findByText('2020007074')).toBeInTheDocument();
   expect(getExpensesJournal).toHaveBeenCalledWith('t', expect.objectContaining({ compagnie: '' }));
   expect(screen.getByRole('columnheader', { name: 'Compagnie' })).toBeInTheDocument();
   expect(screen.getByText('ASTREE')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('S/R'), { target: { value: 'S' } });
   fireEvent.click(await screen.findByRole('button', { name: 'Lister' }));
-  await waitFor(() => expect(getExpensesJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ compagnie: '', nature: 'S' })));
+  await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ type: 'depense', compagnie: '', nature: 'S' })));
 });
 
 test('every line, declared ones included, is ticked and can be unticked; the ticks of a date are kept on the server for that date', async () => {
   const first = render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15' })));
   const declared = await screen.findByLabelText('Choisir 02026000002');
@@ -128,6 +143,7 @@ test('every line, declared ones included, is ticked and can be unticked; the tic
 
   // opened again on that date: the same choice
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
   await waitFor(() => expect(getReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-15'));
   await waitFor(() => expect(screen.getByLabelText('Choisir 02026000002')).not.toBeChecked());
@@ -137,4 +153,25 @@ test('every line, declared ones included, is ticked and can be unticked; the tic
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-30' } });
   await waitFor(() => expect(getReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-30'));
   await waitFor(() => expect(screen.getByLabelText('Choisir 02026000002')).toBeChecked());
+});
+
+test('"Lister": one line per journal of the half months; "Valider" asks, then declares the journal on its date', async () => {
+  validateJournal.mockResolvedValue({ jour: '2026-11-15', declarees: 1, montant: 100, retirees: 0 });
+  render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
+  await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ type: 'encaissement', date: '2026-11-15', nombre: 12 })));
+  const current = (await screen.findByRole('button', { name: 'Journal d’encaissement du 15/11/2026' })).closest('tr');
+  const previous = screen.getByRole('button', { name: 'Journal d’encaissement du 31/10/2026' }).closest('tr');
+  expect(within(current).getByText('300,000')).toBeInTheDocument();
+  expect(within(previous).getByRole('button', { name: 'Valider' })).toBeDisabled();
+  expect(within(previous).getByText('À jour')).toBeInTheDocument();
+  fireEvent.click(within(current).getByRole('button', { name: 'Valider' }));
+  const dialog = screen.getByRole('alertdialog', { name: 'Valider le journal d’encaissement du 15/11/2026 ?' });
+  expect(validateJournal).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, valider' }));
+  await waitFor(() => expect(validateJournal).toHaveBeenCalledWith('t', { type: 'encaissement', jour: '2026-11-15', compagnie: null, nature: '' }));
+  expect(await screen.findByText(/Journal d’encaissement du 15\/11\/2026 validé : 1 quittance/)).toBeInTheDocument();
+  // older journals on demand
+  fireEvent.click(screen.getByRole('button', { name: 'Journaux plus anciens' }));
+  await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ nombre: 24 })));
 });

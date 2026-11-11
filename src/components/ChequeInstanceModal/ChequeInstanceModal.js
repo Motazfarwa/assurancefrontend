@@ -20,7 +20,7 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
   const { accessToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: '', items: [] });
   const [accounts, setAccounts] = useState([]);
-  const [echeance, setEcheance] = useState('tous'); // tous | echus | non_echus
+  const [echeance, setEcheance] = useState('echus'); // tous | echus | non_echus — the pieces due first (échus)
   const [field, setField] = useState('nom');
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState(null); // the piece being paid in: { row, compte, saving, error }
@@ -88,7 +88,7 @@ export default function ChequeInstanceModal({ onClose, moduleId = '565' }) {
             {Object.entries(SEARCH_FIELDS).map(([key, label]) => <label key={key}><input type="radio" name="cqi-field" checked={field === key} onChange={() => setField(key)} /> {label}</label>)}
           </fieldset>
           <label className="acompte-field"><span>{SEARCH_FIELDS[field]}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={field === 'echeance' ? 'jj/mm/aaaa' : 'Rechercher…'} /></label>
-          <button type="button" className="expert-cancel" onClick={() => { setSearch(''); setEcheance('tous'); }} disabled={!search && echeance === 'tous'}>Effacer</button>
+          <button type="button" className="expert-cancel" onClick={() => { setSearch(''); setEcheance('echus'); }} disabled={!search && echeance === 'echus'}>Effacer</button>
           <button type="button" className="expert-submit cqi-etat" onClick={() => setPrinting(true)}>Imprimer la recette</button>
         </div>
 

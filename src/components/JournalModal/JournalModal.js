@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
+import JournalPeriods from './JournalPeriods';
 import { getExpensesJournal, getReceiptChoices, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts, saveReceiptChoices } from '../../services/journalApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -94,8 +95,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [notice, setNotice] = useState('');
   const [sheet, setSheet] = useState(null); // the journal printout: { rows, preview }
   const [cashSheet, setCashSheet] = useState(false); // the feuille de caisse of the company on the date
-  // The lines listed: { compagnie, date, nature }. They are read when the journal opens and when a filter changes;
-  // "Lister" reads them again.
+  // "Lister" (and the opening): one line per journal of the half months; "Détails" opens the lines of one of them.
+  const [view, setView] = useState('journaux');
+  const [periodsKey, setPeriodsKey] = useState(0);
+  // The lines of the journal opened: { compagnie, date, nature }, read again when a filter changes.
   const [listedFor, setListedFor] = useState(null);
 
   useEffect(() => {
@@ -106,14 +109,14 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     return () => { active = false; };
   }, [accessToken]);
 
-  useEffect(() => { setListedFor(date ? { compagnie, date, nature, at: Date.now() } : null); }, [compagnie, date, nature]);
+  useEffect(() => { setListedFor(view === 'detail' && date ? { compagnie, date, nature, at: Date.now() } : null); }, [compagnie, date, nature, view]);
 
   useEffect(() => {
     if (!listedFor) { setState({ loading: false, error: '', items: [] }); setChosen(new Set()); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
     Promise.all([
-      config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams(listedFor.date) }),
+      config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, journal: true, ...settledParams(listedFor.date) }),
       config.choices ? config.choices.load(accessToken, listedFor.date).catch(() => ({ choix: {} })) : Promise.resolve({ choix: {} }),
     ])
       .then(([body, kept]) => {
@@ -128,7 +131,9 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config
   }, [accessToken, config, listedFor, showDone]);
-  const list = () => setListedFor({ compagnie, date, nature, at: Date.now() });
+  const list = () => { setView('journaux'); setPeriodsKey((value) => value + 1); };
+  // The lines of the journal of a half month (its date: the 15th or the last day of the month).
+  const openJournal = (jour) => { setDate(jour); setView('detail'); };
 
   useEffect(() => {
     const onKey = (event) => { if (event.key === 'Escape') { if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else onClose(); } };
@@ -190,7 +195,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         const result = await config.post(accessToken, Number(code), date, rows);
         count += result.comptabilisees;
       }
-      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true, ...settledParams(date) });
+      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true, journal: true, ...settledParams(date) });
       const items = body.items || [];
       setShowDone(true);
       setState({ loading: false, error: '', items });
@@ -240,9 +245,12 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
 
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
-        <section className="unpaid-results">
+        {view === 'journaux' ? <JournalPeriods kind={kind} accessToken={accessToken} date={date} compagnie={compagnie} nature={nature} companyName={company?.nom_compagnie}
+          reloadKey={periodsKey} onOpen={openJournal} onValidated={setNotice} />
+        : <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
+            <div><button type="button" className="jrn-back" onClick={() => setView('journaux')}>← Tous les journaux</button>
+              <span>{config.title.toUpperCase()} DU {formatDate(date)} · {config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
               <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(selected, config.amount))} TND</strong></div>
               <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (!selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
@@ -277,7 +285,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                 </tr>;
               })}</tbody>
             </table></div>}
-        </section>
+        </section>}
       </div>
     </section>
 

@@ -242,3 +242,20 @@
 .jrn-cash-lines h4 small { color: #587079; font-size: 11px; font-weight: 600; }
 .jrn-cash-lines .unpaid-table-scroll { max-height: 34vh; }
 @media print { .jrn-cash-validate, .jrn-cash-error { display: none; } }
+
+/* "Lister": one line per journal of the half months, each with "Détails" and "Valider" */
+.jrn-period-table td { vertical-align: middle; }
+.jrn-period-table td small { display: block; margin-top: 2px; color: #7c8f96; font-size: 10.5px; font-weight: 500; }
+.jrn-period-name { padding: 0; border: 0; background: none; color: #173247; font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.jrn-period-name:hover { color: #1f7a6d; text-decoration: underline; }
+.jrn-period-table tr.is-open { background: #fffaf0; }
+.jrn-period-state { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fff1d6; color: #8a5a0b; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.jrn-period-state.is-done { background: #e3f4ef; color: #1c7a5e; }
+.jrn-period-actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+.jrn-period-actions button { padding: 6px 12px; font-size: 12px; }
+.jrn-period-older { margin: 8px 2px 0; color: #8a5a0b; font-size: 12px; }
+.jrn-period-more { display: flex; justify-content: center; margin-top: 10px; }
+.jrn-back { display: block; margin: 0 0 4px; padding: 0; border: 0; background: none; color: #1f7a6d; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.jrn-period-actions button, .jrn-period-more button { min-height: 32px; border-radius: 7px; font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
+.jrn-period-actions button:disabled, .jrn-period-more button:disabled { cursor: default; opacity: .4; }
+.jrn-period-more button { padding: 0 16px; }
