@@ -95,10 +95,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [notice, setNotice] = useState('');
   const [sheet, setSheet] = useState(null); // the journal printout: { rows, preview }
   const [cashSheet, setCashSheet] = useState(false); // the feuille de caisse of the company on the date
-  // "Lister" (and the opening): one line per journal of the half months; "Détails" opens the lines of one of them.
-  const [view, setView] = useState('journaux');
+  // "Lister": a window with one line per journal of the half months (Détails, Valider).
+  const [periodsOpen, setPeriodsOpen] = useState(false);
   const [periodsKey, setPeriodsKey] = useState(0);
-  // The lines of the journal opened: { compagnie, date, nature }, read again when a filter changes.
+  // The lines listed: { compagnie, date, nature }. They are read when the journal opens and when a filter changes.
   const [listedFor, setListedFor] = useState(null);
 
   useEffect(() => {
@@ -109,14 +109,14 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     return () => { active = false; };
   }, [accessToken]);
 
-  useEffect(() => { setListedFor(view === 'detail' && date ? { compagnie, date, nature, at: Date.now() } : null); }, [compagnie, date, nature, view]);
+  useEffect(() => { setListedFor(date ? { compagnie, date, nature, at: Date.now() } : null); }, [compagnie, date, nature]);
 
   useEffect(() => {
     if (!listedFor) { setState({ loading: false, error: '', items: [] }); setChosen(new Set()); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
     Promise.all([
-      config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, journal: true, ...settledParams(listedFor.date) }),
+      config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams(listedFor.date) }),
       config.choices ? config.choices.load(accessToken, listedFor.date).catch(() => ({ choix: {} })) : Promise.resolve({ choix: {} }),
     ])
       .then(([body, kept]) => {
@@ -131,15 +131,17 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config
   }, [accessToken, config, listedFor, showDone]);
-  const list = () => { setView('journaux'); setPeriodsKey((value) => value + 1); };
-  // The lines of the journal of a half month (its date: the 15th or the last day of the month).
-  const openJournal = (jour) => { setDate(jour); setView('detail'); };
+  const list = () => { setPeriodsKey((value) => value + 1); setPeriodsOpen(true); };
+  // "Détails" of a journal: its date is listed here (the 15th or the last day of the month).
+  const openJournal = (jour) => { setPeriodsOpen(false); if (jour === date) setListedFor({ compagnie, date, nature, at: Date.now() }); else setDate(jour); };
+  // A journal validated in the window: the lines listed here are read again.
+  const afterJournalValidated = (message) => { setNotice(message); setListedFor((current) => (current ? { ...current, at: Date.now() } : current)); };
 
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') { if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else onClose(); } };
+    const onKey = (event) => { if (event.key === 'Escape') { if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else if (periodsOpen) setPeriodsOpen(false); else onClose(); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [sheet, cashSheet, onClose]);
+  }, [sheet, cashSheet, periodsOpen, onClose]);
 
   const company = companies.find((item) => String(item.code_compagnie) === String(compagnie));
   const listed = Boolean(listedFor);
@@ -195,7 +197,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         const result = await config.post(accessToken, Number(code), date, rows);
         count += result.comptabilisees;
       }
-      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true, journal: true, ...settledParams(date) });
+      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true, ...settledParams(date) });
       const items = body.items || [];
       setShowDone(true);
       setState({ loading: false, error: '', items });
@@ -245,12 +247,9 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
 
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
-        {view === 'journaux' ? <JournalPeriods kind={kind} accessToken={accessToken} date={date} compagnie={compagnie} nature={nature} companyName={company?.nom_compagnie}
-          reloadKey={periodsKey} onOpen={openJournal} onValidated={setNotice} />
-        : <section className="unpaid-results">
+        <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><button type="button" className="jrn-back" onClick={() => setView('journaux')}>← Tous les journaux</button>
-              <span>{config.title.toUpperCase()} DU {formatDate(date)} · {config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
+            <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
               <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(selected, config.amount))} TND</strong></div>
               <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (!selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
@@ -285,9 +284,17 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                 </tr>;
               })}</tbody>
             </table></div>}
-        </section>}
+        </section>
       </div>
     </section>
+
+    {periodsOpen && <div className="jrn-periods-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPeriodsOpen(false); }}>
+      <section className="jrn-periods-window" role="dialog" aria-modal="true" aria-label={`${config.title} · journaux par quinzaine`}>
+        <header><h3>{config.title} · journaux par quinzaine</h3><button type="button" className="expert-close" onClick={() => setPeriodsOpen(false)} aria-label="Fermer les journaux">×</button></header>
+        <JournalPeriods kind={kind} accessToken={accessToken} date={date} compagnie={compagnie} nature={nature} companyName={company?.nom_compagnie}
+          reloadKey={periodsKey} onOpen={openJournal} onValidated={afterJournalValidated} />
+      </section>
+    </div>}
 
     {sheet && <div className="jrn-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSheet(null); }}>
       <div className="jrn-sheet-frame">

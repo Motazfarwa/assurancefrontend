@@ -259,3 +259,9 @@
 .jrn-period-actions button, .jrn-period-more button { min-height: 32px; border-radius: 7px; font: inherit; font-size: 11.5px; font-weight: 650; cursor: pointer; }
 .jrn-period-actions button:disabled, .jrn-period-more button:disabled { cursor: default; opacity: .4; }
 .jrn-period-more button { padding: 0 16px; }
+/* The journals of the half months: a window over the journal ("Lister") */
+.jrn-periods-backdrop { position: fixed; inset: 0; z-index: 140; display: grid; place-items: center; padding: 16px; background: rgba(15, 33, 44, .45); }
+.jrn-periods-window { display: flex; flex-direction: column; width: min(1180px, 100%); max-height: calc(100vh - 32px); padding: 16px 20px 18px; overflow: auto; border-radius: 14px; background: #fff; box-shadow: 0 24px 60px rgba(15, 33, 44, .3); }
+.jrn-periods-window > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.jrn-periods-window > header h3 { margin: 0; color: #173247; font-size: 17px; }
+.jrn-periods-window .unpaid-results { margin: 0; }
