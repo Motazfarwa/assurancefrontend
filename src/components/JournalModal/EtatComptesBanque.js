@@ -184,7 +184,8 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
   useEffect(() => {
     let active = true;
     getBankAccounts(accessToken)
-      .then((rows) => { if (active) { setBanks(rows); setFilters((current) => ({ ...current, code_banque: current.code_banque || rows.find((row) => !row.archive)?.code_banque || '' })); } })
+      // Only the accounts in use: the archived ones (closed accounts) are not offered.
+      .then((rows) => { if (active) { const open = (rows || []).filter((row) => !row.archive); setBanks(open); setFilters((current) => ({ ...current, code_banque: current.code_banque || open[0]?.code_banque || '' })); } })
       .catch((requestError) => { if (active) setError(requestError.message); });
     return () => { active = false; };
   }, [accessToken]);
@@ -250,7 +251,7 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
           <label className="acompte-field jrn-company"><span>Code banque</span>
             <select value={filters.code_banque} onChange={(event) => change({ code_banque: event.target.value })}>
               <option value="">Choisir…</option>
-              {banks.map((bank) => <option key={bank.code_banque} value={bank.code_banque}>{bank.code_banque}{bank.archive ? ' (archivé)' : ''}</option>)}
+              {banks.map((bank) => <option key={bank.code_banque} value={bank.code_banque}>{bank.code_banque}</option>)}
             </select>
           </label>
           <fieldset className="jrn-bank-mode"><legend>Etat</legend>

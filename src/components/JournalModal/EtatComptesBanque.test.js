@@ -36,6 +36,8 @@ beforeEach(() => {
 test('shows the account, then confronts it with the bank statement', async () => {
   const { container } = render(<EtatComptesBanqueModal moduleId="598" onClose={() => {}} />);
   await waitFor(() => expect(screen.getByLabelText('Code banque').value).toBe('ATTIJARI GAT'));
+  // the archived accounts are not offered
+  expect(screen.queryByRole('option', { name: /ATB GAT/ })).toBeNull();
   fireEvent.click(screen.getByLabelText('Etat détaillé'));
   fireEvent.click(screen.getByRole('button', { name: 'Aperçu' }));
   expect(await screen.findByText('ETAT DÉTAILLÉ DU COMPTE ATTIJARI GAT')).toBeTruthy();
