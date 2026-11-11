@@ -28,11 +28,23 @@ const receiptStatus = (row) => {
   return ['Reste dû', `Les acomptes (${fmt(row.regle)}) sont déjà déclarés : la ligne déclarerait les ${fmt(row.solde_quittance)} que le client n’a pas encore payés.`];
 };
 
+// The lines unticked in a journal, per journal and date, kept in this browser (a private window keeps nothing).
+const untickedKey = (kind, day) => `jrn-unticked:${kind}:${day}`;
+function readUnticked(kind, day) {
+  try { return new Set(JSON.parse(window.localStorage.getItem(untickedKey(kind, day)) || '[]')); } catch { return new Set(); }
+}
+function writeUnticked(kind, day, keys) {
+  try {
+    if (keys.length) window.localStorage.setItem(untickedKey(kind, day), JSON.stringify(keys));
+    else window.localStorage.removeItem(untickedKey(kind, day));
+  } catch { /* storage blocked: the choice lasts while the journal is open */ }
+}
+
 // Each journal: how its lines are read, keyed, pre-chosen, searched and comptabilisées.
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES RÉGLÉES À LA DATE (DATE DE RÈGLEMENT) · COCHÉES PAR DÉFAUT · « VALIDER » DANS LA FEUILLE DE CAISSE LES DÉCLARE À SA DATE',
+    heading: 'QUITTANCES DÉCLARÉES À CETTE DATE ET QUITTANCES RÉGLÉES À DÉCLARER · COCHÉES PAR DÉFAUT · « VALIDER » DANS LA FEUILLE DE CAISSE LES DÉCLARE À SA DATE',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
@@ -42,7 +54,7 @@ const KINDS = {
     amount: 'montant',
     // Every company is listed until one is chosen.
     allCompanies: true,
-    // The quittances whose date de règlement (TRegCli) is the date chosen (the journal day when the journal opens).
+    // The journal of the date: the quittances declared on it (in its period), and every quittance paid by then still to declare.
     settled: true,
     // No "Comptabiliser": the lines chosen are declared by the validation of the feuille de caisse ("Valider").
     readOnly: true,
@@ -77,8 +89,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [compagnie, setCompagnie] = useState('');
   // The journal day: the 15th until the 15th, then the last day of the month (11/11 -> 15/11, 16/11 -> 30/11).
   const [date, setDate] = useState(journalDay);
-  // Encaissement: only the quittances a client paid something on, with a date de règlement on the date (Réglé > 0).
-  const settledParams = (day) => (config.settled ? { regles: true, periode: true, debut: day, fin: day } : {});
+  // Encaissement: only the quittances a client paid something on (a date de règlement and Réglé > 0).
+  const settledParams = () => (config.settled ? { regles: true, periode: true } : {});
   const [nature, setNature] = useState(''); // dépense: '' | S | R
   const [showDone, setShowDone] = useState(Boolean(config.showDone));
   const [search, setSearch] = useState('');
@@ -111,12 +123,14 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         if (!active) return;
         const items = body.items || [];
         setState({ loading: false, error: '', items });
-        setChosen(new Set(items.filter((row) => !row.comptabilise && config.preselect(row)).map(config.key)));
+        // The lines unticked on this date stay unticked (remembered per journal and date); the others are ticked.
+        const unticked = readUnticked(kind, listedFor.date);
+        setChosen(new Set(items.filter((row) => !row.comptabilise && config.preselect(row) && !unticked.has(config.key(row))).map(config.key)));
       })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [] }); });
     return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config and the date listed
-  }, [accessToken, config, listedFor, showDone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config
+  }, [accessToken, config, kind, listedFor, showDone]);
   const list = () => setListedFor({ compagnie, date, nature, at: Date.now() });
 
   useEffect(() => {
@@ -137,15 +151,20 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const done = state.items.filter((row) => row.comptabilise);
   const allChosen = pending.length > 0 && pending.every((row) => chosen.has(config.key(row)));
 
+  // A tick or untick is kept for the date of the journal: the journal opened again on that date shows the same choice.
+  const remember = (next) => {
+    if (listedFor) writeUnticked(kind, listedFor.date, state.items.filter((row) => !row.comptabilise && !next.has(config.key(row))).map(config.key));
+    return next;
+  };
   const toggle = (row) => setChosen((current) => {
     const next = new Set(current);
     if (next.has(config.key(row))) next.delete(config.key(row)); else next.add(config.key(row));
-    return next;
+    return remember(next);
   });
   const toggleAll = () => setChosen((current) => {
     const next = new Set(current);
     pending.forEach((row) => (allChosen ? next.delete(config.key(row)) : next.add(config.key(row))));
-    return next;
+    return remember(next);
   });
 
   async function comptabiliser() {
@@ -224,7 +243,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
             </div>
           </div>
           {kind === 'encaissement' && listed && shown.some((row) => offDay(row, listedFor.date)) && <p className="jrn-offday-legend"><i aria-hidden="true" /> En rouge : quittance déclarée (ou à déclarer) un autre jour que le 15 ou le dernier jour du mois.</p>}
-          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">{kind === 'depense' ? `Aucune dépense à déclarer ${allListed ? '' : 'pour cette compagnie '}à cette date.` : `Aucune quittance réglée le ${formatDate(listedFor.date)}${allListed ? '' : ' pour cette compagnie'}.`}</div>
+          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">{kind === 'depense' ? `Aucune dépense à déclarer ${allListed ? '' : 'pour cette compagnie '}à cette date.` : `Aucune quittance déclarée ou à déclarer au ${formatDate(listedFor.date)}${allListed ? '' : ' pour cette compagnie'}.`}</div>
             : listed && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
