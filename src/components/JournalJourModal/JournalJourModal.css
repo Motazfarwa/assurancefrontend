@@ -1,0 +1,118 @@
+.jdj-modal { display: flex; width: min(1180px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); flex-direction: column; }
+.jdj-modal .jdj-content { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: auto; }
+.jdj-day, .jdj-team { display: flex; flex-direction: column; gap: 12px; }
+
+.jdj-dayline { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; }
+.jdj-date { display: grid; gap: 4px; color: #4f6873; font-size: 11px; font-weight: 700; }
+.jdj-date input { height: 36px; padding: 0 10px; border: 1px solid #cfdcdf; border-radius: 8px; font: inherit; font-size: 13px; }
+.jdj-dayname { padding-bottom: 8px; color: #173247; font-size: 14px; text-transform: capitalize; }
+.jdj-nav { width: 36px; height: 36px; border: 1px solid #cfdcdf; border-radius: 8px; background: #fff; color: #1d7a6b; font-size: 20px; line-height: 1; cursor: pointer; }
+.jdj-nav:disabled { opacity: .4; cursor: not-allowed; }
+
+.jdj-badge { align-self: center; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.jdj-badge.is-valide { background: #e3f4ee; color: #17705f; }
+.jdj-badge.is-brouillon { background: #fff4e2; color: #8a5a10; }
+.jdj-badge.is-vide { background: #f0f3f4; color: #6d8189; }
+.jdj-tag { padding: 3px 8px; border-radius: 999px; background: #e8f6ee; color: #1b7a43; font-size: 10.5px; font-weight: 700; }
+.jdj-tag.is-seen { background: #eaf1fb; color: #2a5d9c; }
+
+.jdj-notice { margin: 0; padding: 7px 12px; border: 1px solid #cfe6df; border-radius: 8px; background: #f3faf8; color: #1d6b62; font-size: 12px; }
+.jdj-muted { margin: 0; color: #7c8f96; font-size: 12px; }
+.jdj-hint { font-size: 11.5px; }
+.jdj-warn { margin: 0; padding: 7px 10px; border-radius: 8px; background: #fff7ea; color: #8a5a10; font-size: 12px; }
+.jdj-sent { margin: 0; padding: 7px 10px; border-radius: 8px; background: #e8f6ee; color: #1b7a43; font-size: 12px; font-weight: 700; }
+
+.jdj-columns { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
+.jdj-main { display: grid; gap: 12px; min-width: 0; }
+.jdj-card { padding: 12px 14px; border: 1px solid #e3eaec; border-radius: 10px; background: #fff; }
+.jdj-card h3 { margin: 0 0 10px; color: #173247; font-size: 13px; }
+.jdj-text { margin: 6px 0 0; color: #233c4b; font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; }
+
+.jdj-tasks { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: task; }
+.jdj-tasks li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto 30px; align-items: center; gap: 8px; counter-increment: task; }
+.jdj-tasks li::before { content: counter(task); color: #8fa3aa; font-size: 12px; font-weight: 700; text-align: right; }
+.jdj-tasks input { min-width: 0; height: 36px; padding: 0 10px; border: 1px solid #cfdcdf; border-radius: 8px; font: inherit; font-size: 13px; }
+.jdj-tasks input:focus, .jdj-notes textarea:focus, .jdj-date input:focus { border-color: #67bdae; outline: 2px solid rgba(103, 189, 174, .25); }
+.jdj-states { display: inline-flex; overflow: hidden; border: 1px solid #cfdcdf; border-radius: 8px; }
+.jdj-states button { padding: 0 10px; height: 34px; border: 0; border-left: 1px solid #e3eaec; background: #fff; color: #587079; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.jdj-states button:first-child { border-left: 0; }
+.jdj-states button.is-fait.is-on { background: #e3f4ee; color: #17705f; }
+.jdj-states button.is-en_cours.is-on { background: #fff1d9; color: #8a5a10; }
+.jdj-states button.is-a_faire.is-on { background: #eaf1fb; color: #2a5d9c; }
+.jdj-remove { width: 30px; height: 30px; border: 0; border-radius: 7px; background: transparent; color: #a0b0b6; font-size: 18px; cursor: pointer; }
+.jdj-remove:hover { background: #fdeee8; color: #a3402a; }
+.jdj-add { margin-top: 10px; padding: 7px 12px; border: 1px dashed #9ccfc4; border-radius: 8px; background: #f6fbfa; color: #1d7a6b; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+.jdj-notes { display: grid; gap: 10px; }
+.jdj-notes label { display: grid; gap: 5px; color: #4f6873; font-size: 11px; font-weight: 700; }
+.jdj-notes textarea { padding: 8px 10px; border: 1px solid #cfdcdf; border-radius: 8px; font: inherit; font-size: 13px; resize: vertical; }
+
+.jdj-read-tasks { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: #233c4b; }
+.jdj-read-tasks li { display: flex; align-items: baseline; gap: 8px; }
+.jdj-state { flex: none; min-width: 62px; padding: 2px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; text-align: center; }
+.jdj-state.is-fait { background: #e3f4ee; color: #17705f; }
+.jdj-state.is-en_cours { background: #fff1d9; color: #8a5a10; }
+.jdj-state.is-a_faire { background: #eaf1fb; color: #2a5d9c; }
+
+.jdj-activity { padding: 12px 14px; border: 1px solid #e3eaec; border-radius: 10px; background: #f8fbfb; }
+.jdj-activity h4 { margin: 0 0 6px; color: #4f6873; font-size: 12px; }
+.jdj-activity h4 b { color: #173247; font-size: 16px; }
+.jdj-activity p { margin: 0 0 8px; color: #587079; font-size: 11.5px; }
+.jdj-activity ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.jdj-activity li { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 0; border-top: 1px solid #edf2f3; font-size: 11.5px; color: #233c4b; }
+.jdj-activity li small { color: #8fa3aa; }
+.jdj-activity li button { flex: none; padding: 3px 7px; border: 1px solid #b9d8d2; border-radius: 6px; background: #fff; color: #1d7a6b; font: inherit; font-size: 10.5px; font-weight: 700; cursor: pointer; }
+
+.jdj-report { margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; background: #f4f7f8; color: #233c4b; font: 12px/1.5 inherit; font-family: inherit; white-space: pre-wrap; }
+.jdj-send { display: grid; gap: 6px; justify-items: start; }
+.jdj-send small { color: #7c8f96; font-size: 11px; }
+.jdj-wa { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 8px; background: #1fa855; color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; }
+.jdj-wa:hover { background: #178f47; }
+
+.jdj-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.jdj-validate { padding: 9px 16px; border: 0; border-radius: 8px; background: #187d78; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.jdj-validate:disabled { opacity: .5; cursor: wait; }
+
+/* Administrator */
+.jdj-counters { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.jdj-counters > span { padding: 8px 12px; border: 1px solid #e3eaec; border-radius: 10px; background: #fff; color: #587079; font-size: 12px; font-weight: 600; }
+.jdj-counters > span b { margin-right: 4px; color: #173247; font-size: 18px; }
+.jdj-counters > span.is-valide b { color: #17705f; }
+.jdj-counters > span.is-brouillon b { color: #8a5a10; }
+.jdj-number { display: flex; align-items: end; gap: 6px; margin-left: auto; }
+.jdj-number label { display: grid; gap: 4px; color: #4f6873; font-size: 11px; font-weight: 700; }
+.jdj-number input { width: 170px; height: 34px; padding: 0 10px; border: 1px solid #cfdcdf; border-radius: 8px; font: inherit; font-size: 13px; }
+.jdj-people { display: grid; gap: 10px; }
+.jdj-person { border: 1px solid #e3eaec; border-left: 4px solid #cfdcdf; border-radius: 10px; background: #fff; }
+.jdj-person.is-valide { border-left-color: #2f9d84; }
+.jdj-person.is-brouillon { border-left-color: #d6a14f; }
+.jdj-person > header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #eef2f3; }
+.jdj-person > header strong { color: #173247; font-size: 14px; }
+.jdj-person > header button { padding: 5px 10px; font-size: 11.5px; }
+.jdj-spacer { flex: 1; }
+.jdj-person-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; padding: 10px 14px 12px; }
+.jdj-person.is-vide .jdj-person-body { opacity: .85; }
+
+.jdj-history-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(15, 33, 44, .35); }
+.jdj-history { width: min(640px, 100%); max-height: calc(100dvh - 32px); overflow: auto; padding: 14px 18px; border-radius: 12px; background: #fff; box-shadow: 0 20px 50px rgba(15, 33, 44, .25); }
+.jdj-history > header { display: flex; align-items: center; justify-content: space-between; }
+.jdj-history h3 { margin: 0; color: #173247; font-size: 15px; }
+.jdj-history-day { padding: 10px 0; border-top: 1px solid #eef2f3; }
+.jdj-history-day h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; color: #233c4b; font-size: 12.5px; text-transform: capitalize; }
+
+@media (max-width: 860px) {
+  .jdj-columns, .jdj-person-body { grid-template-columns: 1fr; }
+  .jdj-number { margin-left: 0; }
+}
+@media (max-width: 560px) {
+  .jdj-tasks li { grid-template-columns: minmax(0, 1fr) 30px; }
+  .jdj-tasks li::before { display: none; }
+  .jdj-tasks .jdj-states { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+  .jdj-tasks input, .jdj-notes textarea, .jdj-date input, .jdj-number input { font-size: 16px; }
+  .jdj-actions > * { flex: 1 1 100%; }
+}
+.jdj-btn { padding: 8px 14px; border: 1px solid #cfdcdf; border-radius: 8px; background: #fff; color: #233c4b; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.jdj-btn:hover:not(:disabled) { border-color: #9ccfc4; background: #f6fbfa; }
+.jdj-btn:disabled { opacity: .5; cursor: wait; }
+.jdj-number .jdj-btn { height: 34px; padding: 0 12px; }
+.jdj-person > header .jdj-btn { padding: 5px 10px; font-size: 11.5px; }

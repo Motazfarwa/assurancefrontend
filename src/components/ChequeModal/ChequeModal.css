@@ -66,3 +66,28 @@
 .chq-required { color: #b34747; }
 .chq-flags .chq-account { width: 100%; }
 .chq-flags .chq-account select { width: 100%; min-width: 0; }
+
+/* Several cheques scanned at once */
+.chq-batch { display: grid; gap: 8px; padding: 10px 20px; border-bottom: 1px solid #edf1f2; background: #fbfdfd; }
+.chq-batch-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chq-batch-head strong { color: #173247; font-size: 12.5px; }
+.chq-batch-reading { color: #8a5a10; font-size: 12px; font-weight: 600; }
+.chq-batch-list { display: flex; gap: 8px; margin: 0; padding: 2px 0 4px; overflow-x: auto; list-style: none; }
+.chq-batch-item { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 150px; max-width: 220px; padding: 6px 10px; border: 1px solid #dfe8ea; border-radius: 9px; background: #fff; color: #233c4b; font: inherit; text-align: left; cursor: pointer; }
+.chq-batch-item b { grid-row: span 2; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #eef3f4; color: #4f6873; font-size: 11px; }
+.chq-batch-item span { overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.chq-batch-item small { color: #7c8f96; font-size: 10.5px; white-space: nowrap; }
+.chq-batch-item:hover:not(:disabled) { border-color: #9ccfc4; }
+.chq-batch-item.is-current { border-color: #187d78; box-shadow: inset 0 0 0 1px #187d78; background: #f1faf7; }
+.chq-batch-item.is-current b { background: #187d78; color: #fff; }
+.chq-batch-item.is-lecture small, .chq-batch-item.is-attente small { color: #8a5a10; }
+.chq-batch-item.is-erreur small { color: #b34747; }
+.chq-batch-item.is-ajoute { opacity: .6; cursor: default; }
+.chq-batch-item.is-ajoute b { background: #e3f4ee; color: #17705f; }
+.chq-batch-item.is-ajoute small { color: #17705f; font-weight: 700; }
+.chq-batch-found { margin: 0; color: #4f6873; font-size: 11.5px; line-height: 1.45; }
+.chq-batch-found b { color: #173247; }
+@media (max-width: 640px) {
+  .chq-batch { padding: 8px 12px; }
+  .chq-batch-head .chq-tool { flex: 1 1 auto; }
+}

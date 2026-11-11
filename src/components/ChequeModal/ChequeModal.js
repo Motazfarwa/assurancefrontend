@@ -17,6 +17,9 @@ const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', co
 // A piece stored in TPiece is "en instance" until settled; ticking "À verser" then pays it in (it becomes a règlement in TRegCli).
 const storedStatus = (piece) => ({ a_verser: false, en_instance: piece.regle !== 'O', compte_versement: '' });
 
+// Several cheques scanned at once: the state of each one in the strip.
+const BATCH_STATES = { attente: 'En attente', lecture: 'Lecture…', lu: 'À vérifier', erreur: 'Illisible', ajoute: 'Enregistré' };
+
 // Unpaid quittances paid by an imported document: amount per quittance.
 function importedAlloc(list, request) {
   const parts = spreadImported(list, request, (row) => Number(row.solde) - Number(row.instance));
@@ -43,6 +46,13 @@ export default function ChequeModal({ onClose }) {
   const [list, setList] = useState(null);
   const [importFile, setImportFile] = useState(null); // the document being read in the import window
   const pendingImport = useRef(null); // quittances read from a document, spread once the client is loaded
+  // Several cheques scanned at once: { items: [{ id, file, name, status, values, found, error }], current }. They are read one
+  // after the other; the current one fills the form, and once it is added the next one is loaded.
+  const [batch, setBatchState] = useState(null);
+  const batchRef = useRef(null);
+  const scanning = useRef(false);
+  const appliedId = useRef(null);
+  const fillRef = useRef(null);
   const [nameQuery, setNameQuery] = useState(null); // text typed in "Nom client", null while it shows the loaded client
   const [allClients, setAllClients] = useState(null); // loaded the first time a name is typed
 
@@ -199,12 +209,15 @@ export default function ChequeModal({ onClose }) {
       if (action === 'create') result = await createPiece(accessToken, payload());
       if (action === 'update') result = await updatePiece(accessToken, form.nump.trim(), payload());
       if (action === 'delete') await deletePiece(accessToken, form.nump.trim(), client.code_client);
-      setForm(blankForm());
+      // The statut of a batch of cheques is kept for the next one.
+      setForm((current) => (batchRef.current && action === 'create' ? { ...blankForm(), a_verser: current.a_verser, en_instance: current.en_instance, compte_versement: current.compte_versement } : blankForm()));
       setAlloc({});
       setEditing(false);
       await loadClient(client.code_client);
       // "À verser": the piece was recorded as a client règlement (TRegCli) and the quittances it pays are settled.
-      setNotice(result?.num_reg_cli ? `Pièce versée : règlement n° ${result.num_reg_cli} enregistré, quittances réglées.` : doneMessage);
+      const done = result?.num_reg_cli ? `Pièce versée : règlement n° ${result.num_reg_cli} enregistré, quittances réglées.` : doneMessage;
+      setNotice(done);
+      if (action === 'create' && batchRef.current && !advanceBatch()) setNotice(`${done} Tous les chèques scannés sont enregistrés.`);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -244,15 +257,107 @@ export default function ChequeModal({ onClose }) {
   }
 
   function chooseImport(event) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if (file) { setError(''); setNotice(''); setImportFile(file); }
+    if (!files.length) return;
+    setError(''); setNotice('');
+    // One document: the import window; several (or more while a batch is open): the cheques are scanned one by one.
+    if (files.length === 1 && !batchRef.current) setImportFile(files[0]);
+    else addToBatch(files);
   }
+
+  function commitBatch(next) {
+    batchRef.current = next;
+    setBatchState(next);
+  }
+
+  function updateBatchItem(id, patch) {
+    const current = batchRef.current;
+    if (!current) return;
+    commitBatch({ ...current, items: current.items.map((item) => (item.id === id ? { ...item, ...patch } : item)) });
+  }
+
+  function addToBatch(files) {
+    const current = batchRef.current || { items: [], current: 0 };
+    const start = Date.now();
+    const items = files.map((file, index) => ({ id: `${start}-${index}-${file.name}`, file, name: file.name, status: 'attente' }));
+    const open = current.items.some((item) => item.status !== 'ajoute');
+    commitBatch({ items: [...current.items, ...items], current: open ? current.current : current.items.length });
+    readBatch();
+  }
+
+  // The cheques are read one after the other (the OCR server and the browser read one document at a time).
+  async function readBatch() {
+    if (scanning.current) return;
+    scanning.current = true;
+    try {
+      for (;;) {
+        const next = batchRef.current?.items.find((item) => item.status === 'attente');
+        if (!next) break;
+        updateBatchItem(next.id, { status: 'lecture' });
+        try {
+          const { values, found } = await scanPayment(next.file, { accessToken, banks });
+          updateBatchItem(next.id, { status: found.length ? 'lu' : 'erreur', values, found, error: found.length ? '' : 'Aucune information lisible.' });
+        } catch (scanError) {
+          updateBatchItem(next.id, { status: 'erreur', error: scanError.message });
+        }
+      }
+    } finally {
+      scanning.current = false;
+    }
+  }
+
+  // The cheque shown in the form; an unreadable one starts an empty piece to type by hand.
+  function showBatchItem(index) {
+    const current = batchRef.current;
+    if (!current || !current.items[index] || current.items[index].status === 'ajoute') return;
+    appliedId.current = null;
+    commitBatch({ ...current, current: index });
+  }
+
+  // After "Ajouter": the cheque is recorded, the next one waiting is loaded.
+  function advanceBatch() {
+    const current = batchRef.current;
+    if (!current) return false;
+    const items = current.items.map((item, index) => (index === current.current ? { ...item, status: 'ajoute' } : item));
+    const after = items.findIndex((item, index) => index > current.current && item.status !== 'ajoute');
+    const next = after >= 0 ? after : items.findIndex((item) => item.status !== 'ajoute');
+    commitBatch({ items, current: next >= 0 ? next : current.current });
+    return next >= 0;
+  }
+
+  function closeBatch() {
+    const left = batchRef.current?.items.filter((item) => item.status !== 'ajoute').length || 0;
+    if (left && !window.confirm(`${left} chèque(s) scanné(s) ne sont pas encore enregistrés. Fermer la liste ?`)) return;
+    appliedId.current = null;
+    commitBatch(null);
+  }
+
+  // The current cheque of the batch fills the form once it is read.
+  fillRef.current = (item) => {
+    setForm((current) => ({ ...blankForm(), a_verser: current.a_verser, en_instance: current.en_instance, compte_versement: current.compte_versement }));
+    setAlloc({});
+    setEditing(false);
+    const position = `${batchRef.current.current + 1} / ${batchRef.current.items.length}`;
+    if (item.status === 'erreur') { setNotice(`Chèque ${position} illisible (${item.error}) : saisissez-le à la main.`); return; }
+    fillFromScan(item.values, true);
+    setNotice(`Chèque ${position} chargé : vérifiez puis cliquez « Ajouter ».`);
+  };
+  useEffect(() => {
+    const item = batch?.items[batch.current];
+    if (!item || !['lu', 'erreur'].includes(item.status) || appliedId.current === item.id) return;
+    appliedId.current = item.id;
+    fillRef.current(item);
+  }, [batch]);
 
   // Once the import window has read the cheque / traite / bordereau: the piece and its quittances are filled.
   function applyImport({ values, found }) {
     setImportFile(null);
     if (!found.length) { setNotice('Aucune information lisible : renseignez les champs à la main.'); return; }
+    fillFromScan(values);
+  }
+
+  function fillFromScan(values, fresh = false) {
     setForm((current) => ({
       ...current,
       typep: TYPE_CODES[values.typeReglement] || current.typep,
@@ -264,7 +369,7 @@ export default function ChequeModal({ onClose }) {
       en_instance: values.enInstance ?? current.en_instance,
     }));
     setEditing(false);
-    const request = { numbers: values.quittances, montant: values.montant || form.montant };
+    const request = { numbers: values.quittances, montant: values.montant || (fresh ? 0 : form.montant) };
     // A new client code reloads the client: its unpaid quittances are paid once they are loaded.
     if (values.code && values.code !== code.trim()) pendingImport.current = request;
     else if (client) setAlloc(importedAlloc(quittances, request));
@@ -285,10 +390,12 @@ export default function ChequeModal({ onClose }) {
           <button type="button" className="chq-tool" disabled={busy || !editing} onClick={removePiece}>Supprimer</button>
           <button type="button" className="chq-tool" disabled={busy} onClick={openList}>Lister</button>
           <span className="chq-spacer" />
-          <input ref={importInput} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" hidden onChange={chooseImport} />
-          <button type="button" className="chq-import" disabled={busy} onClick={() => importInput.current?.click()} title="Scanner une image ou un PDF pour remplir le formulaire">Importer</button>
+          <input ref={importInput} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" multiple hidden onChange={chooseImport} />
+          <button type="button" className="chq-import" disabled={busy} onClick={() => importInput.current?.click()} title="Scanner un ou plusieurs chèques (images ou PDF) : ils remplissent le formulaire un par un">{batch ? 'Ajouter des chèques' : 'Importer'}</button>
           <button type="button" className="chq-tool" onClick={onClose}>Fermer</button>
         </div>
+
+        {batch && <BatchStrip batch={batch} onShow={showBatchItem} onClose={closeBatch} />}
 
         <div className="chq-body">
           <fieldset className="chq-group">
@@ -439,5 +546,44 @@ export default function ChequeModal({ onClose }) {
       )}
       {importFile && <DocumentImportDialog file={importFile} kicker="RECOUVREMENT · PIÈCES · IMPORT" title="Importer une pièce (chèque, traite, bordereau)" read={(onProgress) => scanPayment(importFile, { accessToken, banks, onProgress })} summarize={({ found }) => ({ rows: found.map((item) => [item.label, item.value]), empty: "Aucune information lisible : renseignez les champs à la main." })} applyLabel="Appliquer à la pièce" onApply={applyImport} onClose={() => setImportFile(null)} />}
     </div>
+  );
+}
+
+// The cheques scanned at once: one button per cheque (number, amount, state); the current one is in the form.
+function BatchStrip({ batch, onShow, onClose }) {
+  const { items, current } = batch;
+  const saved = items.filter((item) => item.status === 'ajoute').length;
+  const reading = items.findIndex((item) => item.status === 'lecture');
+  const item = items[current];
+  const nextOpen = (step) => {
+    for (let index = current + step; index >= 0 && index < items.length; index += step) if (items[index].status !== 'ajoute') return index;
+    return -1;
+  };
+  const previous = nextOpen(-1);
+  const following = nextOpen(1);
+  return (
+    <section className="chq-batch" aria-label="Chèques scannés">
+      <div className="chq-batch-head">
+        <strong>Chèques scannés · {saved} / {items.length} enregistré{saved > 1 ? 's' : ''}</strong>
+        {reading >= 0 && <span className="chq-batch-reading">Lecture du chèque {reading + 1} sur {items.length}…</span>}
+        <span className="chq-spacer" />
+        <button type="button" className="chq-tool" disabled={previous < 0} onClick={() => onShow(previous)}>‹ Précédent</button>
+        <button type="button" className="chq-tool" disabled={following < 0} onClick={() => onShow(following)}>Suivant ›</button>
+        <button type="button" className="chq-tool" onClick={onClose}>{saved === items.length ? 'Terminer' : 'Fermer la liste'}</button>
+      </div>
+      <ol className="chq-batch-list">
+        {items.map((entry, index) => (
+          <li key={entry.id}>
+            <button type="button" className={`chq-batch-item is-${entry.status}${index === current ? ' is-current' : ''}`} disabled={entry.status === 'ajoute'} onClick={() => onShow(index)} aria-current={index === current ? 'true' : undefined} title={entry.name}>
+              <b>{index + 1}</b>
+              <span>{entry.values?.nump || entry.name}</span>
+              <small>{entry.values?.montant && entry.status !== 'erreur' ? `${money(entry.values.montant)} · ${BATCH_STATES[entry.status]}` : BATCH_STATES[entry.status]}</small>
+            </button>
+          </li>
+        ))}
+      </ol>
+      {item?.status === 'lu' && <p className="chq-batch-found"><b>Lu sur le chèque {current + 1} :</b> {item.found.map((field) => `${field.label} ${field.value}`).join(' · ')}</p>}
+      {item && ['attente', 'lecture'].includes(item.status) && <p className="chq-batch-found">Chèque {current + 1} en cours de lecture : le formulaire se remplit dès qu’il est lu.</p>}
+    </section>
   );
 }

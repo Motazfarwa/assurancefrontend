@@ -14,6 +14,7 @@ export const INSURANCE_MODULES = [
   { id: '110', category: 'production', title: 'Gestion des polices', description: 'Consulter et administrer les contrats.', permission: P.POLICIES_VIEW_ALL, form: 'policy' },
   { id: '120', category: 'production', title: 'Gestion des quittances', description: 'Consulter les quittances de tous les clients par client, police, compagnie, echeance ou date de saisie, et les modifier.', permission: P.POLICIES_VIEW_ALL, form: 'quittances' },
   { id: '130', category: 'production', title: 'Operations journalieres (production)', description: 'Polices ou quittances ajoutees, modifiees ou supprimees entre deux dates (production).', permission: P.REPORTS_VIEW, form: 'operations-journalieres' },
+  { id: '150', category: 'production', title: 'Journal du jour', description: 'Mes taches du jour, validees et envoyees a l administrateur sur WhatsApp. Administrateur : le suivi de chaque employe.', permission: P.REPORTS_VIEW, everyone: true, form: 'journal-jour' },
 
   { id: '530', category: 'production', title: 'Reception terme', description: 'Importer le bordereau terme (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-reception' },
   { id: '535', category: 'production', title: 'Reception comptant', description: 'Importer le bordereau comptant (Excel) recu du siege de la compagnie.', permission: P.REPORTS_VIEW, form: 'bordereau-comptant' },

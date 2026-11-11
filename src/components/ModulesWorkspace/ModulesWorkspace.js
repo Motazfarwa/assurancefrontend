@@ -26,6 +26,7 @@ import EtatPercusModal from '../JournalModal/EtatPercus';
 import EtatComptesClientsModal from '../JournalModal/EtatComptesClients';
 import EtatDepensesTechniquesModal from '../JournalModal/EtatDepensesTechniques';
 import ClientsIncompletsModal from '../ClientsIncompletsModal/ClientsIncompletsModal';
+import JournalJourModal from '../JournalJourModal/JournalJourModal';
 import RetourQuittancesModal from '../JournalModal/RetourQuittances';
 import EtatTermeModal from '../JournalModal/EtatTerme';
 import EtatComptesBanqueModal from '../JournalModal/EtatComptesBanque';
@@ -81,6 +82,7 @@ export default function ModulesWorkspace() {
   const [bankModule, setBankModule] = useState(null);
   const [depensesTechModule, setDepensesTechModule] = useState(null);
   const [incompleteModule, setIncompleteModule] = useState(null);
+  const [journalJourModule, setJournalJourModule] = useState(null);
   const [reconciliationModule, setReconciliationModule] = useState(null);
   const [quittancesModule, setQuittancesModule] = useState(null);
   const [ristourneModule, setRistourneModule] = useState(null);
@@ -94,8 +96,9 @@ export default function ModulesWorkspace() {
     getMyModules(accessToken).then(setAllowedModules).catch(() => setAllowedModules(null));
   }, [accessToken, user.isAdmin]);
   const visibleModules = useMemo(
-    () => INSURANCE_MODULES.filter((module) => (!module.adminOnly || user.isAdmin) && (!user.role || hasPermission(user, module.permission))
-      && (user.isAdmin || !allowedModules || allowedModules.includes(module.id))),
+    // "everyone": a module of every user (the daily journal), whatever their role and the modules allowed to them.
+    () => INSURANCE_MODULES.filter((module) => (!module.adminOnly || user.isAdmin) && (module.everyone || ((!user.role || hasPermission(user, module.permission))
+      && (user.isAdmin || !allowedModules || allowedModules.includes(module.id))))),
     [user, allowedModules],
   );
   // A category without any module yet (e.g. Comptabilite) stays listed; otherwise it needs a module the user may open.
@@ -178,6 +181,11 @@ export default function ModulesWorkspace() {
     }
     if (module.form === 'etat-comptes-banque') {
       setBankModule(module);
+      return;
+    }
+    if (module.form === 'journal-jour') {
+      setActiveModuleId(module.id);
+      setJournalJourModule(module);
       return;
     }
     if (module.form === 'clients-incomplets') {
@@ -353,6 +361,7 @@ export default function ModulesWorkspace() {
       {retourModule && <RetourQuittancesModal moduleId={retourModule.id} onClose={() => setRetourModule(null)} />}
       {termeModule && <EtatTermeModal moduleId={termeModule.id} onClose={() => setTermeModule(null)} />}
       {bankModule && <EtatComptesBanqueModal moduleId={bankModule.id} onClose={() => setBankModule(null)} />}
+      {journalJourModule && <JournalJourModal moduleId={journalJourModule.id} onClose={() => { setJournalJourModule(null); setActiveModuleId(null); }} />}
       {incompleteModule && user.isAdmin && <ClientsIncompletsModal moduleId={incompleteModule.id} onClose={() => { setIncompleteModule(null); setActiveModuleId(null); }} />}
       {depensesTechModule && <EtatDepensesTechniquesModal moduleId={depensesTechModule.id} onClose={() => { setDepensesTechModule(null); setActiveModuleId(null); }} />}
       {reconciliationModule && <ReconciliationPoliceModal moduleId={reconciliationModule.id} onClose={() => setReconciliationModule(null)} />}
