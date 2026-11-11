@@ -58,14 +58,12 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
     </div>
     {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
     <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table jrn-period-table">
-      <thead><tr><th>Journal</th><th className="cqi-number">Lignes</th><th className="cqi-number">Déjà {kind === 'depense' ? 'comptabilisé' : 'déclaré'}</th><th className="cqi-number">À {kind === 'depense' ? 'comptabiliser' : 'déclarer'}</th><th className="cqi-number">Total montant</th><th>État</th><th /></tr></thead>
+      <thead><tr><th>Journal</th><th className="cqi-number">Lignes</th><th className="cqi-number">Total montant</th><th>État</th><th /></tr></thead>
       <tbody>{state.items.map((item) => {
         const open = Number(item.a_declarer) > 0;
         return <tr key={item.jour} className={open ? 'is-open' : ''}>
           <td><button type="button" className="jrn-period-name" onClick={() => onOpen(item.jour)}>{names.title} du {formatDate(item.jour)}</button><small>du {shortDate(item.debut)} au {shortDate(item.jour)}</small></td>
           <td className="cqi-number">{item.lignes}</td>
-          <td className="cqi-number">{fmt(item.montant_declare)}<small>{plural(item.declarees, names.what, names.whats)}</small></td>
-          <td className="cqi-number">{open ? <>{fmt(item.montant_a_declarer)}<small>{plural(item.a_declarer, names.what, names.whats)}</small></> : '—'}</td>
           <td className="cqi-number"><b>{fmt(item.montant)}</b></td>
           <td>{item.validation ? <span className="jrn-period-state is-done">Validé le {stamp(item.validation.date_saisie)}{item.validation.utilisateur ? ` par ${item.validation.utilisateur}` : ''}</span>
             : open ? <span className="jrn-period-state">À valider</span> : <span className="jrn-period-state is-done">À jour</span>}</td>
