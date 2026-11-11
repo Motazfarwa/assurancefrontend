@@ -34,11 +34,18 @@ test('an employee writes the day, adds a software action as a task, validates an
   render(<JournalJourModal moduleId="150" onClose={() => {}} />);
   fireEvent.change(await screen.findByLabelText('Tâche 1'), { target: { value: 'Relance du client 4914' } });
   fireEvent.click(screen.getAllByRole('button', { name: 'En cours' })[0]);
+  // each task: the day (calendar) and the time it was done
+  expect(screen.getByLabelText('Date de la tâche 1')).toHaveValue(localDay());
+  fireEvent.change(screen.getByLabelText('Heure de la tâche 1'), { target: { value: '09:45' } });
   fireEvent.click(screen.getByRole('button', { name: '+ Tâche' }));
   fireEvent.click(screen.getByRole('button', { name: 'Soumettre' }));
   await waitFor(() => expect(validateMyJournal).toHaveBeenCalledWith('t', {
-    date_jour: localDay(), remarques: '', demain: '', demandes: [],
-    taches: [{ texte: 'Relance du client 4914', statut: 'en_cours' }, { texte: 'Ajout Quittance N° 341175', statut: 'fait' }],
+    date_jour: localDay(), remarques: '', demain: '',
+    taches: [
+      { texte: 'Relance du client 4914', statut: 'en_cours', date: localDay(), heure: '09:45' },
+      // taken from the activity: the time of that action
+      { texte: 'Ajout Quittance N° 341175', statut: 'fait', date: localDay(), heure: '10:12' },
+    ],
   }));
   expect(await screen.findByText('Rapport envoyé par email à l’administrateur (farwamotez@gmail.com).')).toBeInTheDocument();
   expect(screen.getByText(/^Soumis le/)).toBeInTheDocument();
@@ -64,18 +71,12 @@ test('the administrator follows every employee of the day', async () => {
   expect(screen.getByRole('button', { name: 'Marquer vu' })).toBeInTheDocument();
 });
 
-test('an employee notes a client request: received by phone / email / WhatsApp, the request, an observation', async () => {
+test('the employee view has no client requests block to fill in', async () => {
   mockUser = { name: 'Sami', isAdmin: false };
   render(<JournalJourModal moduleId="150" onClose={() => {}} />);
-  const block = await screen.findByRole('region', { name: 'Demandes clients' });
-  fireEvent.click(within(block).getByLabelText('Téléphone'));
-  fireEvent.click(within(block).getByLabelText('WhatsApp'));
-  fireEvent.change(within(block).getByLabelText('Demande du client'), { target: { value: 'Attestation d’assurance' } });
-  fireEvent.change(within(block).getByLabelText('Observation'), { target: { value: 'Envoyée par email' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Soumettre' }));
-  await waitFor(() => expect(validateMyJournal).toHaveBeenCalledWith('t', expect.objectContaining({
-    taches: [], demandes: [{ canaux: ['telephone', 'whatsapp'], demande: 'Attestation d’assurance', observation: 'Envoyée par email' }],
-  })));
+  await screen.findByLabelText('Tâche 1');
+  expect(screen.queryByRole('region', { name: 'Demandes clients' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Demande du client')).not.toBeInTheDocument();
 });
 
 test('an employee sees the requests assigned to them and marks one as handled', async () => {

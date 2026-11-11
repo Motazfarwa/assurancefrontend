@@ -168,3 +168,15 @@
 }
 .jdj-request-log li { position: relative; padding-right: 42px; }
 .jdj-request-log li .jdj-remove { position: absolute; top: 6px; right: 6px; }
+
+/* Each task: the day and time it was done */
+.jdj-tasks li { grid-template-columns: 22px minmax(0, 1fr) 136px 112px auto 30px; }
+.jdj-tasks .jdj-task-date, .jdj-tasks .jdj-task-time { padding: 0 8px; color: #233c4b; font-size: 12.5px; }
+.jdj-read-text { flex: 1; }
+.jdj-when { flex: none; color: #7c8f96; font-size: 11px; font-weight: 600; white-space: nowrap; }
+@media (max-width: 1000px) {
+  .jdj-tasks li { grid-template-columns: 22px minmax(0, 1fr) 30px; }
+  .jdj-tasks li .jdj-task-date { grid-column: 2; }
+  .jdj-tasks li .jdj-task-time, .jdj-tasks li .jdj-states { grid-column: 2; justify-self: start; }
+  .jdj-tasks li .jdj-remove { grid-row: 1; grid-column: 3; }
+}

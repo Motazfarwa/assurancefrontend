@@ -14,12 +14,13 @@ export const localDay = (date = new Date()) => date.toLocaleDateString('sv-SE');
 const frDay = (iso) => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '');
 const frTime = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)} à ${iso.slice(11, 16)}` : '');
 const shiftDay = (iso, days) => { const date = new Date(`${iso}T12:00:00`); date.setDate(date.getDate() + days); return localDay(date); };
-const blankTask = () => ({ texte: '', statut: 'fait' });
+const nowTime = () => new Date().toTimeString().slice(0, 5); // HH:MM, agency time
+// A task: what was done, its state, and the day and time it was done (the journal's day and the current time by default).
+const blankTask = (day = localDay(), heure = nowTime()) => ({ texte: '', statut: 'fait', date: day, heure });
+const taskWhen = (task) => [task.date ? `${task.date.slice(8, 10)}/${task.date.slice(5, 7)}` : '', task.heure || ''].filter(Boolean).join(' à ');
 // How a client request came in.
 export const CHANNELS = [['telephone', 'Téléphone'], ['email', 'Email'], ['whatsapp', 'WhatsApp']];
 const channelsText = (canaux) => CHANNELS.filter(([value]) => (canaux || []).includes(value)).map(([, label]) => label).join(', ');
-const blankRequest = () => ({ canaux: [], demande: '', observation: '' });
-const written = (item) => item.demande.trim() || item.observation.trim();
 const toggleIn = (list, value) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
 
 // "Reçue par": téléphone, email, WhatsApp (checkboxes).
@@ -90,7 +91,7 @@ function Activity({ activite, onPick }) {
     {onPick && activite.dernieres.length > 0 && <ul>
       {activite.dernieres.map((item, index) => <li key={`${item.design}-${index}`}>
         <span><small>{item.heure}</small> {item.design}</span>
-        <button type="button" onClick={() => onPick(item.design)} title="Ajouter cette action à mes tâches">+ Tâche</button>
+        <button type="button" onClick={() => onPick(item.design, item.heure)} title="Ajouter cette action à mes tâches">+ Tâche</button>
       </li>)}
     </ul>}
   </div>;
@@ -98,7 +99,8 @@ function Activity({ activite, onPick }) {
 
 function TaskList({ taches }) {
   if (!taches.length) return <p className="jdj-muted">Aucune tâche saisie.</p>;
-  return <ul className="jdj-read-tasks">{taches.map((task, index) => <li key={index}><span className={`jdj-state is-${task.statut}`}>{stateLabel(task.statut)}</span>{task.texte}</li>)}</ul>;
+  return <ul className="jdj-read-tasks">{taches.map((task, index) => <li key={index}><span className={`jdj-state is-${task.statut}`}>{stateLabel(task.statut)}</span>
+    <span className="jdj-read-text">{task.texte}</span>{taskWhen(task) && <small className="jdj-when">{taskWhen(task)}</small>}</li>)}</ul>;
 }
 
 // The email to the administrator, sent by the server when the day is submitted.
@@ -123,7 +125,7 @@ function MyDay() {
   const { accessToken } = useAuth();
   const [day, setDay] = useState(localDay());
   const [data, setData] = useState(null);
-  const [draft, setDraft] = useState({ taches: [blankTask()], demandes: [blankRequest()], remarques: '', demain: '' });
+  const [draft, setDraft] = useState({ taches: [blankTask(day)], remarques: '', demain: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -134,7 +136,7 @@ function MyDay() {
       const result = await getMyJournal(accessToken, day);
       setData(result);
       const { journal } = result;
-      setDraft({ taches: journal.taches.length ? journal.taches : [blankTask()], demandes: journal.demandes?.length ? journal.demandes : [blankRequest()], remarques: journal.remarques, demain: journal.demain });
+      setDraft({ taches: journal.taches.length ? journal.taches.map((task) => ({ ...task, date: task.date || day, heure: task.heure || '' })) : [blankTask(day)], remarques: journal.remarques, demain: journal.demain });
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -144,26 +146,22 @@ function MyDay() {
   const locked = data?.journal.statut === 'valide';
   const setTask = (index, patch) => setDraft((current) => ({ ...current, taches: current.taches.map((task, at) => (at === index ? { ...task, ...patch } : task)) }));
   // A new empty line (once the last one is written), or a task taken from the activity in place of the empty lines.
-  const addTask = (texte = '', statut = 'fait') => setDraft((current) => {
+  // A task taken from the activity keeps the time of that action.
+  const addTask = (texte = '', statut = 'fait', heure = nowTime()) => setDraft((current) => {
     const written = current.taches.filter((task) => task.texte.trim());
-    if (texte) return { ...current, taches: [...written, { texte, statut }] };
-    return written.length === current.taches.length ? { ...current, taches: [...current.taches, blankTask()] } : current;
+    if (texte) return { ...current, taches: [...written, { ...blankTask(day, heure), texte, statut }] };
+    return written.length === current.taches.length ? { ...current, taches: [...current.taches, blankTask(day)] } : current;
   });
-  const removeTask = (index) => setDraft((current) => ({ ...current, taches: current.taches.length > 1 ? current.taches.filter((_, at) => at !== index) : [blankTask()] }));
-  const setRequest = (index, patch) => setDraft((current) => ({ ...current, demandes: current.demandes.map((item, at) => (at === index ? { ...item, ...patch } : item)) }));
-  const addRequest = () => setDraft((current) => ({ ...current, demandes: [...current.demandes, blankRequest()] }));
-  const removeRequest = (index) => setDraft((current) => ({ ...current, demandes: current.demandes.length > 1 ? current.demandes.filter((_, at) => at !== index) : [blankRequest()] }));
+  const removeTask = (index) => setDraft((current) => ({ ...current, taches: current.taches.length > 1 ? current.taches.filter((_, at) => at !== index) : [blankTask(day)] }));
   const body = () => ({
     date_jour: day,
-    taches: draft.taches.filter((task) => task.texte.trim()).map((task) => ({ texte: task.texte.trim().slice(0, 300), statut: task.statut })),
-    demandes: draft.demandes.filter(written).map((item) => ({ canaux: item.canaux, demande: item.demande.trim(), observation: item.observation.trim() })),
+    taches: draft.taches.filter((task) => task.texte.trim()).map((task) => ({ texte: task.texte.trim().slice(0, 300), statut: task.statut, date: task.date || null, heure: task.heure || null })),
     remarques: draft.remarques, demain: draft.demain,
   });
 
   async function submit(validate) {
     const current = body();
-    if (current.demandes.some((item) => !item.demande)) { setError('Écrivez la demande du client (l’observation seule ne suffit pas).'); return; }
-    if (validate && !current.taches.length && !current.demandes.length) { setError('Ajoutez au moins une tâche ou une demande client avant de soumettre la journée.'); return; }
+    if (validate && !current.taches.length) { setError('Ajoutez au moins une tâche avant de soumettre la journée.'); return; }
     if (validate && !window.confirm('Soumettre la journée ? Le journal ne pourra plus être modifié et le rapport est envoyé à l’administrateur (email).')) return;
     setBusy(true); setError(''); setNotice('');
     try {
@@ -190,7 +188,6 @@ function MyDay() {
         <AssignedRequests />
         {locked ? <>
           <section className="jdj-card"><h3>Mes tâches</h3><TaskList taches={data.journal.taches} /></section>
-          {data.journal.demandes?.length > 0 && <section className="jdj-card"><h3>Demandes clients</h3><RequestList demandes={data.journal.demandes} /></section>}
           {data.journal.remarques && <section className="jdj-card"><h3>Remarques</h3><p className="jdj-text">{data.journal.remarques}</p></section>}
           {data.journal.demain && <section className="jdj-card"><h3>Prévu ensuite</h3><p className="jdj-text">{data.journal.demain}</p></section>}
           <section className="jdj-card"><h3>Rapport envoyé à l’administrateur</h3><pre className="jdj-report">{data.rapport}</pre><EmailStatus email={data.email} journal={data.journal} /><WhatsappStatus whatsapp={data.whatsapp} journal={data.journal} /></section>
@@ -204,6 +201,8 @@ function MyDay() {
                   onChange={(event) => setTask(index, { texte: event.target.value })}
                   onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); if (task.texte.trim()) addTask(); } }}
                 />
+                <input type="date" className="jdj-task-date" value={task.date || ''} max={localDay()} aria-label={`Date de la tâche ${index + 1}`} onChange={(event) => setTask(index, { date: event.target.value })} />
+                <input type="time" className="jdj-task-time" value={task.heure || ''} aria-label={`Heure de la tâche ${index + 1}`} onChange={(event) => setTask(index, { heure: event.target.value })} />
                 <div className="jdj-states" role="group" aria-label={`État de la tâche ${index + 1}`}>
                   {STATES.map(([value, label]) => <button type="button" key={value} className={`is-${value}${task.statut === value ? ' is-on' : ''}`} aria-pressed={task.statut === value} onClick={() => setTask(index, { statut: value })}>{label}</button>)}
                 </div>
@@ -212,31 +211,13 @@ function MyDay() {
             </ol>
             <button type="button" className="jdj-add" onClick={() => addTask()}>+ Ajouter une tâche</button>
           </section>
-          <section className="jdj-card" aria-label="Demandes clients">
-            <h3>Demandes clients</h3>
-            <div className="jdj-requests">
-              {draft.demandes.map((item, index) => <div className="jdj-request" key={index}>
-                <div className="jdj-request-top">
-                  <ChannelBoxes value={item.canaux} onChange={(canaux) => setRequest(index, { canaux })} />
-                  <button type="button" className="jdj-remove" onClick={() => removeRequest(index)} aria-label={`Retirer la demande ${index + 1}`}>×</button>
-                </div>
-                <label className="jdj-field"><span>Demande du client</span>
-                  <input value={item.demande} maxLength={500} onChange={(event) => setRequest(index, { demande: event.target.value })} placeholder="Ex : attestation d’assurance, changement d’adresse, devis…" />
-                </label>
-                <label className="jdj-field"><span>Observation</span>
-                  <textarea rows={2} maxLength={1500} value={item.observation} onChange={(event) => setRequest(index, { observation: event.target.value })} placeholder="Suite donnée, à rappeler, information pour l’administrateur…" />
-                </label>
-              </div>)}
-            </div>
-            <button type="button" className="jdj-add" onClick={addRequest}>+ Ajouter une demande</button>
-          </section>
           <section className="jdj-card jdj-notes">
             <label><span>Remarques, difficultés</span><textarea rows={3} maxLength={1500} value={draft.remarques} onChange={(event) => setDraft({ ...draft, remarques: event.target.value })} placeholder="Problème rencontré, client à rappeler, information pour l’administrateur…" /></label>
             <label><span>Prévu ensuite</span><textarea rows={2} maxLength={1000} value={draft.demain} onChange={(event) => setDraft({ ...draft, demain: event.target.value })} placeholder="Ce qui reste à faire demain" /></label>
           </section>
         </>}
       </div>
-      <aside className="jdj-side"><Activity activite={data.activite} onPick={locked ? null : (design) => addTask(design, 'fait')} /></aside>
+      <aside className="jdj-side"><Activity activite={data.activite} onPick={locked ? null : (design, heure) => addTask(design, 'fait', heure || nowTime())} /></aside>
     </div>}
     {data && !locked && <footer className="jdj-actions">
       <button type="button" className="jdj-btn" disabled={busy} onClick={() => submit(false)}>Enregistrer le brouillon</button>
