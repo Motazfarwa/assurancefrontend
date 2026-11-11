@@ -100,10 +100,17 @@ function SinistreNumberPicker({ accessToken, value, ignored, missing, onChange, 
   useEffect(() => {
     if (!menu.open) return undefined;
     const measure = () => {
-      const box = inputRef.current?.getBoundingClientRect();
+      const input = inputRef.current;
+      const box = input?.getBoundingClientRect();
       if (!box) return;
-      const width = Math.min(Math.max(box.width, 440), window.innerWidth - 24);
-      setPlace({ top: box.bottom + 3, left: Math.max(12, Math.min(box.left, window.innerWidth - width - 12)), width, maxHeight: Math.max(160, Math.min(320, window.innerHeight - box.bottom - 60)) });
+      // The application zoom (CSS zoom on the page, "ZoomControl"): the field is measured on screen, but the menu's
+      // top / left / width are zoomed again; they are given in unzoomed pixels so the menu sits right under the field.
+      const zoom = input.currentCSSZoom || parseFloat(document.documentElement.style.zoom) || 1;
+      const screenWidth = window.innerWidth;
+      const width = Math.min(Math.max(box.width, 440 * zoom), screenWidth - 24);
+      const left = Math.max(12, Math.min(box.left, screenWidth - width - 12));
+      const maxHeight = Math.max(160 * zoom, Math.min(320 * zoom, window.innerHeight - box.bottom - 60));
+      setPlace({ top: (box.bottom + 3) / zoom, left: left / zoom, width: width / zoom, maxHeight: maxHeight / zoom });
     };
     measure();
     window.addEventListener('resize', measure);
@@ -251,6 +258,10 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   const [proposed, setProposed] = useState('');
   const autoNumber = useRef(''); // the proposed number written in "N° sinistre" of a new claim (not typed by the user)
   const [dirty, setDirty] = useState(false);
+  // A stored claim opens locked: "Modifier" opens its fields, "Enregistrer" stores them, "Annuler" puts it back.
+  const [editing, setEditing] = useState(false);
+  const locked = Boolean(current) && !editing;
+  useEffect(() => { setEditing(false); }, [current]);
   const [tried, setTried] = useState(false); // a save was attempted: required fields are highlighted
   const [busy, setBusy] = useState(false);
   const [importFile, setImportFile] = useState(null); // the constat / déclaration being read in the import window
@@ -570,7 +581,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         return numero;
       }
       const record = await getSinistre(accessToken, numero);
-      setForm(await completed(toForm(record))); setCurrent(numero); setDirty(false); setTried(false);
+      setForm(await completed(toForm(record))); setCurrent(numero); setDirty(false); setTried(false); setEditing(false);
       return numero;
     } catch (requestError) {
       fail(requestError.message);
@@ -593,13 +604,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   // Ctrl+S saves, Échap closes the list.
   useEffect(() => {
     const onKey = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!busy && !scanning && !payDraft) save({ reset: !current }); }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!busy && !scanning && !payDraft && !locked) save({ reset: !current }); }
       if (event.key === 'Escape' && payDraft) setPayDraft(null);
       else if (event.key === 'Escape' && list) setList(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [busy, scanning, save, list, payDraft, current]);
+  }, [busy, scanning, save, list, payDraft, current, locked]);
 
   // Agency accounts (TBanque), loaded with the screen: the settlement popup proposes the claim company's account.
   useEffect(() => {
@@ -648,7 +659,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     <label className={`snr-span-${span}${missing(name) ? ' is-missing' : ''}${search ? ' snr-search' : ''}`}>
       <span>{label}{required && <i> *</i>}</span>
       <input
-        type={type} value={form[name]} maxLength={maxLength} onBlur={onBlur} placeholder={placeholder} list={list}
+        type={type} value={form[name]} maxLength={maxLength} onBlur={onBlur} placeholder={placeholder} list={list} readOnly={locked && !search}
         onKeyDown={onBlur ? (event) => { if (event.key === 'Enter') { event.preventDefault(); onBlur(); } } : undefined}
         step={type === 'number' ? 'any' : undefined} min={type === 'number' ? '0' : undefined} max={type === 'datetime-local' ? `${today()}T23:59` : undefined}
         onChange={(event) => {
@@ -664,7 +675,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     return (
       <label className={`snr-span-${span}`}>
         <span>{label}</span>
-        <select value={form[name]} onChange={(event) => change({ [name]: event.target.value })}>
+        <select value={form[name]} disabled={locked} onChange={(event) => change({ [name]: event.target.value })}>
           <option value={none}>{noneLabel}</option>
           {!known && form[name] !== '' && <option value={form[name]}>{form[name]}</option>}
           {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
@@ -699,7 +710,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <div><span>SINISTRES · MODULE {moduleId}</span><h2 id="snr-title">{mode === 'new' ? 'Déclarer un sinistre' : 'Gestion des sinistres'}</h2></div>
           <div className="snr-header-actions">
             <input ref={fileInput} type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" hidden onChange={chooseImport} />
-            <button type="button" className="snr-import" onClick={() => fileInput.current?.click()} disabled={scanning || busy} title="Scanner un constat amiable ou une déclaration (image ou PDF) pour remplir le dossier">
+            <button type="button" className="snr-import" onClick={() => fileInput.current?.click()} disabled={scanning || busy || locked} title="Scanner un constat amiable ou une déclaration (image ou PDF) pour remplir le dossier">
               Importer
             </button>
             <button type="button" className="snr-close" onClick={close} aria-label="Fermer">×</button>
@@ -707,7 +718,11 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         </header>
 
         <div className="snr-toolbar">
-          {current && <button type="button" className="snr-tool snr-primary" onClick={() => save()} disabled={busy || scanning || !dirty} title="Ctrl+S">{busy ? 'Patientez…' : 'Enregistrer'}</button>}
+          {current && locked && <button type="button" className="snr-tool snr-primary" onClick={() => { setMessage(null); setEditing(true); }} disabled={busy || scanning}>Modifier</button>}
+          {current && !locked && <>
+            <button type="button" className="snr-tool snr-primary" onClick={() => save()} disabled={busy || scanning || !dirty} title="Ctrl+S">{busy ? 'Patientez…' : 'Enregistrer'}</button>
+            <button type="button" className="snr-tool" onClick={() => (dirty ? open(current) : Promise.resolve(true)).then((done) => { if (done) setEditing(false); })} disabled={busy || scanning}>Annuler</button>
+          </>}
           <button type="button" className="snr-tool snr-submit" onClick={() => save({ reset: true })} disabled={busy || scanning || (!dirty && Boolean(current))} title="Enregistre le sinistre puis vide le formulaire pour un nouveau sinistre">{busy && !current ? 'Patientez…' : 'Soumettre'}</button>
           <button type="button" className="snr-tool" onClick={() => setList(newList(clientCode))} disabled={busy}>Lister</button>
           {message && <p className={`snr-message is-${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'} title={message.text}>{message.text}</p>}
@@ -745,7 +760,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {choose('Branche', 'Code_Type_Branche', lookups.branches)}
           </fieldset>
 
-          <fieldset className="snr-group">
+          <fieldset className="snr-group" disabled={locked}>
             <legend>Assuré et police</legend>
             {input('N° police', 'Num_Int', { maxLength: 15, onBlur: () => fillFromPolicy(), onType: () => fillFromPolicy({ quiet: true }), list: 'snr-client-policies', placeholder: 'Recherche auto', required: true })}
             {input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => { if (!form.Code_Client) fillFromPolicy({ plate: true }); }, onType: () => { if (!formRef.current.Code_Client) fillFromPolicy({ plate: true, quiet: true }); }, placeholder: '209 TU 2222' })}
@@ -764,7 +779,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {choose('Compagnie', 'Code_Compagnie_Assure', lookups.compagnies, { span: 6 })}
           </fieldset>
 
-          <fieldset className="snr-group">
+          <fieldset className="snr-group" disabled={locked}>
             <legend>Partie adverse</legend>
             {input('Tiers', 'Tiers1', { span: 6, maxLength: 50 })}
             {choose('Compagnie adverse', 'Code_Compagnie_Advers1', lookups.compagnies_adverses, { none: '0', noneLabel: '(Aucune)' })}
@@ -773,7 +788,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {input('N° sinistre adverse', 'Num_Sinistre_Compagnie_Advers1', { maxLength: 20 })}
           </fieldset>
 
-          <fieldset className="snr-group">
+          <fieldset className="snr-group" disabled={locked}>
             <legend>Nature du sinistre</legend>
             {choose('Type sinistre', 'Type_Sinistre', lookups.types_sinistre)}
             {choose('Garantie', 'Garantie', asOptions(lookups.garanties))}
@@ -783,7 +798,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             <div className="snr-span-2 snr-flag"><label className="snr-check"><input type="checkbox" checked={form.IDA} onChange={(event) => change({ IDA: event.target.checked })} />Convention IDA</label></div>
           </fieldset>
 
-          <fieldset className="snr-group">
+          <fieldset className="snr-group" disabled={locked}>
             <legend>Expertise et règlement</legend>
             {choose('Expert', 'Code_Expert1', lookups.experts, { none: '0', noneLabel: '(Aucun)', span: 6 })}
             {input('Montant devis', 'Montant_Devis', { type: 'number' })}
@@ -800,7 +815,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             )}
           </fieldset>
 
-          <fieldset className="snr-group snr-observation">
+          <fieldset className="snr-group snr-observation" disabled={locked}>
             <legend>Observation</legend>
             <textarea value={form.Observation} maxLength={200} onChange={(event) => change({ Observation: event.target.value })} placeholder="Circonstances, suivi, pièces attendues…" aria-label="Observation" />
             <small>{form.Observation.length}/200</small>

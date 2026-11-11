@@ -240,3 +240,7 @@
 .snr-pay .snr-pay-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .snr-pay select:disabled { background: #f3f6f7; color: #4a6370; opacity: 1; }
 .snr-pay .snr-pay-note { margin-top: -4px; color: #6b818b; font-size: 10px; line-height: 1.35; }
+
+/* A stored claim is shown locked until "Modifier": its values stay readable */
+.snr-body fieldset:disabled input, .snr-body fieldset:disabled select, .snr-body fieldset:disabled textarea,
+.snr-body select:disabled, .snr-body input[readonly] { color: #233c4b; -webkit-text-fill-color: #233c4b; opacity: 1; cursor: default; }

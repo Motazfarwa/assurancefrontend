@@ -142,6 +142,10 @@ const DATE_FIELDS = [
     "date_mvt", "date_saisie", "date_emission"
 ];
 
+// A policy in force, as in "Liste des polices" (same rule as the API): état AN, not expired.
+export const isInForce = (item) => String(item?.etat || "").trim().toUpperCase() === "AN"
+    && (!item.expiration || String(item.expiration).slice(0, 10) >= new Date().toLocaleDateString("sv-SE"));
+
 const toTimestamp = (value) =>
     !value ? null : value.length === 10 ? `${value}T00:00:00` : value;
 
@@ -208,7 +212,7 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
 // anything; the last step stores everything through saveRef. beforeSave runs first (it creates the client). saveRef.current()
 // resolves to the stored result, with `fleet` when a fleet window opened, or to null with the error shown on the receipt.
 export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onReceiptReady, saveRef, fleetRetryRef, finalLabel = "Soumettre", clientName = "" }) {
-    const { accessToken } = useAuth();
+    const { accessToken, user } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
     const isCreate = Boolean(clientCode);
     const [step, setStep] = useState(1);
@@ -241,6 +245,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const [nomBranche, setNomBranche] = useState(""); // the branch name the database gives with a loaded police
     const [branchCandidates, setBranchCandidates] = useState(null); // companies / branches the N° police can belong to
     const [clientPolices, setClientPolices] = useState(null); // the client's polices, the latest first
+    const [allPolices, setAllPolices] = useState(false); // "Gestion des polices": the polices not in force are offered too
+    const [editing, setEditing] = useState(null); // "Modifier": the values before the change (null: the police is only shown)
     const [newPolice, setNewPolice] = useState(false); // a client with polices: a new number is being typed instead
     const [showClientPolices, setShowClientPolices] = useState(false);
     const update = (key, value) => {
@@ -330,6 +336,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             {options ? (
                 <select
                     value={values[name]}
+                    disabled={locked}
                     onChange={e => update(name, e.target.value)}
                 >
                     <option value="">Sélectionner</option>
@@ -344,7 +351,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     type={type}
                     step={type === "number" ? "any" : undefined}
                     value={values[name]}
-                    readOnly={name === "code_client" && Boolean(clientCode)}
+                    readOnly={(name === "code_client" && Boolean(clientCode)) || locked}
                     onChange={e => updateLinked(name, e.target.value)}
                 />
             )}
@@ -352,11 +359,12 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         </label>
     );
 
-    const check = (label, name) => (
+    const check = (label, name, frozen = false) => (
         <label className="pf-check">
             <input
                 type="checkbox"
                 checked={values[name]}
+                disabled={locked || frozen}
                 onChange={e => update(name, e.target.checked)}
             />
             {label}
@@ -371,6 +379,59 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     };
 
     const loadedExisting = loadedRef.current.num !== "" && loadedRef.current.num === values.num_police;
+    // "Gestion des polices": the police is shown locked; "Modifier" (administrator) opens its fields, "Enregistrer" stores them.
+    const locked = !isCreate && !editing;
+    const fixed = !isCreate; // parts stored elsewhere (garanties, dommages cumulés, revalorisation, flotte): not changed here
+    const canModify = !isCreate && Boolean(user?.isAdmin) && loadedExisting && Boolean(loadedRef.current.numInt);
+    const numberOrNull = (value) => (value === "" || value == null ? null : Number(value));
+    const policeChanges = (form) => ({
+        date_creation: toTimestamp(form.date_creation),
+        num_imat: form.num_imat || null,
+        renouvelable: Boolean(form.renouvelable),
+        duree: numberOrNull(form.duree),
+        echeance: form.echeance || null,
+        effet: toTimestamp(form.effet),
+        expiration: toTimestamp(form.expiration),
+        hors_taxe: Boolean(form.hors_taxe),
+        participation: Boolean(form.participation),
+        heure_effet: form.effet ? `${form.effet}T${form.heure_effet || "00:00"}:00` : null,
+        etat: form.etat ? form.etat.trim().toUpperCase() : null,
+        date_mvt: toTimestamp(form.date_mvt),
+        risque: form.risque || null,
+        obser: form.observation || null,
+        tous_risque: Boolean(form.tous_risque),
+        franchise: form.franchise === "" ? null : Math.round(Number(form.franchise)) || 0,
+        neuf: numberOrNull(form.neuf),
+        venale: numberOrNull(form.venale)
+    });
+    const startEditing = () => { setMessage(""); setError(""); setEditing(values); };
+    const cancelEditing = () => { setValues(editing); setEditing(null); setError(""); };
+    async function saveChanges() {
+        const before = policeChanges(editing);
+        const after = policeChanges(values);
+        const changed = Object.fromEntries(Object.entries(after).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(before[key])));
+        if (!Object.keys(changed).length) { setEditing(null); setMessage("Aucune modification."); return; }
+        if (changed.etat !== undefined && changed.etat !== null && changed.etat.length !== 2) { setError("L’état est un code de 2 lettres (AN, RE, SS, RV)."); return; }
+        setSaving(true);
+        setError("");
+        try {
+            const response = await fetch(`${API_URL}/api/polices/${encodeURIComponent(loadedRef.current.numInt)}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+                credentials: "include",
+                body: JSON.stringify(changed)
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "Impossible d’enregistrer les modifications.");
+            setEditing(null);
+            await lookup({ num_police: values.num_police }, new AbortController().signal);
+            setMessage(`Police ${values.num_police} modifiée.`);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setSaving(false);
+        }
+    }
 
     // The branch of the chosen company written in the number. A new number is the year then the code branche; a police
     // already stored keeps its own code when it has one (older numbers start with the code branche).
@@ -414,12 +475,29 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     ? rows.map(row => ({ ...row, num_police: String(row.num_police || "").trim() })).filter(row => row.num_police)
                     : [];
                 setClientPolices(list);
-                if (list.length) setValues(prev => (prev.num_police ? prev : { ...prev, num_police: list[0].num_police }));
+                if (isCreate) {
+                    if (list.length) setValues(prev => (prev.num_police ? prev : { ...prev, num_police: list[0].num_police }));
+                    return;
+                }
+                // "Gestion des polices": a police typed (of this client) stays shown, even out of force; otherwise the
+                // client's latest police in force is shown.
+                if (!list.length) { setAllPolices(false); lookup({ code_client: code }, controller.signal); return; }
+                const typed = list.find(item => item.num_police === loadedRef.current.num && loadedRef.current.client === code);
+                setAllPolices(Boolean(typed) && !isInForce(typed));
+                if (typed) return;
+                const shown = list.find(isInForce);
+                if (shown) { setValues(prev => ({ ...prev, num_police: shown.num_police })); return; }
+                loadedRef.current = { num: "", client: code, numInt: "" };
+                setValues(prev => ({ ...initialValues, code_client: prev.code_client, num_police: "" }));
+                setQuittances([]);
+                setNomBranche("");
+                setMessage(`Aucune police en vigueur pour ce client : ${list.length} police${list.length > 1 ? "s" : ""} expirée${list.length > 1 ? "s" : ""}, suspendue${list.length > 1 ? "s" : ""} ou résiliée${list.length > 1 ? "s" : ""} (« voir toutes »).`);
             } catch (err) {
                 if (err.name !== "AbortError") setClientPolices([]);
             }
         }, 300);
         return () => { controller.abort(); clearTimeout(timer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [values.code_client]);
 
     // A client with polices, in the "Saisir police" step: leave them for a new number, or come back to them.
@@ -436,6 +514,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         setNewPolice(false);
         if (clientPolices?.length) handleNumberChange(clientPolices[0].num_police);
     };
+    // "Gestion des polices" offers the polices in force ("voir toutes": every police of the client).
+    const inForce = (clientPolices || []).filter(isInForce);
+    const shownPolices = isCreate || allPolices ? clientPolices || [] : inForce;
     const policeLabel = (item) => [
         item.num_police,
         item.nom_compagnie,
@@ -640,7 +721,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 throw new Error(typeof data.detail === 'string' ? data.detail : 'Recherche impossible');
             }
             const loaded = fromDetail(data);
-            loadedRef.current = { num: loaded.num_police, client: loaded.code_client };
+            loadedRef.current = { num: loaded.num_police, client: loaded.code_client, numInt: String(data.police?.num_int || "").trim() };
             const g = data.garanties || {};
             const guarantees = {
                 g_vol: asText(g.vol), g_incendie: asText(g.incendie), g_bdg: asText(g.bdg),
@@ -663,6 +744,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             setQuittances(Array.isArray(data.quittances) ? data.quittances.map(normalizeReceipt) : []);
             if (params.code_client && data.matches > 1) {
                 setMessage(`${data.matches} polices pour ce client — la plus récente est affichée.`);
+            }
+            if (!isCreate && !isInForce({ etat: loaded.etat, expiration: loaded.expiration })) {
+                setMessage("Cette police n’est pas en vigueur (expirée, suspendue ou résiliée).");
             }
         } catch (err) {
             if (err.name !== 'AbortError') {
@@ -707,15 +791,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [values.num_police]);
 
-    // Client code -> the client's most recent policy and its receipts.
-    useEffect(() => {
-        const client = values.code_client.trim();
-        if (isCreate || !client || client === loadedRef.current.client) return undefined;
-        const controller = new AbortController();
-        const timer = setTimeout(() => lookup({ code_client: client }, controller.signal), 400);
-        return () => { controller.abort(); clearTimeout(timer); };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [values.code_client]);
+    // Client code -> its polices (above): the latest police in force is shown, with its receipts.
 
 
     // "Nom client": a typed name proposes the matching clients; picking one fills the code, which loads its policy.
@@ -750,6 +826,11 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
              >
              Vis. Pol. Client
                   </button>
+                    {canModify && !editing && <button type="button" className="pf-view-client-button pf-modify-button" onClick={startEditing}>Modifier</button>}
+                    {editing && <>
+                        <button type="button" className="pf-view-client-button" onClick={cancelEditing} disabled={saving}>Annuler</button>
+                        <button type="button" className="pf-view-client-button pf-modify-button" onClick={saveChanges} disabled={saving}>{saving ? "Enregistrement..." : "Enregistrer"}</button>
+                    </>}
                
                 </div>
             </div>
@@ -787,20 +868,24 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     </label>
 
                     <div className="pf-field pf-field-wide pf-num-police">
-                        <span>N° Police *{clientPolices?.length > 0 && <small className="pf-num-count"> · {clientPolices.length} police{clientPolices.length > 1 ? "s" : ""} pour ce client</small>}</span>
-                        {clientPolices?.length > 1 && !newPolice ? (
+                        <span>N° Police *{clientPolices?.length > 0 && (isCreate
+                            ? <small className="pf-num-count"> · {clientPolices.length} police{clientPolices.length > 1 ? "s" : ""} pour ce client</small>
+                            : <small className="pf-num-count"> · {inForce.length} en vigueur sur {clientPolices.length}{inForce.length < clientPolices.length && <> · <button type="button" className="pf-link-button" disabled={Boolean(editing)} onClick={() => setAllPolices(!allPolices)}>{allPolices ? "en vigueur seulement" : "voir toutes"}</button></>}</small>)}</span>
+                        {(isCreate ? clientPolices?.length > 1 : clientPolices?.length > 0 && (shownPolices.length !== 1 || shownPolices.length !== clientPolices.length)) && !newPolice ? (
                             <select
                                 aria-label="N° Police"
-                                value={clientPolices.some(item => item.num_police === values.num_police) ? values.num_police : ""}
+                                disabled={Boolean(editing)}
+                                value={shownPolices.some(item => item.num_police === values.num_police) ? values.num_police : ""}
                                 onChange={e => (e.target.value === NEW_POLICE ? startNewPolice() : handleNumberChange(e.target.value))}
                             >
-                                <option value="" disabled>Choisir une police du client…</option>
-                                {clientPolices.map(item => <option key={item.num_int || item.num_police} value={item.num_police}>{policeLabel(item)}</option>)}
+                                <option value="" disabled>{isCreate || shownPolices.length ? "Choisir une police du client…" : "Aucune police en vigueur"}</option>
+                                {shownPolices.map(item => <option key={item.num_int || item.num_police} value={item.num_police}>{policeLabel(item)}</option>)}
                                 {isCreate && <option value={NEW_POLICE}>＋ Nouvelle police (saisir le numéro)</option>}
                             </select>
                         ) : (
                             <input
                                 aria-label="N° Police"
+                                readOnly={Boolean(editing)}
                                 value={values.num_police}
                                 maxLength={15}
                                 onChange={e => handleNumberChange(e.target.value)}
@@ -831,7 +916,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <span>Code client</span>
                         <input
                             value={values.code_client}
-                            readOnly={Boolean(clientCode)}
+                            readOnly={Boolean(clientCode) || Boolean(editing)}
                             onChange={e => { setNameQuery(null); update("code_client", e.target.value); }}
                         />
                     </label>
@@ -842,7 +927,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <span>Nom client</span>
                         <input
                             value={nameQuery ?? nomClient}
-                            readOnly={Boolean(clientCode)}
+                            readOnly={Boolean(clientCode) || Boolean(editing)}
                             onChange={e => typeName(e.target.value)}
                             onBlur={() => setTimeout(() => setNameQuery(null), 150)}
                             placeholder="Saisir un nom ou un prénom"
@@ -869,6 +954,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         <span>Date création{isCreate ? " *" : ""}</span>
                         <input
                             type="date"
+                            readOnly={locked}
                             value={values.date_creation}
                             onChange={e => update("date_creation", e.target.value)}
                         />
@@ -880,7 +966,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             )}
 
             {!(isCreate && step === 2) && (
-            <div className="pf-info-row">
+            <fieldset className="pf-info-row pf-lockable" disabled={locked}>
             <section className={`pf-section pf-policy-info${isCreate ? " pf-span-full" : ""}`}>
                 <h3>Information Police</h3>
 
@@ -948,18 +1034,18 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 <div className="pf-check-row">
                     {check("Hors taxe", "hors_taxe")}
                     {check("Bonification", "participation")}
-                    {check("Police flotte", "flotte")}
-                    {check("Revalorisation", "revalorisation")}
+                    {check("Police flotte", "flotte", fixed)}
+                    {check("Revalorisation", "revalorisation", fixed)}
                     {values.revalorisation && (
                         <>
                             <label className="pf-franchise pf-inline-date">
                                 <span>Date de revalorisation</span>
-                                <input type="date" value={values.date_revalorisation} onChange={e => update("date_revalorisation", e.target.value)} />
+                                <input type="date" disabled={fixed} value={values.date_revalorisation} onChange={e => update("date_revalorisation", e.target.value)} />
                                 {err("date_revalorisation")}
                             </label>
                             <label className="pf-franchise pf-inline-date">
                                 <span>Date d'envoi de décharge</span>
-                                <input type="date" value={values.date_envoi} onChange={e => update("date_envoi", e.target.value)} />
+                                <input type="date" disabled={fixed} value={values.date_envoi} onChange={e => update("date_envoi", e.target.value)} />
                             </label>
                         </>
                     )}
@@ -1010,7 +1096,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     {field("Date mouvement", "date_mvt", "date")}
                     <label className="pf-field pf-risque">
                         <span>Risque</span>
-                        <textarea rows={3} value={values.risque} onChange={e => update("risque", e.target.value)} />
+                        <textarea rows={3} maxLength={isCreate ? undefined : 50} value={values.risque} onChange={e => update("risque", e.target.value)} />
                         {err("risque")}
                     </label>
                 </div>
@@ -1022,14 +1108,15 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     className="pf-observation"
                     value={values.observation}
                     onChange={e => update("observation", e.target.value)}
+                    maxLength={500}
                 />
             </section>
             )}
-            </div>
+            </fieldset>
             )}
 
             {!(isCreate && step === 2) && (
-            <div className="pf-right-column">
+            <fieldset className="pf-right-column pf-lockable" disabled={locked}>
             <div className="pf-tousrisque">
                 {/* Tous risques and Dommages cumulés are two kinds of cover: one or the other. */}
                 <label className="pf-check">
@@ -1037,7 +1124,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     Tous risques
                 </label>
                 <label className="pf-check">
-                    <input type="checkbox" checked={values.dommages_cumules} onChange={e => { const on = e.target.checked; setValues(prev => ({ ...prev, dommages_cumules: on, tous_risque: on ? false : prev.tous_risque })); }} />
+                    <input type="checkbox" checked={values.dommages_cumules} disabled={fixed} onChange={e => { const on = e.target.checked; setValues(prev => ({ ...prev, dommages_cumules: on, tous_risque: on ? false : prev.tous_risque })); }} />
                     Dommages cumulés
                 </label>
                 {(values.tous_risque || values.dommages_cumules) && (
@@ -1064,11 +1151,11 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     <div className="pf-dc-list">
                         {DC_GUARANTEES.map(([key, label]) => (
                             <div className="pf-dc-item" key={key}>
-                                {check(label, `dc_${key}`)}
+                                {check(label, `dc_${key}`, fixed)}
                                 {values[`dc_${key}`] && (
                                     <label className="pf-franchise">
                                         <span>Montant</span>
-                                        <input type="number" min="0" step="any" value={values[`dc_${key}_montant`]} onChange={e => update(`dc_${key}_montant`, e.target.value)} />
+                                        <input type="number" min="0" step="any" disabled={fixed} value={values[`dc_${key}_montant`]} onChange={e => update(`dc_${key}_montant`, e.target.value)} />
                                         {err(`dc_${key}_montant`)}
                                     </label>
                                 )}
@@ -1079,6 +1166,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             </div>
             <section className="pf-section pf-garanties pf-span-full">
                 <h3>Garanties véhicule</h3>
+                <fieldset className="pf-lockable pf-lock-contents" disabled={fixed}>
                 <div className="pf-grid pf-grid-garanties">
                     {GARANTIES.map(([key, label]) => key === "g_remarquage" ? (
                         <div className="pf-field" key={key}>
@@ -1122,8 +1210,9 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                         </label>
                     ))}
                 </div>
+                </fieldset>
             </section>
-            </div>
+            </fieldset>
             )}
 
             {isCreate && step === 2 && (

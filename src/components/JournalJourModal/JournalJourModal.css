@@ -180,3 +180,15 @@
   .jdj-tasks li .jdj-task-time, .jdj-tasks li .jdj-states { grid-column: 2; justify-self: start; }
   .jdj-tasks li .jdj-remove { grid-row: 1; grid-column: 3; }
 }
+
+/* Search by client code or name */
+.jdj-filter { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.jdj-filter input { flex: 1; min-width: 0; padding: 8px 10px 8px 30px; border: 1px solid #cfdcdf; border-radius: 8px; color: #233c4b; font: inherit; font-size: 13px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2390a4ab' stroke-width='2.4'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 10px center; }
+.jdj-filter input:focus { border-color: #67bdae; outline: 2px solid rgba(103, 189, 174, .25); }
+.jdj-filter small { color: #6b8088; font-size: 11.5px; white-space: nowrap; }
+.jdj-client-picker { position: relative; }
+.jdj-client-name { color: #1f7a6d; font-size: 11.5px; font-weight: 600; }
+.jdj-client-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; max-height: 240px; overflow-y: auto; margin: 4px 0 0; padding: 4px; list-style: none; border: 1px solid #cfdcdf; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px rgba(20, 50, 60, .14); }
+.jdj-client-results li { padding: 7px 9px; border-radius: 6px; color: #233c4b; font-size: 12.5px; font-weight: 400; cursor: pointer; }
+.jdj-client-results li:hover { background: #eef7f5; }
+.jdj-client-results b { margin-right: 6px; color: #1f7a6d; }

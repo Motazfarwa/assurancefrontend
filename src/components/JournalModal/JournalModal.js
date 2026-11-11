@@ -32,7 +32,7 @@ const receiptStatus = (row) => {
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES RÉGLÉES · COCHÉES PAR DÉFAUT · « VALIDER » DANS LA FEUILLE DE CAISSE LES DÉCLARE À SA DATE',
+    heading: 'QUITTANCES RÉGLÉES À LA DATE (DATE DE RÈGLEMENT) · COCHÉES PAR DÉFAUT · « VALIDER » DANS LA FEUILLE DE CAISSE LES DÉCLARE À SA DATE',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
@@ -42,7 +42,7 @@ const KINDS = {
     amount: 'montant',
     // Every company is listed until one is chosen.
     allCompanies: true,
-    // The date: the 15th, then the end of the month.
+    // The quittances whose date de règlement (TRegCli) is the date chosen; the date is today when the journal opens.
     settled: true,
     // No "Comptabiliser": the lines chosen are declared by the validation of the feuille de caisse ("Valider").
     readOnly: true,
@@ -75,9 +75,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [compagnie, setCompagnie] = useState('');
-  const [date, setDate] = useState(journalDay);
-  // Encaissement: only the quittances a client paid something on (a règlement date and Réglé > 0).
-  const settledParams = config.settled ? { regles: true, periode: true } : {};
+  // Encaissement: today, its règlements are listed; dépense: the journal day (the 15th or the end of the month).
+  const [date, setDate] = useState(() => (config.settled ? new Date().toLocaleDateString('sv-SE') : journalDay()));
+  // Encaissement: only the quittances a client paid something on, with a date de règlement on the date (Réglé > 0).
+  const settledParams = (day) => (config.settled ? { regles: true, periode: true, debut: day, fin: day } : {});
   const [nature, setNature] = useState(''); // dépense: '' | S | R
   const [showDone, setShowDone] = useState(Boolean(config.showDone));
   const [search, setSearch] = useState('');
@@ -87,7 +88,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [notice, setNotice] = useState('');
   const [sheet, setSheet] = useState(null); // the journal printout: { rows, preview }
   const [cashSheet, setCashSheet] = useState(false); // the feuille de caisse of the company on the date
-  // The lines are read when "Lister" is pressed: { compagnie, date, nature } listed (a change of filter clears the list).
+  // The lines listed: { compagnie, date, nature }. They are read when the journal opens and when a filter changes;
+  // "Lister" reads them again.
   const [listedFor, setListedFor] = useState(null);
 
   useEffect(() => {
@@ -98,13 +100,13 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     return () => { active = false; };
   }, [accessToken]);
 
-  useEffect(() => { setListedFor(null); }, [compagnie, date, nature]);
+  useEffect(() => { setListedFor(date ? { compagnie, date, nature, at: Date.now() } : null); }, [compagnie, date, nature]);
 
   useEffect(() => {
     if (!listedFor) { setState({ loading: false, error: '', items: [] }); setChosen(new Set()); return undefined; }
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
-    config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams })
+    config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams(listedFor.date) })
       .then((body) => {
         if (!active) return;
         const items = body.items || [];
@@ -113,7 +115,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
       })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [] }); });
     return () => { active = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- settledParams only depends on config and the date listed
   }, [accessToken, config, listedFor, showDone]);
   const list = () => setListedFor({ compagnie, date, nature, at: Date.now() });
 
@@ -163,7 +165,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         const result = await config.post(accessToken, Number(code), date, rows);
         count += result.comptabilisees;
       }
-      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true, ...settledParams });
+      const body = await config.load(accessToken, { compagnie, date, nature, comptabilises: true, ...settledParams(date) });
       const items = body.items || [];
       setShowDone(true);
       setState({ loading: false, error: '', items });
@@ -213,7 +215,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
         <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>{config.heading}</span><h3>{!listed ? `Choisissez la compagnie (ou toutes) et la date, puis « Lister »` : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
+            <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
               <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(selected, config.amount))} TND</strong></div>
               <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (!selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
@@ -222,7 +224,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
             </div>
           </div>
           {kind === 'encaissement' && listed && shown.some((row) => offDay(row, listedFor.date)) && <p className="jrn-offday-legend"><i aria-hidden="true" /> En rouge : quittance déclarée (ou à déclarer) un autre jour que le 15 ou le dernier jour du mois.</p>}
-          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">{kind === 'depense' ? 'Aucune dépense' : 'Aucune quittance réglée'} à déclarer {allListed ? '' : 'pour cette compagnie '}à cette date.</div>
+          {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">{kind === 'depense' ? `Aucune dépense à déclarer ${allListed ? '' : 'pour cette compagnie '}à cette date.` : `Aucune quittance réglée le ${formatDate(listedFor.date)}${allListed ? '' : ' pour cette compagnie'}.`}</div>
             : listed && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>

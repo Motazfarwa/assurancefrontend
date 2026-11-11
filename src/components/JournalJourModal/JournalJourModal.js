@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import {
   createRequest, deleteRequest, getEmployeeHistory, getMyJournal, getMyRequests, getRequestTargets, getTeamDay, handleRequest, listRequests,
   markJournalSeen, reopenJournal, saveJournalParams, saveMyJournal, validateMyJournal,
 } from '../../services/journalJourApi';
+import { searchClients } from '../../services/clientApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import './JournalJourModal.css';
@@ -22,6 +23,51 @@ const taskWhen = (task) => [task.date ? `${task.date.slice(8, 10)}/${task.date.s
 export const CHANNELS = [['telephone', 'Téléphone'], ['email', 'Email'], ['whatsapp', 'WhatsApp']];
 const channelsText = (canaux) => CHANNELS.filter(([value]) => (canaux || []).includes(value)).map(([, label]) => label).join(', ');
 const toggleIn = (list, value) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
+
+const fold = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const clientLabel = (item) => [item.client, item.client_nom].filter(Boolean).join(' · ');
+// The requests whose client code or client name contains the searched text.
+const matchClient = (items, text) => {
+  const term = fold(text);
+  return term ? (items || []).filter((item) => fold(item.client).includes(term) || fold(item.client_nom).includes(term)) : items || [];
+};
+
+// The search bar above a list of requests: by client code or client name.
+function ClientFilter({ value, onChange, total, shown }) {
+  return <div className="jdj-filter">
+    <input type="search" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Rechercher par code ou nom du client" aria-label="Rechercher par code ou nom du client" />
+    {value.trim() && <small>{shown} / {total}</small>}
+  </div>;
+}
+
+// The client of a new request: searched in the clients (code or name), or written as is.
+function ClientPicker({ value, name, onChange }) {
+  const { accessToken } = useAuth();
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const text = value.trim();
+    if (!open || text.length < 2) { setResults([]); return undefined; }
+    let active = true;
+    const timer = setTimeout(() => {
+      searchClients(accessToken, text, 8).then((rows) => { if (active) setResults(rows); }).catch(() => { if (active) setResults([]); });
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [accessToken, value, open]);
+  const nameOf = (row) => (row.nom_client || `${row.lastName} ${row.firstName}`).trim();
+  return <div className="jdj-field jdj-client-picker">
+    <span>Client</span>
+    <input value={value} maxLength={150} placeholder="Code ou nom du client" aria-label="Client" autoComplete="off" role="combobox" aria-controls="jdj-client-results" aria-expanded={open && results.length > 0}
+      onChange={(event) => { onChange(event.target.value, ''); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} />
+    {name && <small className="jdj-client-name">{name}</small>}
+    {open && results.length > 0 && <ul id="jdj-client-results" className="jdj-client-results" role="listbox" aria-label="Clients trouvés">
+      {results.map((row) => <li key={row.clientCode} role="option" aria-selected={false}
+        onMouseDown={(event) => { event.preventDefault(); onChange(row.clientCode, nameOf(row)); setOpen(false); }}>
+        <b>{row.clientCode}</b> {nameOf(row)}
+      </li>)}
+    </ul>}
+  </div>;
+}
 
 // "Reçue par": téléphone, email, WhatsApp (checkboxes).
 function ChannelBoxes({ value, onChange, label = 'Reçue par' }) {
@@ -44,6 +90,7 @@ function AssignedRequests() {
   const { accessToken } = useAuth();
   const [items, setItems] = useState(null);
   const [replies, setReplies] = useState({});
+  const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
@@ -61,13 +108,16 @@ function AssignedRequests() {
   }
   if (!items?.length && !error) return null;
   const open = (items || []).filter((item) => item.statut !== 'traitee').length;
+  const shown = matchClient(items, search);
   return <section className="jdj-card jdj-assigned" aria-label="Demandes qui me sont affectées">
     <h3>Demandes qui me sont affectées {open > 0 && <span className="jdj-count">{open} à traiter</span>}</h3>
     {error && <p className="jdj-warn" role="alert">{error}</p>}
-    <ul>{(items || []).map((item) => <li key={item.id} className={item.statut === 'traitee' ? 'is-done' : ''}>
+    {items?.length > 0 && <ClientFilter value={search} onChange={setSearch} total={items.length} shown={shown.length} />}
+    {search.trim() && !shown.length && <p className="jdj-muted">Aucune demande pour ce client.</p>}
+    <ul>{shown.map((item) => <li key={item.id} className={item.statut === 'traitee' ? 'is-done' : ''}>
       <div className="jdj-assigned-head">
         <strong>{item.demande}</strong>
-        {item.client && <span className="jdj-via">Client : {item.client}</span>}
+        {item.client && <span className="jdj-via">Client : {clientLabel(item)}</span>}
         {item.canaux?.length > 0 && <span className="jdj-via">{channelsText(item.canaux)}</span>}
         <small>de {item.cree_par} · {frTime(item.date_creation)}</small>
       </div>
@@ -338,6 +388,8 @@ function ClientRequests() {
   const [targets, setTargets] = useState(null);
   const [items, setItems] = useState(null);
   const [form, setForm] = useState(blankAssignment);
+  const [clientName, setClientName] = useState('');
+  const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -357,6 +409,7 @@ function ClientRequests() {
   const agency = targets?.agences.find((item) => item.agence === form.agence);
   const recipients = form.cible_type === 'agence' ? agency?.utilisateurs || [] : form.utilisateurs;
   const set = (patch) => setForm((current) => ({ ...current, ...patch }));
+  const shown = useMemo(() => matchClient(items, search), [items, search]);
 
   async function submit(event) {
     event.preventDefault();
@@ -369,6 +422,7 @@ function ClientRequests() {
       const created = await createRequest(accessToken, { ...form, client: form.client.trim(), demande: form.demande.trim(), observation: form.observation.trim() });
       setItems((current) => [created, ...(current || [])]);
       setForm(blankAssignment());
+      setClientName('');
       setNotice(`Demande affectée à : ${created.affectations.map((item) => item.utilisateur).join(', ')}`);
     } catch (requestError) {
       setError(requestError.message);
@@ -391,7 +445,7 @@ function ClientRequests() {
     <form className="jdj-card jdj-assign" onSubmit={submit} aria-label="Nouvelle demande client">
       <h3>Nouvelle demande client</h3>
       <div className="jdj-assign-grid">
-        <label className="jdj-field"><span>Client</span><input value={form.client} maxLength={150} onChange={(event) => set({ client: event.target.value })} placeholder="Nom ou code du client" /></label>
+        <ClientPicker value={form.client} name={clientName} onChange={(client, nom) => { set({ client }); setClientName(nom); }} />
         <ChannelBoxes value={form.canaux} onChange={(canaux) => set({ canaux })} />
       </div>
       <label className="jdj-field"><span>Demande du client</span><input value={form.demande} maxLength={1000} onChange={(event) => set({ demande: event.target.value })} placeholder="Ex : attestation d’assurance, changement d’adresse, devis…" /></label>
@@ -417,10 +471,11 @@ function ClientRequests() {
     </form>
     <section className="jdj-card">
       <h3>Demandes affectées (30 derniers jours)</h3>
-      {!items ? <p className="jdj-muted">Chargement…</p> : items.length === 0 ? <p className="jdj-muted">Aucune demande.</p> : <ul className="jdj-request-log">{items.map((item) => <li key={item.id}>
+      {items?.length > 0 && <ClientFilter value={search} onChange={setSearch} total={items.length} shown={shown.length} />}
+      {!items ? <p className="jdj-muted">Chargement…</p> : items.length === 0 ? <p className="jdj-muted">Aucune demande.</p> : !shown.length ? <p className="jdj-muted">Aucune demande pour ce client.</p> : <ul className="jdj-request-log">{shown.map((item) => <li key={item.id}>
         <div className="jdj-assigned-head">
           <strong>{item.demande}</strong>
-          {item.client && <span className="jdj-via">Client : {item.client}</span>}
+          {item.client && <span className="jdj-via">Client : {clientLabel(item)}</span>}
           {item.canaux.length > 0 && <span className="jdj-via">{channelsText(item.canaux)}</span>}
           <small>{item.cible_type === 'agence' ? `Agence ${item.cible}` : 'Par utilisateur'} · {frTime(item.date_creation)}</small>
           <button type="button" className="jdj-remove" onClick={() => remove(item)} aria-label={`Supprimer la demande ${item.id}`}>×</button>

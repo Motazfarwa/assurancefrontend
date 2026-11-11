@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import JournalJourModal, { localDay } from './JournalJourModal';
 import { createRequest, getMyJournal, getMyRequests, getRequestTargets, getTeamDay, handleRequest, listRequests, validateMyJournal } from '../../services/journalJourApi';
 import { INSURANCE_MODULES } from '../../data/insuranceModules';
+import { searchClients } from '../../services/clientApi';
 
 let mockUser = { name: 'Sami', isAdmin: false };
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: mockUser }) }));
@@ -11,6 +12,8 @@ jest.mock('../../services/journalJourApi', () => ({
   getMyRequests: jest.fn(), handleRequest: jest.fn(), getRequestTargets: jest.fn(), listRequests: jest.fn(), createRequest: jest.fn(), deleteRequest: jest.fn(),
 }));
 
+jest.mock('../../services/clientApi', () => ({ searchClients: jest.fn() }));
+
 const activite = { total: 3, par_type: [{ type: 'Ajout', libelle: 'ajouts', nombre: 3 }], dernieres: [{ heure: '10:12', design: 'Ajout Quittance N° 341175' }] };
 const empty = (day) => ({ journal: { date_jour: day, taches: [], remarques: '', demain: '', statut: 'vide' }, activite, rapport: '', whatsapp: { numero: true, lien: null } });
 
@@ -18,6 +21,7 @@ beforeEach(() => {
   window.confirm = () => true;
   getMyJournal.mockImplementation((token, day) => Promise.resolve(empty(day)));
   getMyRequests.mockResolvedValue({ items: [] });
+  searchClients.mockResolvedValue([]);
   validateMyJournal.mockImplementation((token, body) => Promise.resolve({
     journal: { ...body, statut: 'valide', date_validation: `${body.date_jour}T17:05`, envoi: 'lien' }, activite,
     rapport: '📋 Journal — Sami', whatsapp: { numero: true, envoye: false, lien: 'https://wa.me/21698123456?text=x' },
@@ -119,4 +123,54 @@ test('the administrator assigns a client request to every employee of an agency,
   })));
   expect(await screen.findByText('Demande affectée à : Mami G., Maaoui E.')).toBeInTheDocument();
   expect(screen.getByText('Mami G. · à traiter')).toBeInTheDocument();
+});
+
+test('the employee searches the assigned requests by client code or client name', async () => {
+  mockUser = { name: 'Sami', isAdmin: false };
+  const base = { canaux: [], observation: '', statut: 'a_traiter', cree_par: 'admin', date_creation: '2026-11-11T09:00' };
+  getMyRequests.mockResolvedValue({ items: [
+    { ...base, id: 1, client: '5060', client_nom: 'MOTEZ Motez', demande: 'Attestation' },
+    { ...base, id: 2, client: '2973', client_nom: 'JEMMALI WALID', demande: 'Devis auto' },
+  ] });
+  render(<JournalJourModal moduleId="150" onClose={() => {}} />);
+  const box = await screen.findByRole('region', { name: 'Demandes qui me sont affectées' });
+  expect(within(box).getByText('Client : 5060 · MOTEZ Motez')).toBeInTheDocument();
+  const search = within(box).getByLabelText('Rechercher par code ou nom du client');
+  fireEvent.change(search, { target: { value: 'jemmali' } });
+  expect(within(box).queryByText('Attestation')).toBeNull();
+  expect(within(box).getByText('Devis auto')).toBeInTheDocument();
+  fireEvent.change(search, { target: { value: '506' } });
+  expect(within(box).getByText('Attestation')).toBeInTheDocument();
+  expect(within(box).queryByText('Devis auto')).toBeNull();
+  fireEvent.change(search, { target: { value: 'zzz' } });
+  expect(within(box).getByText('Aucune demande pour ce client.')).toBeInTheDocument();
+});
+
+test('the administrator picks the client from a search by code or name, and filters the assigned requests', async () => {
+  mockUser = { name: 'Admin', isAdmin: true };
+  getTeamDay.mockResolvedValue({ date_jour: localDay(), compteurs: {}, whatsapp: { numero: '', api: false }, email: { adresse: '', configure: true }, items: [] });
+  getRequestTargets.mockResolvedValue({ utilisateurs: [{ nom: 'Mami G.', agence: 'Tunis' }], agences: [{ agence: 'Tunis', utilisateurs: ['Mami G.'] }] });
+  const old = { canaux: [], observation: '', cible_type: 'utilisateur', cible: 'Mami G.', date_creation: '2026-11-10T09:00', affectations: [{ utilisateur: 'Mami G.', statut: 'a_traiter' }] };
+  listRequests.mockResolvedValue({ items: [{ ...old, id: 1, client: '5060', client_nom: 'MOTEZ Motez', demande: 'Attestation' }, { ...old, id: 2, client: '4914', client_nom: 'BEN SALAH', demande: 'Résiliation' }] });
+  searchClients.mockResolvedValue([{ clientCode: '2973', nom_client: 'JEMMALI WALID' }]);
+  createRequest.mockImplementation((token, body) => Promise.resolve({ ...old, id: 3, ...body, client_nom: 'JEMMALI WALID', affectations: [{ utilisateur: 'Mami G.', statut: 'a_traiter' }] }));
+  render(<JournalJourModal moduleId="150" onClose={() => {}} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Demandes clients' }));
+  const form = await screen.findByRole('form', { name: 'Nouvelle demande client' });
+  const client = within(form).getByLabelText('Client');
+  fireEvent.focus(client);
+  fireEvent.change(client, { target: { value: 'jemm' } });
+  const option = await within(form).findByRole('option', { name: /JEMMALI WALID/ });
+  expect(searchClients).toHaveBeenCalledWith('t', 'jemm', 8);
+  fireEvent.mouseDown(option);
+  expect(client).toHaveValue('2973');
+  expect(within(form).getByText('JEMMALI WALID')).toBeInTheDocument();
+  const log = screen.getByRole('heading', { name: /Demandes affectées/ }).closest('section');
+  fireEvent.change(within(log).getByLabelText('Rechercher par code ou nom du client'), { target: { value: 'ben salah' } });
+  expect(within(log).queryByText('Attestation')).toBeNull();
+  expect(within(log).getByText('Résiliation')).toBeInTheDocument();
+  fireEvent.change(within(form).getByLabelText('Demande du client'), { target: { value: 'Devis' } });
+  fireEvent.click(within(form).getByLabelText(/^Mami G./));
+  fireEvent.click(within(form).getByRole('button', { name: 'Affecter la demande' }));
+  await waitFor(() => expect(createRequest).toHaveBeenCalledWith('t', expect.objectContaining({ client: '2973', demande: 'Devis' })));
 });
