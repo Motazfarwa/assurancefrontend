@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import {
-  getEmployeeHistory, getMyJournal, getTeamDay, markJournalSeen, reopenJournal, saveMyJournal, saveWhatsappNumber, validateMyJournal,
+  getEmployeeHistory, getMyJournal, getTeamDay, markJournalSeen, reopenJournal, saveJournalParams, saveMyJournal, validateMyJournal,
 } from '../../services/journalJourApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -32,6 +32,13 @@ function Activity({ activite, onPick }) {
 function TaskList({ taches }) {
   if (!taches.length) return <p className="jdj-muted">Aucune tâche saisie.</p>;
   return <ul className="jdj-read-tasks">{taches.map((task, index) => <li key={index}><span className={`jdj-state is-${task.statut}`}>{stateLabel(task.statut)}</span>{task.texte}</li>)}</ul>;
+}
+
+// The email to the administrator, sent by the server when the day is submitted.
+function EmailStatus({ email, journal }) {
+  if (email?.envoye || journal.envoi_email === 'envoye') return <p className="jdj-sent">Rapport envoyé par email à l’administrateur{email?.destinataire ? ` (${email.destinataire})` : ''}.</p>;
+  if (email?.erreur) return <p className="jdj-warn">{email.erreur}</p>;
+  return null;
 }
 
 function WhatsappStatus({ whatsapp, journal }) {
@@ -79,13 +86,13 @@ function MyDay() {
   const body = () => ({ date_jour: day, taches: draft.taches.filter((task) => task.texte.trim()).map((task) => ({ texte: task.texte.trim().slice(0, 300), statut: task.statut })), remarques: draft.remarques, demain: draft.demain });
 
   async function submit(validate) {
-    if (validate && !body().taches.length) { setError('Ajoutez au moins une tâche avant de valider la journée.'); return; }
-    if (validate && !window.confirm('Valider la journée ? Le journal ne pourra plus être modifié et le rapport est envoyé à l’administrateur.')) return;
+    if (validate && !body().taches.length) { setError('Ajoutez au moins une tâche avant de soumettre la journée.'); return; }
+    if (validate && !window.confirm('Soumettre la journée ? Le journal ne pourra plus être modifié et le rapport est envoyé à l’administrateur (email).')) return;
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await (validate ? validateMyJournal : saveMyJournal)(accessToken, body());
       setData(result);
-      setNotice(validate ? 'Journée validée.' : 'Brouillon enregistré.');
+      setNotice(validate ? 'Journée soumise à l’administrateur.' : 'Brouillon enregistré.');
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -97,7 +104,7 @@ function MyDay() {
     <div className="jdj-dayline">
       <label className="jdj-date"><span>Journée du</span><input type="date" value={day} max={localDay()} onChange={(event) => event.target.value && setDay(event.target.value)} /></label>
       <strong className="jdj-dayname">{frDay(day)}</strong>
-      {data && <span className={`jdj-badge is-${data.journal.statut}`}>{locked ? `Validé le ${frTime(data.journal.date_validation)}` : data.journal.statut === 'brouillon' ? 'Brouillon' : 'Non saisi'}</span>}
+      {data && <span className={`jdj-badge is-${data.journal.statut}`}>{locked ? `Soumis le ${frTime(data.journal.date_validation)}` : data.journal.statut === 'brouillon' ? 'Brouillon' : 'Non saisi'}</span>}
     </div>
     {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
     {notice && <p className="jdj-notice" role="status">{notice}</p>}
@@ -107,7 +114,7 @@ function MyDay() {
           <section className="jdj-card"><h3>Mes tâches</h3><TaskList taches={data.journal.taches} /></section>
           {data.journal.remarques && <section className="jdj-card"><h3>Remarques</h3><p className="jdj-text">{data.journal.remarques}</p></section>}
           {data.journal.demain && <section className="jdj-card"><h3>Prévu ensuite</h3><p className="jdj-text">{data.journal.demain}</p></section>}
-          <section className="jdj-card"><h3>Rapport envoyé à l’administrateur</h3><pre className="jdj-report">{data.rapport}</pre><WhatsappStatus whatsapp={data.whatsapp} journal={data.journal} /></section>
+          <section className="jdj-card"><h3>Rapport envoyé à l’administrateur</h3><pre className="jdj-report">{data.rapport}</pre><EmailStatus email={data.email} journal={data.journal} /><WhatsappStatus whatsapp={data.whatsapp} journal={data.journal} /></section>
         </> : <>
           <section className="jdj-card">
             <h3>Mes tâches du jour</h3>
@@ -136,7 +143,7 @@ function MyDay() {
     </div>}
     {data && !locked && <footer className="jdj-actions">
       <button type="button" className="jdj-btn" disabled={busy} onClick={() => submit(false)}>Enregistrer le brouillon</button>
-      <button type="button" className="jdj-validate" disabled={busy} onClick={() => submit(true)}>{busy ? 'Envoi…' : 'Valider et envoyer à l’administrateur'}</button>
+      <button type="button" className="jdj-validate" disabled={busy} onClick={() => submit(true)}>{busy ? 'Soumission…' : 'Soumettre'}</button>
     </footer>}
   </div>;
 }
@@ -148,6 +155,7 @@ function TeamDay() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [numero, setNumero] = useState(null);
+  const [email, setEmail] = useState(null);
   const [history, setHistory] = useState(null); // { utilisateur, items }
 
   const load = useCallback(async () => {
@@ -156,6 +164,7 @@ function TeamDay() {
       const result = await getTeamDay(accessToken, day);
       setData(result);
       setNumero((current) => current ?? result.whatsapp.numero);
+      setEmail((current) => current ?? result.email?.adresse ?? '');
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -165,7 +174,7 @@ function TeamDay() {
   async function act(action, item) {
     try {
       if (action === 'vu') await markJournalSeen(accessToken, item.utilisateur, item.date_jour);
-      if (action === 'rouvrir' && window.confirm(`Rouvrir le journal de ${item.utilisateur} ? Il pourra le corriger puis le valider à nouveau.`)) await reopenJournal(accessToken, item.utilisateur, item.date_jour);
+      if (action === 'rouvrir' && window.confirm(`Rouvrir le journal de ${item.utilisateur} ? Il pourra le corriger puis le soumettre à nouveau.`)) await reopenJournal(accessToken, item.utilisateur, item.date_jour);
       if (action === 'historique') setHistory(await getEmployeeHistory(accessToken, item.utilisateur));
       if (action !== 'historique') await load();
     } catch (requestError) {
@@ -176,7 +185,7 @@ function TeamDay() {
   async function saveNumber(event) {
     event.preventDefault();
     try {
-      await saveWhatsappNumber(accessToken, numero || '');
+      await saveJournalParams(accessToken, { whatsapp_admin: numero || '', email_admin: email || '' });
       await load();
       setError('');
     } catch (requestError) {
@@ -193,21 +202,24 @@ function TeamDay() {
       <strong className="jdj-dayname">{frDay(day)}</strong>
     </div>
     <div className="jdj-counters">
-      <span className="is-valide"><b>{counts.valide ?? '…'}</b> validé{counts.valide > 1 ? 's' : ''}</span>
+      <span className="is-valide"><b>{counts.valide ?? '…'}</b> soumis</span>
       <span className="is-brouillon"><b>{counts.brouillon ?? '…'}</b> en brouillon</span>
       <span className="is-vide"><b>{counts.vide ?? '…'}</b> non saisi{counts.vide > 1 ? 's' : ''}</span>
       <form className="jdj-number" onSubmit={saveNumber}>
+        <label><span>Email des rapports</span><input type="email" value={email ?? ''} onChange={(event) => setEmail(event.target.value)} placeholder="adresse@exemple.com" /></label>
         <label><span>WhatsApp de l’administrateur</span><input value={numero ?? ''} onChange={(event) => setNumero(event.target.value)} placeholder="Ex : 98 123 456" inputMode="tel" /></label>
         <button type="submit" className="jdj-btn">Enregistrer</button>
       </form>
     </div>
+    {data?.email && !data.email.configure && <p className="jdj-warn">L’envoi des emails n’est pas encore configuré sur le serveur (SMTP_HOST, SMTP_USER, SMTP_PASSWORD, ou BREVO_API_KEY) : les journaux soumis restent visibles ici.</p>}
     {data && !data.whatsapp.api && <p className="jdj-muted jdj-hint">Les employés envoient le rapport depuis leur WhatsApp en un clic (le message est déjà écrit). Pour un envoi automatique par le serveur, configurer l’API WhatsApp Business (WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID).</p>}
     {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
     <div className="jdj-people">
       {!data ? <p className="jdj-muted">Chargement…</p> : data.items.length === 0 ? <p className="jdj-muted">Aucun employé.</p> : data.items.map((item) => <article key={item.utilisateur} className={`jdj-person is-${item.statut}`}>
         <header>
           <strong>{item.utilisateur}</strong>
-          <span className={`jdj-badge is-${item.statut}`}>{item.statut === 'valide' ? `Validé le ${frTime(item.date_validation)}` : item.statut === 'brouillon' ? 'Brouillon (non validé)' : 'Non saisi'}</span>
+          <span className={`jdj-badge is-${item.statut}`}>{item.statut === 'valide' ? `Soumis le ${frTime(item.date_validation)}` : item.statut === 'brouillon' ? 'Brouillon (non soumis)' : 'Non saisi'}</span>
+          {item.envoi_email === 'envoye' && <span className="jdj-tag">Email envoyé</span>}
           {item.envoi === 'api' && <span className="jdj-tag">WhatsApp envoyé</span>}
           {item.vu_admin && <span className="jdj-tag is-seen">Vu</span>}
           <span className="jdj-spacer" />
@@ -229,7 +241,7 @@ function TeamDay() {
       <section className="jdj-history" role="dialog" aria-label={`Historique de ${history.utilisateur}`}>
         <header><h3>{history.utilisateur} · 14 derniers jours</h3><button type="button" className="expert-close" onClick={() => setHistory(null)} aria-label="Fermer">×</button></header>
         {history.items.length === 0 ? <p className="jdj-muted">Aucun journal sur cette période.</p> : history.items.map((item) => <div key={item.date_jour} className="jdj-history-day">
-          <h4>{frDay(item.date_jour)} <span className={`jdj-badge is-${item.statut}`}>{item.statut === 'valide' ? 'Validé' : 'Brouillon'}</span></h4>
+          <h4>{frDay(item.date_jour)} <span className={`jdj-badge is-${item.statut}`}>{item.statut === 'valide' ? 'Soumis' : 'Brouillon'}</span></h4>
           <TaskList taches={item.taches} />
           {item.remarques && <p className="jdj-text"><b>Remarques :</b> {item.remarques}</p>}
         </div>)}

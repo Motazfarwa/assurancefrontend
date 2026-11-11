@@ -116,3 +116,5 @@
 .jdj-btn:disabled { opacity: .5; cursor: wait; }
 .jdj-number .jdj-btn { height: 34px; padding: 0 12px; }
 .jdj-person > header .jdj-btn { padding: 5px 10px; font-size: 11.5px; }
+.jdj-number input[type="email"] { width: 230px; }
+@media (max-width: 560px) { .jdj-number { flex-wrap: wrap; } .jdj-number input, .jdj-number input[type="email"] { width: 100%; } .jdj-number label { flex: 1 1 100%; } }

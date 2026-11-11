@@ -19,7 +19,8 @@ async function request(accessToken, path, method = 'GET', body) {
 //   activite: { total, par_type, dernieres }, rapport, whatsapp: { numero, lien } }
 export const getMyJournal = (accessToken, day) => request(accessToken, `/moi?date=${day}`);
 export const saveMyJournal = (accessToken, journal) => request(accessToken, '/moi', 'PUT', journal);
-// The same body, and whatsapp: { numero, envoye, erreur, lien } (lien: wa.me link when the server did not send it).
+// The same body, whatsapp: { numero, envoye, erreur, lien } (lien: wa.me link when the server did not send it)
+// and email: { destinataire, envoye, erreur }.
 export const validateMyJournal = (accessToken, journal) => request(accessToken, '/moi/valider', 'POST', journal);
 
 // Administrator
@@ -28,3 +29,5 @@ export const getEmployeeHistory = (accessToken, name, jours = 14) => request(acc
 export const markJournalSeen = (accessToken, name, day) => request(accessToken, `/equipe/${encodeURIComponent(name)}/${day}/vu`, 'POST');
 export const reopenJournal = (accessToken, name, day) => request(accessToken, `/equipe/${encodeURIComponent(name)}/${day}/rouvrir`, 'POST');
 export const saveWhatsappNumber = (accessToken, numero) => request(accessToken, '/parametres', 'PUT', { whatsapp_admin: numero });
+// Where the submitted days go: { whatsapp_admin, email_admin } (only the keys given are changed).
+export const saveJournalParams = (accessToken, params) => request(accessToken, '/parametres', 'PUT', params);
