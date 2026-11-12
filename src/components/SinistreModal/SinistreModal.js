@@ -464,7 +464,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         code_branche: policy.code_branche || '', Code_Type_Branche: policy.code_type_branche != null ? String(policy.code_type_branche) : latest.Code_Type_Branche,
         Risque: (policy.risque || latest.Risque).slice(0, 50),
       });
-      info(`Police ${policy.num_int} : ${policy.code_client} ${policy.nom_client || ''}${policy.etat && policy.etat !== 'AN' ? ` — police ${policy.etat}` : ''}`);
+      info(`Police ${policy.num_int} : ${policy.code_client} ${policy.nom_client || ''}${policy.etat && !['AN', 'RV'].includes(policy.etat) ? ` — police ${policy.etat}` : ''}`);
     } catch (requestError) {
       if (!quiet) info(requestError.message);
     }
@@ -506,7 +506,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       if (!policies.length) { info(`Client ${code} : aucune police enregistrée.`); return; }
       const typedPolicy = formRef.current.Num_Int.trim();
       if (typedPolicy && policies.some((row) => row.num_int === typedPolicy || row.num_police === typedPolicy)) return; // already one of this client's policies
-      const chosen = policies.find((row) => row.etat === 'AN') || policies[0];
+      const chosen = policies.find((row) => ['AN', 'RV'].includes(row.etat)) || policies[0];
       await fillFromPolicy({ numero: chosen.num_int || chosen.num_police });
       if (policies.length > 1) info(`${policies.length} polices pour ce client — police ${chosen.num_int || chosen.num_police} affichée, choisissez-en une autre dans « N° police ».`);
     } catch { /* policies unavailable: the name alone is shown */ }

@@ -64,8 +64,8 @@ const POLICY_ORDERS = [['effet', 'Date effet'], ['client', 'Client'], ['police',
 const blankPolicyFilters = (code = '') => ({ code_client: code, nom_client: '', num_police: '', statut: 'vigueur', code_compagnie: '', ordre: 'effet', date_debut: '', date_fin: '', obs: '' });
 function policyStatus(policy) {
   const etat = String(policy.etat || '').trim().toUpperCase();
-  if (etat === 'AN') return policy.expiration && String(policy.expiration).slice(0, 10) < new Date().toISOString().slice(0, 10) ? 'Expirée' : 'En vigueur';
-  if (['SS', 'RE', 'RV'].includes(etat)) return 'Suspendue / résiliée';
+  if (etat === 'AN' || etat === 'RV') return policy.expiration && String(policy.expiration).slice(0, 10) < new Date().toISOString().slice(0, 10) ? 'Expirée' : 'En vigueur';
+  if (['SS', 'RE'].includes(etat)) return 'Suspendue / résiliée';
   return '';
 }
 // Fleet contracts and vehicles of a fleet are told apart in the Risque column (the policy's own risque is kept apart).

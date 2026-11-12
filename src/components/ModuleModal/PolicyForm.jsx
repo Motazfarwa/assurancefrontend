@@ -142,8 +142,9 @@ const DATE_FIELDS = [
     "date_mvt", "date_saisie", "date_emission"
 ];
 
-// A policy in force, as in "Liste des polices" (same rule as the API): état AN, not expired.
-export const isInForce = (item) => String(item?.etat || "").trim().toUpperCase() === "AN"
+// A policy in force, as in "Liste des polices" (same rule as the API): état AN (affaire nouvelle) or RV (remise en
+// vigueur), not expired.
+export const isInForce = (item) => ["AN", "RV"].includes(String(item?.etat || "").trim().toUpperCase())
     && (!item.expiration || String(item.expiration).slice(0, 10) >= new Date().toLocaleDateString("sv-SE"));
 
 const toTimestamp = (value) =>
