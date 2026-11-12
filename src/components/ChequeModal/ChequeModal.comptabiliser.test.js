@@ -22,7 +22,7 @@ beforeEach(() => {
     quittances: [{ num_quittance: '20261001136712', num_police: '074202648171', echeance: '2026-11-14', solde: 120, instance: 0 }],
     pieces: [],
   });
-  createPiece.mockResolvedValue({ nump: 'ESP1', num_reg_cli: 41804, date_comptabilise: journalDay() });
+  createPiece.mockResolvedValue({ nump: 'ESP1', num_reg_cli: 41804, date_comptabilise: '2026-11-12' });
 });
 
 test('"À verser": the quittances paid can be comptabilisées in the feuille de caisse of the journal day', async () => {
@@ -45,5 +45,6 @@ test('"À verser": the quittances paid can be comptabilisées in the feuille de 
   fireEvent.change(document.querySelector('input.chq-amount'), { target: { value: '120' } });
   fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }));
   await waitFor(() => expect(createPiece).toHaveBeenCalledWith('t', expect.objectContaining({ a_verser: true, comptabiliser: true, allocations: [{ num_quittance: '20261001136712', montant: 120 }] })));
-  expect(await screen.findByText(new RegExp(`comptabilisées dans la feuille de caisse du ${shortDate(journalDay())}`))).toBeInTheDocument();
+  // Date_Comptabiliser: the date saisie
+  expect(await screen.findByText(/comptabilisées le 12\/11\/2026/)).toBeInTheDocument();
 });

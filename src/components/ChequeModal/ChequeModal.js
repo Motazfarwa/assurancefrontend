@@ -218,7 +218,7 @@ export default function ChequeModal({ onClose }) {
       setEditing(false);
       await loadClient(client.code_client);
       // "À verser": the piece was recorded as a client règlement (TRegCli) and the quittances it pays are settled.
-      const done = result?.num_reg_cli ? `Pièce versée : règlement n° ${result.num_reg_cli} enregistré, quittances réglées${result.date_comptabilise ? ` et comptabilisées dans la feuille de caisse du ${shortDate(result.date_comptabilise)}` : ''}.` : doneMessage;
+      const done = result?.num_reg_cli ? `Pièce versée : règlement n° ${result.num_reg_cli} enregistré, quittances réglées${result.date_comptabilise ? ` et comptabilisées le ${shortDate(result.date_comptabilise)}` : ''}.` : doneMessage;
       setNotice(done);
       if (action === 'create' && batchRef.current && !advanceBatch()) setNotice(`${done} Tous les chèques scannés sont enregistrés.`);
     } catch (requestError) {
