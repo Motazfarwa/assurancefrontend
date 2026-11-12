@@ -43,7 +43,9 @@ export const FAMILIES = {
           ['N° Police', (row) => row.num_int],
           ['C_Cl', (row) => row.code_client], ['Nom_Client', (row) => (row.trouvee === false ? 'Quittance introuvable dans la base' : row.nom_client)],
           ['Echéance', (row) => formatDate(row.echeance)],
-          ['TC', (row) => row.tc], ['Période', (row) => row.periode], ['Prime totale', (row) => fmt(row.prime_total), 'num'], ['Mvt', (row) => row.mvt],
+          // The période of a comptant quittance is set when it is validated in a month of Réception comptant: until
+          // then it is empty in the base, and said so (no month is made up for it).
+          ['TC', (row) => row.tc], ['Période', (row) => row.periode || (row.trouvee !== false && row.tc === 'C' ? 'Non validée' : '')], ['Prime totale', (row) => fmt(row.prime_total), 'num'], ['Mvt', (row) => row.mvt],
         ],
       },
     },
