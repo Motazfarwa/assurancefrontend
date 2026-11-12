@@ -162,3 +162,17 @@ test('"Lister": one line per journal of the half months; "Valider" asks, then de
   expect(screen.getByLabelText('Date')).toHaveValue('2026-10-31');
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-10-31' })));
 });
+
+test('a quittance comptabilisée then paid again by a pièce not comptabilisée: one line ticked, one line unticked', async () => {
+  getReceiptsJournal.mockResolvedValue({ items: [
+    line('12690396', { comptabilise: true, date_comptabilise: '2026-11-12', montant: 140, a_s: 'A', partie: 'declaree' }),
+    line('12690396', { comptabilise: false, montant: 35, a_s: 'A', partie: 'a_declarer' }),
+  ] });
+  render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
+  await waitFor(() => expect(screen.getByLabelText('Choisir 12690396')).toBeChecked());
+  const rest = screen.getByLabelText('Choisir 12690396 (à déclarer)');
+  expect(rest).not.toBeChecked();
+  fireEvent.click(rest);
+  await waitFor(() => expect(tickReceipts).toHaveBeenCalledWith('t', '2026-11-15', [{ num_quittance: '12690396', coche: true }]));
+});

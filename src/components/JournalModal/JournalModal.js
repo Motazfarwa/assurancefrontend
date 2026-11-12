@@ -36,7 +36,9 @@ const KINDS = {
     heading: 'COCHÉES : COMPTABILISÉES DANS CE JOURNAL · NON COCHÉES : RÉGLÉES (100 MILLIMES ET PLUS), À DÉCLARER · COCHER COMPTABILISE À LA DATE DU JOURNAL',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
-    key: (row) => row.num_quittance,
+    // A quittance declared in the journal and paid again since has two lines: the part declared, the part to declare.
+    key: (row) => (row.partie === 'a_declarer' ? `${row.num_quittance} (à déclarer)` : row.num_quittance),
+    number: (row) => row.num_quittance,
     // Ticked: comptabilisée in the half month of the journal (here, from Saisir les pièces or the feuille de caisse);
     // unticked: paid and still to declare.
     preselect: (row) => Boolean(row.comptabilise),
@@ -160,7 +162,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     if (!config.tick || !listedFor || !rows.length) return;
     setTicking(true); setNotice('');
     try {
-      const body = await config.tick(accessToken, listedFor.date, rows.map((row) => ({ num_quittance: config.key(row), coche: ticked })));
+      const body = await config.tick(accessToken, listedFor.date, rows.map((row) => ({ num_quittance: config.number(row), coche: ticked })));
       const done = ticked ? body.comptabilisees || [] : body.retirees || [];
       const what = done.length === 1 ? `Quittance ${done[0]}` : `${done.length} quittances`;
       setNotice(ticked ? `${what} comptabilisée${done.length > 1 ? 's' : ''} au ${formatDate(listedFor.date)}.` : `${what} retirée${done.length > 1 ? 's' : ''} du journal du ${formatDate(listedFor.date)} : à déclarer.`);
@@ -230,7 +232,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   }
 
   // The feuille de caisse validates the lines ticked here (once listed); otherwise every line still to declare.
-  const cashSelection = listed && config.selection ? config.selection(selected.filter((row) => !row.comptabilise).map(config.key)) : undefined;
+  const cashSelection = listed && config.selection ? config.selection(selected.filter((row) => !row.comptabilise).map(config.number || config.key)) : undefined;
   // After its validation the journal is read again: the lines declared stay listed, ticked.
   const afterCashValidation = () => { if (listed) setListedFor((current) => ({ ...current, at: Date.now() })); };
 
