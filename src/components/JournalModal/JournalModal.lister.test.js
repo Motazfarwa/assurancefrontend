@@ -6,21 +6,19 @@ import { getExpensesJournal, getReceiptsJournal } from '../../services/journalAp
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Sami' } }) }));
 jest.mock('../../services/journalApi', () => ({
   getReceiptsJournal: jest.fn(), getExpensesJournal: jest.fn(), listJournalCompanies: jest.fn(), postReceipts: jest.fn(), postExpenses: jest.fn(),
-  getReceiptChoices: jest.fn(), saveReceiptChoices: jest.fn(), getJournalPeriods: jest.fn(), validateJournal: jest.fn(),
+  getReceiptChoices: jest.fn(), saveReceiptChoices: jest.fn(), tickReceipts: jest.fn(), getJournalPeriods: jest.fn(), validateJournal: jest.fn(),
 }));
 jest.mock('./FeuilleCaisse', () => ({
   ...jest.requireActual('./FeuilleCaisse'),
   CashSheet: jest.fn(() => null),
 }));
 
-const { listJournalCompanies, getReceiptChoices, saveReceiptChoices, getJournalPeriods, validateJournal } = jest.requireMock('../../services/journalApi');
+const { listJournalCompanies, tickReceipts, getJournalPeriods, validateJournal } = jest.requireMock('../../services/journalApi');
 const period = (jour, debut, extra) => ({ jour, debut, declarees: 2, montant_declare: 200, a_declarer: 1, montant_a_declarer: 100, lignes: 3, montant: 300, validation: null, ...extra });
 // The journal opens on its lines (the table); "Lister" opens the window of the journals of the half months.
 async function openDetails() {
   await screen.findByRole('button', { name: 'Lister' });
 }
-// The ticks kept on the server, per date (as dbo.TJournalChoix).
-let mockKept = {};
 const line = (number, extra) => ({
   num_quittance: number, tc: 'T', echeance: '2026-01-01', num_police: '6320245109', code_agence: '00', code_compagnie: 4, nom_compagnie: 'CARTE',
   montant: 100, a_s: 'S', frais: 0, timbre: 0, comm: 2.5, assure: 'MIDANI NEJLA', regle: 100, date_reglement: '2026-02-17T00:00:00',
@@ -30,12 +28,9 @@ const line = (number, extra) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   listJournalCompanies.mockResolvedValue([{ code_compagnie: 4, nom_compagnie: 'CARTE' }]);
-  mockKept = {};
-  getReceiptChoices.mockImplementation((token, date) => Promise.resolve({ choix: { ...(mockKept[date] || {}) } }));
-  saveReceiptChoices.mockImplementation((token, date, items) => {
-    mockKept[date] = { ...(mockKept[date] || {}), ...Object.fromEntries(items.map((item) => [item.num_quittance, item.coche])) };
-    return Promise.resolve({ enregistres: items.length });
-  });
+  tickReceipts.mockImplementation((token, date, items) => Promise.resolve({
+    date, comptabilisees: items.filter((item) => item.coche).map((item) => item.num_quittance), retirees: items.filter((item) => !item.coche).map((item) => item.num_quittance),
+  }));
   getReceiptsJournal.mockResolvedValue({ items: [
     line('02026017527'),
     line('02026000001', { comptabilise: true, date_comptabilise: '2026-11-11' }),
@@ -58,19 +53,20 @@ test('encaissement: listed as it opens, on the journal day (the 15th, or the las
   expect(screen.getByLabelText('Date')).toHaveValue(day);
   await openDetails();
   expect(await screen.findByText('02026017527')).toBeInTheDocument();
-  expect(getReceiptsJournal).toHaveBeenCalledWith('t', expect.objectContaining({ date: day, regles: true, periode: true, comptabilises: false }));
+  expect(getReceiptsJournal).toHaveBeenCalledWith('t', expect.objectContaining({ date: day, regles: true, periode: true, comptabilises: true }));
   expect(getReceiptsJournal.mock.lastCall[1]).not.toHaveProperty('debut');
 });
 
-test('encaissement: the quittances declared on the date and those to declare, every line ticked, no validation column, red when declared off the 15th / end of month', async () => {
+test('encaissement: the quittances comptabilisées in the journal ticked, those to declare unticked, no validation column, red when declared off the 15th / end of month', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
-  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15', regles: true, periode: true, comptabilises: false })));
+  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15', regles: true, periode: true, comptabilises: true })));
   const row = (await screen.findByText('02026017527')).closest('tr');
   expect(screen.queryByRole('columnheader', { name: 'Validation' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();
-  expect(within(row).getByRole('checkbox')).toBeChecked();
+  expect(within(row).getByRole('checkbox')).not.toBeChecked();
+  expect(screen.getByLabelText('Choisir 02026000002')).toBeChecked();
   expect(row).not.toHaveClass('is-offday');
   expect(screen.getByText('02026000001').closest('tr')).toHaveClass('is-offday');
   expect(screen.getByText('02026000002').closest('tr')).not.toHaveClass('is-offday');
@@ -79,6 +75,9 @@ test('encaissement: the quittances declared on the date and those to declare, ev
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-12' } });
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-12' })));
   await waitFor(() => expect(screen.getByText('02026017527').closest('tr')).toHaveClass('is-offday'));
+  // not a journal day: nothing can be ticked (comptabilised) on it
+  expect(screen.getByLabelText('Choisir 02026017527')).toBeDisabled();
+  expect(screen.getByText(/n’est ni le 15 ni le dernier jour du mois : choisissez la date d’un journal/)).toBeInTheDocument();
   // "Lister": the window of the journals of the half months, over the table
   expect(getJournalPeriods).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole('button', { name: 'Lister' }));
@@ -95,7 +94,7 @@ test('encaissement: nothing declared or to declare at the date', async () => {
   expect(await screen.findByText('Aucune quittance déclarée ou à déclarer au 15/11/2026.')).toBeInTheDocument();
 });
 
-test('the feuille de caisse opened from the journal validates the quittances ticked in it', async () => {
+test('the feuille de caisse opened from the journal: the quittances ticked are already comptabilisées, nothing more to validate', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
@@ -104,10 +103,7 @@ test('the feuille de caisse opened from the journal validates the quittances tic
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ compagnie: '4' })));
   await screen.findByText('02026017527');
   fireEvent.click(screen.getByRole('button', { name: 'Feuille de caisse' }));
-  expect(CashSheet.mock.lastCall[0]).toMatchObject({ date: '2026-11-15', selection: { quittances: ['02026017527'] } });
-  // a quittance unticked is left out of the validation
-  fireEvent.click(screen.getByLabelText('Choisir 02026017527'));
-  expect(CashSheet.mock.lastCall[0].selection).toEqual({ quittances: [] });
+  expect(CashSheet.mock.lastCall[0]).toMatchObject({ date: '2026-11-15', selection: { quittances: [] } });
 });
 
 test('dépense: the journal opened lists every company; "Lister" lists the journals again with the filters', async () => {
@@ -122,36 +118,22 @@ test('dépense: the journal opened lists every company; "Lister" lists the journ
   await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ type: 'depense', compagnie: '', nature: 'S' })));
 });
 
-test('every line, declared ones included, is ticked and can be unticked; the ticks of a date are kept on the server for that date', async () => {
-  const first = render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
-  await openDetails();
-  fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
-  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15' })));
-  const declared = await screen.findByLabelText('Choisir 02026000002');
-  await waitFor(() => expect(declared).toBeChecked());
-  expect(declared).not.toBeDisabled();
-  fireEvent.click(declared);
-  fireEvent.click(screen.getByLabelText('Choisir 02026017527'));
-  expect(declared).not.toBeChecked();
-  expect(saveReceiptChoices).toHaveBeenCalledWith('t', '2026-11-15', [{ num_quittance: '02026000002', coche: false }]);
-  expect(saveReceiptChoices).toHaveBeenCalledWith('t', '2026-11-15', [{ num_quittance: '02026017527', coche: false }]);
-  // ticked again: kept as ticked
-  fireEvent.click(screen.getByLabelText('Choisir 02026017527'));
-  expect(saveReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-15', [{ num_quittance: '02026017527', coche: true }]);
-  first.unmount();
-
-  // opened again on that date: the same choice
+test('a tick comptabilises the quittance at once on the journal date, an untick takes it back out; the journal is read again', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
-  await waitFor(() => expect(getReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-15'));
-  await waitFor(() => expect(screen.getByLabelText('Choisir 02026000002')).not.toBeChecked());
-  expect(screen.getByLabelText('Choisir 02026017527')).toBeChecked();
-  expect(screen.getByLabelText('Choisir 02026000001')).toBeChecked();
-  // another date: its own choice (every line ticked)
-  fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-30' } });
-  await waitFor(() => expect(getReceiptChoices).toHaveBeenLastCalledWith('t', '2026-11-30'));
-  await waitFor(() => expect(screen.getByLabelText('Choisir 02026000002')).toBeChecked());
+  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15' })));
+  const pending = await screen.findByLabelText('Choisir 02026017527');
+  expect(pending).not.toBeChecked();
+  const calls = getReceiptsJournal.mock.calls.length;
+  fireEvent.click(pending);
+  await waitFor(() => expect(tickReceipts).toHaveBeenCalledWith('t', '2026-11-15', [{ num_quittance: '02026017527', coche: true }]));
+  expect(await screen.findByText('Quittance 02026017527 comptabilisée au 15/11/2026.')).toBeInTheDocument();
+  await waitFor(() => expect(getReceiptsJournal.mock.calls.length).toBeGreaterThan(calls));
+  await waitFor(() => expect(screen.getByLabelText('Choisir 02026000002')).not.toBeDisabled());
+  fireEvent.click(screen.getByLabelText('Choisir 02026000002'));
+  await waitFor(() => expect(tickReceipts).toHaveBeenLastCalledWith('t', '2026-11-15', [{ num_quittance: '02026000002', coche: false }]));
+  expect(await screen.findByText('Quittance 02026000002 retirée du journal du 15/11/2026 : à déclarer.')).toBeInTheDocument();
 });
 
 test('"Lister": one line per journal of the half months; "Valider" asks, then declares the journal on its date', async () => {

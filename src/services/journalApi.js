@@ -30,6 +30,9 @@ export const getReceiptsJournal = (token, params) => request(`/api/journaux/enca
 // The ticks kept for the journal d'encaissement of a date: { choix: { num_quittance: ticked } } (absent: ticked).
 export const getReceiptChoices = (token, date) => request(`/api/journaux/encaissement/choix?${query({ date })}`, token);
 export const saveReceiptChoices = (token, date, items) => request('/api/journaux/encaissement/choix', token, { method: 'PUT', body: JSON.stringify({ date, items }) });
+// Ticks of the journal d'encaissement of a journal day: ticked = comptabilisée on that date at once, unticked = taken back
+// out. items: [{ num_quittance, coche }] -> { date, comptabilisees, retirees }.
+export const tickReceipts = (token, date, items) => request('/api/journaux/encaissement/coche', token, { method: 'PUT', body: JSON.stringify({ date, items }) });
 // The journals of the half months, one line each, from the one of the date back: { items, anterieur }.
 export const getJournalPeriods = (token, params) => request(`/api/journaux/periodes?${query(params)}`, token);
 // Validates the journal (encaissement / dépense) of a half month: { type, jour, compagnie, nature }.

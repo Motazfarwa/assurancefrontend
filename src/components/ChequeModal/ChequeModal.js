@@ -5,6 +5,7 @@ import { listClients, normalizeClientRecord, rankClients } from '../../services/
 import { spreadImported } from '../../services/importedPayment';
 import { scanPayment } from '../../services/paymentScan';
 import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
+import { journalDay } from '../JournalModal/FeuilleCaisse';
 import './ChequeModal.css';
 
 const TYPES = [['T', 'Traite'], ['C', 'Chèque'], ['V', 'Virement'], ['E', 'Espèce'], ['B', 'Carte bancaire']];
@@ -13,7 +14,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const num = (value) => (value === '' || value == null ? 0 : Number(value) || 0);
-const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: false, en_instance: false, compte_versement: '' });
+const blankForm = () => ({ nump: '', typep: 'C', datep: today(), montant: '', code_banque: '', a_verser: false, en_instance: false, compte_versement: '', comptabiliser: false });
 // A piece stored in TPiece is "en instance" until settled; ticking "À verser" then pays it in (it becomes a règlement in TRegCli).
 const storedStatus = (piece) => ({ a_verser: false, en_instance: piece.regle !== 'O', compte_versement: '' });
 
@@ -183,6 +184,7 @@ export default function ChequeModal({ onClose }) {
     return {
       code_client: client.code_client, nump: form.nump.trim(), typep: form.typep, datep: form.datep || null, montant: num(form.montant),
       code_banque: form.code_banque || null, a_verser: form.a_verser, en_instance: form.en_instance, compte_versement: form.a_verser ? form.compte_versement : null,
+      comptabiliser: form.a_verser && form.comptabiliser,
       allocations: Object.entries(alloc).filter(([, value]) => num(value) > 0).map(([num_quittance, value]) => ({ num_quittance, montant: num(value) })),
     };
   }
@@ -193,6 +195,7 @@ export default function ChequeModal({ onClose }) {
     if (!form.nump.trim()) return 'Le numéro de pièce est obligatoire.';
     if (!form.a_verser && !form.en_instance) return 'Le statut est obligatoire : cochez « À verser » ou « En instance ».';
     if (form.a_verser && !form.compte_versement) return 'Choisissez le compte de versement de l’agence.';
+    if (form.a_verser && form.comptabiliser && allocated <= 0) return 'Pour comptabiliser dans la feuille de caisse, répartissez le montant sur au moins une quittance.';
     if (num(form.montant) <= 0) return 'Le montant doit être supérieur à zéro.';
     if (allocated > num(form.montant) + 0.001) return 'Le total réparti dépasse le montant de la pièce.';
     const tooMuch = quittances.find((row) => num(alloc[row.num_quittance]) > Number(row.solde) - Number(row.instance) + 0.001);
@@ -210,12 +213,12 @@ export default function ChequeModal({ onClose }) {
       if (action === 'update') result = await updatePiece(accessToken, form.nump.trim(), payload());
       if (action === 'delete') await deletePiece(accessToken, form.nump.trim(), client.code_client);
       // The statut of a batch of cheques is kept for the next one.
-      setForm((current) => (batchRef.current && action === 'create' ? { ...blankForm(), a_verser: current.a_verser, en_instance: current.en_instance, compte_versement: current.compte_versement } : blankForm()));
+      setForm((current) => (batchRef.current && action === 'create' ? { ...blankForm(), a_verser: current.a_verser, en_instance: current.en_instance, compte_versement: current.compte_versement, comptabiliser: current.comptabiliser } : blankForm()));
       setAlloc({});
       setEditing(false);
       await loadClient(client.code_client);
       // "À verser": the piece was recorded as a client règlement (TRegCli) and the quittances it pays are settled.
-      const done = result?.num_reg_cli ? `Pièce versée : règlement n° ${result.num_reg_cli} enregistré, quittances réglées.` : doneMessage;
+      const done = result?.num_reg_cli ? `Pièce versée : règlement n° ${result.num_reg_cli} enregistré, quittances réglées${result.date_comptabilise ? ` et comptabilisées dans la feuille de caisse du ${shortDate(result.date_comptabilise)}` : ''}.` : doneMessage;
       setNotice(done);
       if (action === 'create' && batchRef.current && !advanceBatch()) setNotice(`${done} Tous les chèques scannés sont enregistrés.`);
     } catch (requestError) {
@@ -476,6 +479,13 @@ export default function ChequeModal({ onClose }) {
                     <option value="">—</option>
                     {accounts.map((account) => <option key={account.code_banque} value={account.code_banque}>{account.code_banque} · {account.nom_banque}</option>)}
                   </select>
+                </label>
+              )}
+              {/* "À verser": the quittances paid are comptabilisées in the feuille de caisse of the journal day (the 15th until
+                  the 15th, then the last day of the month), and shown ticked in the journal d'encaissement of that day. */}
+              {form.a_verser && (
+                <label className="chq-check" title="Les quittances réglées par la pièce sont comptabilisées (Comptabiliser = O) à cette date et cochées dans le journal d’encaissement du même jour">
+                  <input type="checkbox" checked={form.comptabiliser} onChange={(event) => change({ comptabiliser: event.target.checked })} />Comptabiliser dans la feuille de caisse du {shortDate(journalDay())}
                 </label>
               )}
               {bankName && <small>{bankName}</small>}

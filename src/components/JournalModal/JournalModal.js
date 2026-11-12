@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import JournalPeriods from './JournalPeriods';
-import { getExpensesJournal, getReceiptChoices, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts, saveReceiptChoices } from '../../services/journalApi';
+import { getExpensesJournal, getReceiptsJournal, listJournalCompanies, postExpenses, postReceipts, tickReceipts } from '../../services/journalApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import '../AcompteModal/AcompteModal.css';
@@ -33,12 +33,13 @@ const receiptStatus = (row) => {
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES RÉGLÉES (100 MILLIMES ET PLUS) À DÉCLARER · COMPTABILISER = N, SANS DATE DE COMPTABILISATION · COCHÉES PAR DÉFAUT',
+    heading: 'COCHÉES : COMPTABILISÉES DANS CE JOURNAL · NON COCHÉES : RÉGLÉES (100 MILLIMES ET PLUS), À DÉCLARER · COCHER COMPTABILISE À LA DATE DU JOURNAL',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
-    // Every quittance paid by a client (RDetRegCli) is chosen from the start; one is left out by unticking it.
-    preselect: () => true,
+    // Ticked: comptabilisée in the half month of the journal (here, from Saisir les pièces or the feuille de caisse);
+    // unticked: paid and still to declare.
+    preselect: (row) => Boolean(row.comptabilise),
     text: (row) => `${row.num_quittance} ${row.num_police || ''} ${row.assure || ''} ${row.code_client || ''} ${row.nom_compagnie || ''}`,
     amount: 'montant',
     // Every company is listed until one is chosen.
@@ -47,14 +48,13 @@ const KINDS = {
     settled: true,
     // No "Comptabiliser": the lines chosen are declared by the validation of the feuille de caisse ("Valider").
     readOnly: true,
-    // Only the lines still to declare (Comptabiliser N, no Date_Comptabiliser); the declared ones are in "Lister".
-    showDone: false,
+    // The quittances comptabilisées in the half month of the journal (shown only in that journal), and those to declare.
+    showDone: true,
     // The feuille de caisse validates the quittances chosen here.
     selection: (keys) => ({ quittances: keys }),
-    // Every line, declared or not, is ticked and can be unticked; the ticks of a date are kept on the server, so the
-    // journal of that date shows the same choice when it is opened again. "Valider" on the feuille of the date declares
-    // the ticked lines and takes the unticked ones out of the date.
-    choices: { load: getReceiptChoices, save: saveReceiptChoices },
+    // A tick comptabilises the quittance at once on the journal date (the 15th or the last day of the month):
+    // Comptabiliser O, Date_Comptabiliser = that date; an untick takes it back out (to declare again).
+    tick: tickReceipts,
   },
   depense: {
     title: 'Journal de dépense',
@@ -84,8 +84,9 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [date, setDate] = useState(journalDay);
   // Encaissement: only the quittances a client paid something on (a date de règlement and Réglé > 0).
   const settledParams = () => (config.settled ? { regles: true, periode: true } : {});
-  // A line that can be ticked / unticked: every line of the journal d'encaissement, the ones not comptabilisées elsewhere.
-  const editable = (row) => Boolean(config.choices) || !row.comptabilise;
+  // A line that can be ticked / unticked: every line of the journal d'encaissement of a journal day (15th, end of month),
+  // the dépenses not comptabilisées.
+  const editable = (row) => (config.tick ? isJournalDay(listedFor?.date) : !row.comptabilise);
   const [nature, setNature] = useState(''); // dépense: '' | S | R
   const [showDone, setShowDone] = useState(Boolean(config.showDone));
   const [search, setSearch] = useState('');
@@ -100,6 +101,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [periodsKey, setPeriodsKey] = useState(0);
   // The lines listed: { compagnie, date, nature }. They are read when the journal opens and when a filter changes.
   const [listedFor, setListedFor] = useState(null);
+  const [ticking, setTicking] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -117,15 +119,12 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
     setState((current) => ({ ...current, loading: true, error: '' }));
     Promise.all([
       config.load(accessToken, { compagnie: listedFor.compagnie, date: listedFor.date, nature: listedFor.nature, comptabilises: showDone, ...settledParams(listedFor.date) }),
-      config.choices ? config.choices.load(accessToken, listedFor.date).catch(() => ({ choix: {} })) : Promise.resolve({ choix: {} }),
     ])
-      .then(([body, kept]) => {
+      .then(([body]) => {
         if (!active) return;
         const items = body.items || [];
-        const choix = kept.choix || {};
         setState({ loading: false, error: '', items });
-        // Ticked from the start, unless unticked on this date before.
-        setChosen(new Set(items.filter((row) => editable(row) && config.preselect(row) && choix[config.key(row)] !== false).map(config.key)));
+        setChosen(new Set(items.filter((row) => config.preselect(row)).map(config.key)));
       })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [] }); });
     return () => { active = false; };
@@ -155,29 +154,48 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const done = state.items.filter((row) => row.comptabilise);
   const allChosen = pending.length > 0 && pending.every((row) => chosen.has(config.key(row)));
 
-  // A tick or untick is kept on the server for the date of the journal: opened again on that date, the journal shows it.
-  const remember = (rows, ticked) => {
-    if (!config.choices || !listedFor || !rows.length) return;
-    config.choices.save(accessToken, listedFor.date, rows.map((row) => ({ num_quittance: config.key(row), coche: ticked })))
-      .catch((requestError) => setState((current) => ({ ...current, error: `Choix non enregistré : ${requestError.message}` })));
-  };
+  // Encaissement: a tick comptabilises the quittances on the journal date, an untick takes them back out; then the
+  // journal is read again.
+  async function tick(rows, ticked) {
+    if (!config.tick || !listedFor || !rows.length) return;
+    setTicking(true); setNotice('');
+    try {
+      const body = await config.tick(accessToken, listedFor.date, rows.map((row) => ({ num_quittance: config.key(row), coche: ticked })));
+      const done = ticked ? body.comptabilisees || [] : body.retirees || [];
+      const what = done.length === 1 ? `Quittance ${done[0]}` : `${done.length} quittances`;
+      setNotice(ticked ? `${what} comptabilisée${done.length > 1 ? 's' : ''} au ${formatDate(listedFor.date)}.` : `${what} retirée${done.length > 1 ? 's' : ''} du journal du ${formatDate(listedFor.date)} : à déclarer.`);
+    } catch (requestError) {
+      setState((current) => ({ ...current, error: requestError.message }));
+    } finally {
+      setTicking(false);
+      setListedFor((current) => (current ? { ...current, at: Date.now() } : current));
+    }
+  }
   const toggle = (row) => {
+    if (ticking) return;
     const ticked = !chosen.has(config.key(row));
+    if (config.tick) { setChosen((current) => { const next = new Set(current); if (ticked) next.add(config.key(row)); else next.delete(config.key(row)); return next; }); tick([row], ticked); return; }
     setChosen((current) => {
       const next = new Set(current);
       if (ticked) next.add(config.key(row)); else next.delete(config.key(row));
       return next;
     });
-    remember([row], ticked);
   };
   const toggleAll = () => {
     const ticked = !allChosen;
+    if (config.tick) {
+      const rows = pending.filter((row) => chosen.has(config.key(row)) !== ticked);
+      if (!rows.length || ticking) return;
+      const question = ticked ? `Comptabiliser ${rows.length} quittance${rows.length > 1 ? 's' : ''} au ${formatDate(listedFor.date)} ?` : `Retirer ${rows.length} quittance${rows.length > 1 ? 's' : ''} du journal du ${formatDate(listedFor.date)} ?`;
+      if (!window.confirm(question)) return;
+      tick(rows, ticked);
+      return;
+    }
     setChosen((current) => {
       const next = new Set(current);
       pending.forEach((row) => (ticked ? next.add(config.key(row)) : next.delete(config.key(row))));
       return next;
     });
-    remember(pending, ticked);
   };
 
   async function comptabiliser() {
@@ -219,7 +237,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   // The feuille: what is comptabilisé on the date, or else a preview of the chosen lines.
   function openSheet() {
     // Encaissement: the lines ticked (a preview while some are still to declare).
-    if (config.choices) setSheet({ rows: selected, preview: selected.some((row) => !row.comptabilise) });
+    if (config.tick) setSheet({ rows: selected, preview: selected.some((row) => !row.comptabilise) });
     else if (showDone && done.length) setSheet({ rows: done, preview: false });
     else setSheet({ rows: selected, preview: true });
   }
@@ -257,6 +275,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               {!config.readOnly && <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>}
             </div>
           </div>
+          {config.tick && listed && !isJournalDay(listedFor.date) && <p className="jrn-offday-legend">Le {formatDate(listedFor.date)} n’est ni le 15 ni le dernier jour du mois : choisissez la date d’un journal pour cocher (comptabiliser) une quittance.</p>}
           {kind === 'encaissement' && listed && shown.some((row) => offDay(row, listedFor.date)) && <p className="jrn-offday-legend"><i aria-hidden="true" /> En rouge : quittance déclarée (ou à déclarer) un autre jour que le 15 ou le dernier jour du mois.</p>}
           {listed && !state.loading && shown.length === 0 ? <div className="unpaid-empty">{kind === 'depense' ? `Aucune dépense à déclarer ${allListed ? '' : 'pour cette compagnie '}à cette date.` : `Aucune quittance déclarée ou à déclarer au ${formatDate(listedFor.date)}${allListed ? '' : ' pour cette compagnie'}.`}</div>
             : listed && <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table">
@@ -273,7 +292,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                 const status = kind === 'encaissement' ? receiptStatus(row) : null;
                 return <tr key={key} className={`${!editable(row) ? 'is-done' : on ? 'is-chosen' : ''}${red ? ' is-offday' : ''}`} onClick={() => { if (editable(row)) toggle(row); }}
                   title={status ? `${status[0]} : ${status[1]}${row.comptabilise && row.date_comptabilise ? ` Déclarée le ${formatDate(row.date_comptabilise)}.` : ''}` : undefined}>
-                  <td className="cqi-verser"><input type="checkbox" checked={on} disabled={!editable(row)} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
+                  <td className="cqi-verser"><input type="checkbox" checked={on} disabled={!editable(row) || ticking} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
                   {kind === 'encaissement'
                     ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.a_s}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
