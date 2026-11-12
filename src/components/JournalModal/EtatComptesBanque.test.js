@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import EtatComptesBanqueModal from './EtatComptesBanque';
 import { getBankAccounts, getBankStatement } from '../../services/journalApi';
 import { readSpreadsheetRows } from '../../services/bordereauParser';
@@ -24,7 +24,9 @@ const bankRows = [
   ['Date opération', 'Libellé', 'Date valeur', 'Débit', 'Crédit'],
   ['02/10/2026', 'VERSEMENT ESPECES', '02/10/2026', '', '1009,274'],
   ['06/10/2026', 'REMISE CHQ 0001180', '07/10/2026', '', '738,842'],
+  ['05/10/2026', 'PAIEMENT CHQ 45123', '05/10/2026', '2915,000', ''], // 1 TND less than our 2 916,000
   ['30/10/2026', 'FRAIS TENUE DE COMPTE', '30/10/2026', '45,500', ''],
+  ['03/11/2026', 'VERSEMENT ESPECES', '03/11/2026', '', '500,000'], // after the period
 ];
 
 beforeEach(() => {
@@ -36,6 +38,8 @@ beforeEach(() => {
 test('shows the account, then confronts it with the bank statement', async () => {
   const { container } = render(<EtatComptesBanqueModal moduleId="598" onClose={() => {}} />);
   await waitFor(() => expect(screen.getByLabelText('Code banque').value).toBe('ATTIJARI GAT'));
+  fireEvent.change(screen.getByLabelText('Date début'), { target: { value: '2026-10-01' } });
+  fireEvent.change(screen.getByLabelText('Date fin'), { target: { value: '2026-10-31' } });
   // the archived accounts are not offered
   expect(screen.queryByRole('option', { name: /ATB GAT/ })).toBeNull();
   fireEvent.click(screen.getByLabelText('Etat détaillé'));
@@ -46,12 +50,32 @@ test('shows the account, then confronts it with the bank statement', async () =>
 
   const file = new File(['x'], 'releve.xlsx');
   await act(async () => { fireEvent.change(container.querySelector('input[type="file"]'), { target: { files: [file] } }); });
-  expect(await screen.findByText(/3 opérations lues · 2 rapprochées, 1 chez nous seulement, 1 sur le relevé seulement/)).toBeTruthy();
+  // Only the lines of the period are confronted.
+  expect(await screen.findByText(/5 opérations lues, dont/)).toHaveTextContent('5 opérations lues, dont 4 du 01/10/2026 au 31/10/2026 (1 hors période, non confrontée)');
   expect(getBankStatement).toHaveBeenCalledTimes(1); // same account and dates: not fetched again
+  const tally = screen.getByLabelText('Résultat de la confrontation');
+  expect(tally).toHaveTextContent('2rapprochés1montants proches à confirmer0chez nous seulement1sur le relevé seulement');
+  // 2 916,000 chez nous and 2 915,000 on the statement: side by side, the user answers.
+  const proposal = screen.getByRole('group', { name: /Même opération : 2.916,000 et 2.915,000/ });
+  expect(proposal.closest('tr')).toHaveTextContent(/− 1,000/);
+
   fireEvent.click(screen.getByRole('button', { name: 'Voir le rapport de confrontation' }));
-  expect(await screen.findByText('Chez nous, absents du relevé (1)')).toBeTruthy();
-  expect(screen.getByText('Sur le relevé, absents chez nous (1)')).toBeTruthy();
+  expect(await screen.findByText('2. Montants proches à confirmer (1)')).toBeTruthy();
+  expect(screen.getByText('3. Chez nous, absents du relevé (0)')).toBeTruthy();
+  expect(screen.getByText('4. Sur le relevé, absents chez nous (1)')).toBeTruthy();
   expect(screen.getByText('FRAIS TENUE DE COMPTE')).toBeTruthy();
+  expect(screen.queryByText('03/11/2026')).toBeNull(); // the line after the period is not in the report
+
+  // "Oui": the two are paired with their difference.
+  fireEvent.click(within(proposal).getByRole('button', { name: 'Oui' }));
+  if (process.env.DUMP_DIR) fs.writeFileSync(`${process.env.DUMP_DIR}/bank-confront-oui.html`, screen.getByTestId('report').innerHTML);
+  expect(tally).toHaveTextContent('3rapprochés0montants proches à confirmer');
+  expect(await screen.findByText('2. Rapprochés avec un écart de montant (1)')).toBeTruthy();
+  expect(screen.getByText(/Écart total − 1,000/)).toBeTruthy();
+  // "Non": each stays on its own side.
+  fireEvent.click(within(proposal).getByRole('button', { name: 'Non' }));
+  expect(tally).toHaveTextContent('2rapprochés0montants proches à confirmer1chez nous seulement2sur le relevé seulement');
+  expect(screen.getByText('3. Sur le relevé, absents chez nous (2)')).toBeTruthy();
   if (process.env.DUMP_DIR) {
     fs.writeFileSync(`${process.env.DUMP_DIR}/bank-confront.html`, screen.getByTestId('report').innerHTML);
     fs.writeFileSync(`${process.env.DUMP_DIR}/bank-modal.html`, container.querySelector('.expert-modal-backdrop').outerHTML.replace(/<div data-testid="report">[\s\S]*$/, '</section></div>'));

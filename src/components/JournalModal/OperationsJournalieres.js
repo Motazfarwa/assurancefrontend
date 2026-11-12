@@ -16,7 +16,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 // The two modules (as the legacy software): production (policies / quittances moved) and financières (money in and out).
 // Each kind: its radio label, the report title, how to load it and its columns [label, value, 'num' for amounts].
-const FAMILIES = {
+export const FAMILIES = {
   production: {
     category: 'PRODUCTION',
     title: 'Opérations journalières (Production)',
@@ -37,8 +37,12 @@ const FAMILIES = {
         label: 'Quittance',
         title: 'Production des quittances',
         columns: [
-          ['Date Mvt', (row) => formatDate(row.date_mvt)], ['N° Quittance', (row) => row.num_quittance], ['N° Police', (row) => row.num_int],
-          ['C_Cl', (row) => row.code_client], ['Nom_Client', (row) => row.nom_client], ['Echéance', (row) => formatDate(row.echeance)],
+          // A quittance logged under its série (SERIE 341173 in its observation) shows its own number and the série;
+          // one the base does not have any more is said so, nothing is filled in for it.
+          ['Date Mvt', (row) => formatDate(row.date_mvt)], ['N° Quittance', (row) => (row.serie ? `${row.num_quittance} (série ${row.serie})` : row.num_quittance)],
+          ['N° Police', (row) => row.num_int],
+          ['C_Cl', (row) => row.code_client], ['Nom_Client', (row) => (row.trouvee === false ? 'Quittance introuvable dans la base' : row.nom_client)],
+          ['Echéance', (row) => formatDate(row.echeance)],
           ['TC', (row) => row.tc], ['Période', (row) => row.periode], ['Prime totale', (row) => fmt(row.prime_total), 'num'], ['Mvt', (row) => row.mvt],
         ],
       },
@@ -75,7 +79,7 @@ const FAMILIES = {
 };
 
 // The printable état of the kind chosen between two dates.
-function OperationsSheet({ family, type, debut, fin, onClose }) {
+export function OperationsSheet({ family, type, debut, fin, onClose }) {
   const { accessToken, user } = useAuth();
   const [state, setState] = useState({ loading: true, error: '', data: null });
   const kind = family.kinds[type];

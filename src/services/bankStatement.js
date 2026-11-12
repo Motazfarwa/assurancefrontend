@@ -68,9 +68,22 @@ const sameReference = (ours, bank) => {
   return number.length >= 4 && digits(`${bank.reference} ${bank.libelle}`).includes(number);
 };
 
+// The statement lines of the period chosen (date d'opération from début to fin): the others are left out of the
+// confrontation and counted.
+export function inPeriod(lines, debut, fin) {
+  const kept = lines.filter((line) => (!debut || line.date >= debut) && (!fin || line.date <= fin));
+  return { lines: kept, outside: lines.length - kept.length };
+}
+
+const round3 = (value) => Math.round(value * 1000) / 1000;
+export const proposalKey = (proposal) => `${proposal.ours.id}|${proposal.bank.ligne}`;
+
 // Pairs each statement line with one of our movements: same direction and same amount (to the millime), first when the
-// piece number matches, then by the closest date within `tolerance` days. Returns the pairs, ours alone, the bank's alone.
-export function confront(ours, bank, tolerance = 10) {
+// piece number matches, then by the closest date within `tolerance` days. Then, among what is left, a movement and a
+// line of the same direction whose amounts differ by `amountTolerance` TND at most (within the same days) are proposed
+// side by side: the user says whether they are the same operation. Returns the pairs, the proposals, ours alone, the
+// bank's alone (both without the proposals).
+export function confront(ours, bank, tolerance = 10, amountTolerance = 1) {
   const free = new Set(ours.map((_, index) => index));
   const taken = new Set();
   const matched = [];
@@ -98,12 +111,55 @@ export function confront(ours, bank, tolerance = 10) {
     if (!taken.has(bankIndex) && free.has(ourIndex)) pair(bankIndex, ourIndex, 'montant et date');
   });
 
-  matched.sort((a, b) => a.bank.date.localeCompare(b.bank.date) || a.bank.ligne - b.bank.ligne);
-  const sum = (lines, sens) => Math.round(lines.filter((line) => line.sens === sens).reduce((total, line) => total + Number(line.montant), 0) * 1000) / 1000;
+  // Close amounts: the smallest difference first, then the closest dates.
+  const near = [];
+  if (amountTolerance > 0) {
+    bank.forEach((line, bankIndex) => {
+      if (taken.has(bankIndex)) return;
+      free.forEach((ourIndex) => {
+        const o = ours[ourIndex];
+        const difference = round3(Number(line.montant) - Number(o.montant));
+        const gap = Math.abs(days(o.date_mvt, line.date));
+        if (o.sens === line.sens && Math.abs(difference) <= amountTolerance + 0.0005 && gap <= tolerance) near.push({ bankIndex, ourIndex, difference, gap });
+      });
+    });
+  }
+  near.sort((a, b) => Math.abs(a.difference) - Math.abs(b.difference) || a.gap - b.gap || a.bankIndex - b.bankIndex);
+  const proposals = [];
+  const proposedOurs = new Set();
+  const proposedBank = new Set();
+  near.forEach(({ bankIndex, ourIndex, difference }) => {
+    if (proposedOurs.has(ourIndex) || proposedBank.has(bankIndex)) return;
+    proposedOurs.add(ourIndex); proposedBank.add(bankIndex);
+    proposals.push({ ours: ours[ourIndex], bank: bank[bankIndex], ecart: days(ours[ourIndex].date_mvt, bank[bankIndex].date), difference });
+  });
+
+  const byBankDate = (a, b) => a.bank.date.localeCompare(b.bank.date) || a.bank.ligne - b.bank.ligne;
+  matched.sort(byBankDate);
+  proposals.sort(byBankDate);
+  const sum = (lines, sens) => round3(lines.filter((line) => line.sens === sens).reduce((total, line) => total + Number(line.montant), 0));
   return {
     matched,
-    oursOnly: ours.filter((_, index) => free.has(index)),
-    bankOnly: bank.filter((_, index) => !taken.has(index)),
+    proposals,
+    oursOnly: ours.filter((_, index) => free.has(index) && !proposedOurs.has(index)),
+    bankOnly: bank.filter((_, index) => !taken.has(index) && !proposedBank.has(index)),
     totals: { ours: { credit: sum(ours, 'C'), debit: sum(ours, 'D') }, bank: { credit: sum(bank, 'C'), debit: sum(bank, 'D') } },
   };
+}
+
+// The user's answers on the proposals ({ key: 'oui' | 'non' }): "oui", the two are the same operation (rapprochés avec
+// un écart de montant); "non", each stays on its own side; no answer yet, still to confirm.
+export function decide(result, decisions = {}) {
+  const accepted = [];
+  const pending = [];
+  const oursOnly = [...result.oursOnly];
+  const bankOnly = [...result.bankOnly];
+  result.proposals.forEach((proposal) => {
+    const answer = decisions[proposalKey(proposal)];
+    if (answer === 'oui') accepted.push(proposal);
+    else if (answer === 'non') { oursOnly.push(proposal.ours); bankOnly.push(proposal.bank); } else pending.push(proposal);
+  });
+  oursOnly.sort((a, b) => String(a.date_mvt).localeCompare(String(b.date_mvt)));
+  bankOnly.sort((a, b) => a.date.localeCompare(b.date) || a.ligne - b.ligne);
+  return { ...result, accepted, pending, oursOnly, bankOnly, ecartAccepte: round3(accepted.reduce((total, pair) => total + pair.difference, 0)) };
 }

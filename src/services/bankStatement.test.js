@@ -1,4 +1,4 @@
-import { bankLines, confront } from './bankStatement';
+import { bankLines, confront, decide, inPeriod, proposalKey } from './bankStatement';
 
 jest.mock('./bordereauParser', () => ({ ...jest.requireActual('./bordereauParser'), readSpreadsheetRows: jest.fn() }));
 
@@ -42,4 +42,39 @@ test('pairs by piece number, then by amount and closest date, and lists what is 
   expect(result.oursOnly.map((line) => line.id)).toEqual(['R2', 'D2']); // R2: 20 days from the only 500 line
   expect(result.bankOnly.map((line) => line.ligne)).toEqual([4, 6]);
   expect(result.totals).toEqual({ ours: { credit: 1738.842, debit: 3016 }, bank: { credit: 4154.842, debit: 2961.5 } });
+});
+
+test('keeps the statement lines of the period only', () => {
+  const lines = [{ ligne: 2, date: '2026-09-30' }, { ligne: 3, date: '2026-10-01' }, { ligne: 4, date: '2026-10-31' }, { ligne: 5, date: '2026-11-01' }];
+  expect(inPeriod(lines, '2026-10-01', '2026-10-31')).toEqual({ lines: [lines[1], lines[2]], outside: 2 });
+});
+
+test('proposes close amounts side by side, and follows the answers', () => {
+  const ours = [
+    { id: 'A', date_mvt: '2026-10-02', sens: 'C', montant: 500, reference: '' },
+    { id: 'B', date_mvt: '2026-10-03', sens: 'C', montant: 120, reference: '' },
+    { id: 'C', date_mvt: '2026-10-04', sens: 'D', montant: 80, reference: '' },
+  ];
+  const bank = [
+    { ligne: 2, date: '2026-10-02', sens: 'C', montant: 500, libelle: 'VERSEMENT', reference: '' },
+    { ligne: 3, date: '2026-10-04', sens: 'C', montant: 119, libelle: 'VERSEMENT', reference: '' }, // 1 TND less than B
+    { ligne: 4, date: '2026-10-05', sens: 'C', montant: 80.5, libelle: 'VIREMENT', reference: '' }, // other direction than C
+    { ligne: 5, date: '2026-10-05', sens: 'D', montant: 82, libelle: 'CHQ', reference: '' }, // 2 TND more than C
+  ];
+  const result = confront(ours, bank, 10, 1);
+  expect(result.matched.map((pair) => [pair.ours.id, pair.bank.ligne])).toEqual([['A', 2]]);
+  expect(result.proposals.map((pair) => [pair.ours.id, pair.bank.ligne, pair.difference])).toEqual([['B', 3, -1]]);
+  expect(result.oursOnly.map((line) => line.id)).toEqual(['C']);
+  expect(result.bankOnly.map((line) => line.ligne)).toEqual([4, 5]);
+
+  const key = proposalKey(result.proposals[0]);
+  expect(decide(result, {})).toMatchObject({ accepted: [], pending: [result.proposals[0]] });
+  const yes = decide(result, { [key]: 'oui' });
+  expect(yes.accepted.map((pair) => pair.ours.id)).toEqual(['B']);
+  expect(yes.ecartAccepte).toBe(-1);
+  const no = decide(result, { [key]: 'non' });
+  expect(no.pending).toEqual([]);
+  expect(no.oursOnly.map((line) => line.id)).toEqual(['B', 'C']);
+  expect(no.bankOnly.map((line) => line.ligne)).toEqual([3, 4, 5]);
+  expect(confront(ours, bank, 10, 2).proposals.map((pair) => [pair.ours.id, pair.bank.ligne])).toEqual([['B', 3], ['C', 5]]);
 });

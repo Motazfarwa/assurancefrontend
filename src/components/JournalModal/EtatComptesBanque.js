@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 import { getBankAccounts, getBankStatement } from '../../services/journalApi';
-import { BANK_COLUMNS, bankLines, confront, readBankFile } from '../../services/bankStatement';
+import { BANK_COLUMNS, bankLines, confront, decide, inPeriod, proposalKey, readBankFile } from '../../services/bankStatement';
 import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -121,46 +121,89 @@ function AccountSheet({ data, mode, onClose }) {
   </SheetFrame>;
 }
 
-// Confrontation: the totals of both sides, then the pairs, our movements missing from the statement and the bank's
-// lines missing from our books.
-function ConfrontationSheet({ data, result, fichier, tolerance, onClose }) {
+// Confrontation: the summary (both sides, the gap, what was paired), then each list by date: the close amounts still to
+// confirm, those confirmed (side by side, with their difference), our movements missing from the statement, the bank's
+// lines missing from our books, and the movements paired at the same amount.
+const signedMoney = (value) => `${value > 0 ? '+ ' : value < 0 ? '− ' : ''}${money(Math.abs(value))}`;
+const client = (item) => [item.code_client, item.nom_client].filter(Boolean).join(' · ');
+const sideTotal = (lines, sens) => lines.filter((line) => line.sens === sens).reduce((total, line) => total + Number(line.montant), 0);
+
+function PairsTable({ pairs, label }) {
+  return <table className="jrn-sheet-table jrn-bank-table jrn-bank-pairs">
+    <thead>
+      <tr><th colSpan={4}>Chez nous</th><th colSpan={3}>Sur le relevé</th><th rowSpan={2}>Différence (relevé − nous)</th><th rowSpan={2}>Même opération ?</th></tr>
+      <tr><th>Date</th><th>Référence</th><th>Libellé · client</th><th>Montant</th><th>Date</th><th>Libellé de la banque</th><th>Montant</th></tr>
+    </thead>
+    <tbody>{pairs.map((pair) => <tr key={proposalKey(pair)}>
+      <td>{formatDate(pair.ours.date_mvt)}</td><td>{pair.ours.reference}</td><td>{[pair.ours.libelle, client(pair.ours)].filter(Boolean).join(' · ')}</td><td className="num">{money(pair.ours.montant)} {pair.ours.sens}</td>
+      <td>{formatDate(pair.bank.date)}</td><td>{pair.bank.libelle}</td><td className="num">{money(pair.bank.montant)} {pair.bank.sens}</td>
+      <td className="num jrn-bank-diff">{signedMoney(pair.difference)}</td><td className="jrn-center">{label}</td>
+    </tr>)}</tbody>
+  </table>;
+}
+
+function ConfrontationSheet({ data, result, fichier, outside, tolerance, amountTolerance, onClose }) {
   const { totals } = result;
   const gap = (side) => Math.round((totals.bank[side] - totals.ours[side]) * 1000) / 1000;
-  return <SheetFrame title="CONFRONTATION AVEC LE RELEVÉ BANCAIRE" subtitle={[`Compte ${data.banque.code_banque}${data.banque.num_compte ? ` · N° ${data.banque.num_compte}` : ''}`, `Du ${formatDate(data.debut)} au ${formatDate(data.fin)} · Relevé : ${fichier}`]} onClose={onClose}>
+  const bankCount = result.matched.length + result.accepted.length + result.pending.length + result.bankOnly.length;
+  const amounts = (lines) => `Crédit ${money(sideTotal(lines, 'C'))} · Débit ${money(sideTotal(lines, 'D'))}`;
+  const rows = [
+    ['Rapprochés, même montant', result.matched.length, '', 'is-ok'],
+    ['Rapprochés avec un écart de montant (confirmés « Oui »)', result.accepted.length, result.accepted.length ? `Écart total ${signedMoney(result.ecartAccepte)}` : '', 'is-ok'],
+    ['Montants proches à confirmer', result.pending.length, '', result.pending.length ? 'is-warn' : ''],
+    ['Chez nous, absents du relevé', result.oursOnly.length, amounts(result.oursOnly), result.oursOnly.length ? 'is-gap' : ''],
+    ['Sur le relevé, absents chez nous', result.bankOnly.length, amounts(result.bankOnly), result.bankOnly.length ? 'is-gap' : ''],
+  ];
+  let section = 1;
+  return <SheetFrame title="CONFRONTATION AVEC LE RELEVÉ BANCAIRE" subtitle={[`Compte ${data.banque.code_banque}${data.banque.nom_banque ? ` · ${data.banque.nom_banque}` : ''}${data.banque.num_compte ? ` · N° ${data.banque.num_compte}` : ''}`, `Période du ${formatDate(data.debut)} au ${formatDate(data.fin)} · Relevé : ${fichier}${outside ? ` (${plural(outside, 'ligne')} hors période, non confrontée${outside > 1 ? 's' : ''})` : ''}`]} onClose={onClose}>
+    <h2 className="jrn-bank-title">{section++}. Résumé de la période</h2>
     <table className="jrn-sheet-table jrn-bank-summary">
       <thead><tr><th /><th>Mouvements</th><th>Crédit</th><th>Débit</th></tr></thead>
       <tbody>
         <tr><td>Nos écritures</td><td className="jrn-center">{data.items.length}</td><td className="num">{money(totals.ours.credit)}</td><td className="num">{money(totals.ours.debit)}</td></tr>
-        <tr><td>Relevé de la banque</td><td className="jrn-center">{result.matched.length + result.bankOnly.length}</td><td className="num">{money(totals.bank.credit)}</td><td className="num">{money(totals.bank.debit)}</td></tr>
-        <tr className={gap('credit') || gap('debit') ? 'is-gap' : 'is-ok'}><td>Écart (banque − nous)</td><td className="jrn-center">{result.matched.length} rapprochés</td><td className="num">{money(gap('credit'))}</td><td className="num">{money(gap('debit'))}</td></tr>
+        <tr><td>Relevé de la banque</td><td className="jrn-center">{bankCount}</td><td className="num">{money(totals.bank.credit)}</td><td className="num">{money(totals.bank.debit)}</td></tr>
+        <tr className={gap('credit') || gap('debit') ? 'is-gap' : 'is-ok'}><td>Écart (relevé − nous)</td><td /><td className="num">{signedMoney(gap('credit'))}</td><td className="num">{signedMoney(gap('debit'))}</td></tr>
       </tbody>
     </table>
-    <p className="jrn-bank-note">Rapprochement : même sens et même montant, d’abord par le N° de pièce retrouvé dans le libellé de la banque, puis par la date la plus proche (écart de {tolerance} jours au plus).</p>
+    <table className="jrn-sheet-table jrn-bank-summary jrn-bank-result">
+      <thead><tr><th>Rapprochement</th><th>Nombre</th><th>Montants</th></tr></thead>
+      <tbody>{rows.map(([label, count, detail, tone]) => <tr key={label} className={tone}><td>{label}</td><td className="jrn-center">{count}</td><td>{detail}</td></tr>)}</tbody>
+    </table>
+    <p className="jrn-bank-note">Même montant : même sens, d’abord par le N° de pièce retrouvé dans le libellé de la banque, puis par la date la plus proche ({tolerance} jours d’écart au plus). Montants proches : même sens, {money(amountTolerance)} TND de différence au plus, dans les mêmes {tolerance} jours ; « Oui » les rapproche, « Non » les laisse chacun de son côté.</p>
 
-    <h2 className="jrn-bank-title is-missing">Chez nous, absents du relevé ({result.oursOnly.length})</h2>
+    {result.pending.length > 0 && <>
+      <h2 className="jrn-bank-title is-warn">{section++}. Montants proches à confirmer ({result.pending.length})</h2>
+      <PairsTable pairs={result.pending} label="À confirmer" />
+    </>}
+    {result.accepted.length > 0 && <>
+      <h2 className="jrn-bank-title">{section++}. Rapprochés avec un écart de montant ({result.accepted.length})</h2>
+      <PairsTable pairs={result.accepted} label="Oui" />
+    </>}
+
+    <h2 className="jrn-bank-title is-missing">{section++}. Chez nous, absents du relevé ({result.oursOnly.length})</h2>
     <table className="jrn-sheet-table jrn-bank-table">
       <thead><tr><th>Date</th><th>Référence</th><th>Libellé</th><th>Client</th><th>Sens</th><th>Montant</th></tr></thead>
       <tbody>
-        {result.oursOnly.map((item) => <tr key={item.id}><td>{formatDate(item.date_mvt)}</td><td>{item.reference}</td><td>{item.libelle}</td><td>{[item.code_client, item.nom_client].filter(Boolean).join(' · ')}</td><td className="jrn-center">{SENS[item.sens]}</td><td className="num">{money(item.montant)}</td></tr>)}
-        {!result.oursOnly.length && <tr><td colSpan={6} className="jrn-sheet-state">Toutes nos écritures figurent sur le relevé.</td></tr>}
+        {result.oursOnly.map((item) => <tr key={item.id}><td>{formatDate(item.date_mvt)}</td><td>{item.reference}</td><td>{item.libelle}</td><td>{client(item)}</td><td className="jrn-center">{SENS[item.sens]}</td><td className="num">{money(item.montant)}</td></tr>)}
+        {!result.oursOnly.length && <tr><td colSpan={6} className="jrn-sheet-state">Toutes nos écritures de la période figurent sur le relevé.</td></tr>}
       </tbody>
     </table>
 
-    <h2 className="jrn-bank-title is-missing">Sur le relevé, absents chez nous ({result.bankOnly.length})</h2>
+    <h2 className="jrn-bank-title is-missing">{section++}. Sur le relevé, absents chez nous ({result.bankOnly.length})</h2>
     <table className="jrn-sheet-table jrn-bank-table">
       <thead><tr><th>Ligne</th><th>Date</th><th>Date valeur</th><th>Libellé de la banque</th><th>Référence</th><th>Sens</th><th>Montant</th></tr></thead>
       <tbody>
         {result.bankOnly.map((line) => <tr key={line.ligne}><td className="jrn-center">{line.ligne}</td><td>{formatDate(line.date)}</td><td>{formatDate(line.valeur)}</td><td>{line.libelle}</td><td>{line.reference}</td><td className="jrn-center">{SENS[line.sens]}</td><td className="num">{money(line.montant)}</td></tr>)}
-        {!result.bankOnly.length && <tr><td colSpan={7} className="jrn-sheet-state">Toutes les lignes du relevé sont dans nos écritures.</td></tr>}
+        {!result.bankOnly.length && <tr><td colSpan={7} className="jrn-sheet-state">Toutes les lignes du relevé de la période sont dans nos écritures.</td></tr>}
       </tbody>
     </table>
 
-    <h2 className="jrn-bank-title">Rapprochés ({result.matched.length})</h2>
+    <h2 className="jrn-bank-title">{section++}. Rapprochés, même montant ({result.matched.length})</h2>
     <table className="jrn-sheet-table jrn-bank-table">
       <thead><tr><th>Notre date</th><th>Date banque</th><th>Écart (j)</th><th>Notre référence</th><th>Libellé de la banque</th><th>Sens</th><th>Montant</th><th>Rapproché par</th></tr></thead>
       <tbody>
         {result.matched.map(({ ours, bank, ecart, how }) => <tr key={`${ours.id}-${bank.ligne}`}><td>{formatDate(ours.date_mvt)}</td><td>{formatDate(bank.date)}</td><td className="jrn-center">{ecart}</td><td>{ours.reference}</td><td>{bank.libelle}</td><td className="jrn-center">{SENS[ours.sens]}</td><td className="num">{money(ours.montant)}</td><td>{how}</td></tr>)}
-        {!result.matched.length && <tr><td colSpan={8} className="jrn-sheet-state">Aucun mouvement rapproché.</td></tr>}
+        {!result.matched.length && <tr><td colSpan={8} className="jrn-sheet-state">Aucun mouvement rapproché au même montant.</td></tr>}
       </tbody>
     </table>
   </SheetFrame>;
@@ -176,6 +219,8 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
   const [data, setData] = useState(null); // the account movements, for the filters they were loaded with
   const [statement, setStatement] = useState(null); // the bank's file: { fichier, rows, headerRow, headers, mapping }
   const [tolerance, setTolerance] = useState(10);
+  const [amountTolerance, setAmountTolerance] = useState(1); // TND: amounts this close are proposed side by side
+  const [decisions, setDecisions] = useState({}); // the answers on those proposals: { key: 'oui' | 'non' }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const fileInput = useRef(null);
@@ -229,12 +274,18 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
     try {
       const [read] = await Promise.all([readBankFile(file), movements()]);
       setStatement({ ...read, fichier: file.name });
+      setDecisions({}); // the answers were on the lines of the previous statement
     } catch (readError) { setError(readError.message); setStatement(null); }
     finally { setBusy(false); }
   }
 
   const lines = useMemo(() => (statement ? bankLines(statement) : []), [statement]);
-  const result = useMemo(() => (statement && data?.key === key ? confront(data.items, lines, tolerance) : null), [statement, data, key, lines, tolerance]);
+  // Only the statement lines of the period chosen (Date début - Date fin) are confronted with our movements of it.
+  const period = useMemo(() => inPeriod(lines, filters.debut, filters.fin), [lines, filters.debut, filters.fin]);
+  const raw = useMemo(() => (statement && data?.key === key ? confront(data.items, period.lines, tolerance, amountTolerance) : null), [statement, data, key, period, tolerance, amountTolerance]);
+  const result = useMemo(() => (raw ? decide(raw, decisions) : null), [raw, decisions]);
+  // A second click on the same answer takes it back.
+  const answer = (pair, value) => setDecisions((current) => ({ ...current, [proposalKey(pair)]: current[proposalKey(pair)] === value ? undefined : value }));
 
   function showConfrontation() {
     setError('');
@@ -269,7 +320,32 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
             <button type="button" className="expert-cancel" onClick={() => fileInput.current?.click()} disabled={!valid || busy}>{statement ? 'Changer de relevé' : 'Importer le relevé'}</button>
           </div>
           {statement && <>
-            <p className="jrn-hint">« {statement.fichier} » : {lines.length} opération{lines.length > 1 ? 's' : ''} lue{lines.length > 1 ? 's' : ''}{result ? ` · ${result.matched.length} rapprochée${result.matched.length > 1 ? 's' : ''}, ${result.oursOnly.length} chez nous seulement, ${result.bankOnly.length} sur le relevé seulement` : ' · changez le compte ou les dates : réimportez pour confronter'}.</p>
+            <p className="jrn-hint">« {statement.fichier} » : {plural(lines.length, 'opération')} lue{lines.length > 1 ? 's' : ''}, dont <strong>{period.lines.length} du {formatDate(filters.debut)} au {formatDate(filters.fin)}</strong>{period.outside ? ` (${period.outside} hors période, non confrontée${period.outside > 1 ? 's' : ''})` : ''}{result ? '' : ' · changez le compte ou les dates : réimportez pour confronter'}.</p>
+            {result && <div className="jrn-bank-tally" aria-label="Résultat de la confrontation">
+              <div className="is-ok"><strong>{result.matched.length + result.accepted.length}</strong><span>rapprochés</span></div>
+              <div className={result.pending.length ? 'is-warn' : ''}><strong>{result.pending.length}</strong><span>montants proches à confirmer</span></div>
+              <div className={result.oursOnly.length ? 'is-gap' : ''}><strong>{result.oursOnly.length}</strong><span>chez nous seulement</span></div>
+              <div className={result.bankOnly.length ? 'is-gap' : ''}><strong>{result.bankOnly.length}</strong><span>sur le relevé seulement</span></div>
+            </div>}
+            {raw && raw.proposals.length > 0 && <div className="jrn-bank-proposals">
+              <strong>Montants proches : est-ce la même opération ?</strong>
+              <small>« Oui » : rapprochés avec l’écart affiché. « Non » : chacun reste de son côté.</small>
+              <div className="jrn-bank-proposals-scroll"><table>
+                <thead><tr><th>Chez nous</th><th>Sur le relevé</th><th>Différence</th><th>Même opération ?</th></tr></thead>
+                <tbody>{raw.proposals.map((pair) => {
+                  const choice = decisions[proposalKey(pair)];
+                  return <tr key={proposalKey(pair)} className={choice ? `is-${choice}` : ''}>
+                    <td><b>{money(pair.ours.montant)}</b><small>{formatDate(pair.ours.date_mvt)} · {SENS[pair.ours.sens]}{pair.ours.reference ? ` · ${pair.ours.reference}` : ''}</small><small>{[pair.ours.libelle, client(pair.ours)].filter(Boolean).join(' · ')}</small></td>
+                    <td><b>{money(pair.bank.montant)}</b><small>{formatDate(pair.bank.date)} · {SENS[pair.bank.sens]}</small><small>{pair.bank.libelle}</small></td>
+                    <td className="jrn-bank-diff">{signedMoney(pair.difference)}</td>
+                    <td><div className="jrn-bank-answer" role="group" aria-label={`Même opération : ${money(pair.ours.montant)} et ${money(pair.bank.montant)}`}>
+                      <button type="button" className={choice === 'oui' ? 'is-on' : ''} aria-pressed={choice === 'oui'} onClick={() => answer(pair, 'oui')}>Oui</button>
+                      <button type="button" className={choice === 'non' ? 'is-on is-no' : ''} aria-pressed={choice === 'non'} onClick={() => answer(pair, 'non')}>Non</button>
+                    </div></td>
+                  </tr>;
+                })}</tbody>
+              </table></div>
+            </div>}
             <details className="jrn-bank-mapping">
               <summary>Colonnes du relevé — corrigez si besoin</summary>
               <div>
@@ -283,6 +359,7 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
                     {statement.headers.map((header, index) => <option key={index} value={index}>{header}</option>)}
                   </select>
                 </label>)}
+                <label className="acompte-field"><span>Écart de montant proposé (TND)</span><input type="number" min="0" max="1000" step="0.5" value={amountTolerance} onChange={(event) => setAmountTolerance(Math.max(0, Math.min(1000, Number(event.target.value) || 0)))} /></label>
                 <label className="acompte-field"><span>Écart de dates admis (jours)</span><input type="number" min="0" max="60" value={tolerance} onChange={(event) => setTolerance(Math.max(0, Math.min(60, Number(event.target.value) || 0)))} /></label>
               </div>
             </details>
@@ -296,7 +373,7 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
     {report && data && <NewWindow popup={report.popup} title={report.kind === 'etat' ? 'Etat détaillé des comptes' : 'Confrontation bancaire'} onClose={() => setReport(null)}>
       {report.kind === 'etat'
         ? <AccountSheet data={data} mode={filters.mode} onClose={() => setReport(null)} />
-        : result && <ConfrontationSheet data={data} result={result} fichier={statement.fichier} tolerance={tolerance} onClose={() => setReport(null)} />}
+        : result && <ConfrontationSheet data={data} result={result} fichier={statement.fichier} outside={period.outside} tolerance={tolerance} amountTolerance={amountTolerance} onClose={() => setReport(null)} />}
     </NewWindow>}
   </div>;
 }

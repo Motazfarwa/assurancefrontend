@@ -265,3 +265,34 @@
 .jrn-periods-window > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .jrn-periods-window > header h3 { margin: 0; color: #173247; font-size: 17px; }
 .jrn-periods-window .unpaid-results { margin: 0; }
+
+/* Confrontation bancaire: the result in four figures, and the close amounts to answer Oui / Non. */
+.jrn-bank-tally { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.jrn-bank-tally > div { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid #d3dfe5; border-radius: 8px; background: #fff; }
+.jrn-bank-tally strong { color: #173247; font-size: 18px; }
+.jrn-bank-tally span { color: #587079; font-size: 11px; }
+.jrn-bank-tally .is-ok strong { color: #08765e; }
+.jrn-bank-tally .is-warn { border-color: #e6b54a; background: #fffaf0; }
+.jrn-bank-tally .is-warn strong { color: #a15c07; }
+.jrn-bank-tally .is-gap strong { color: #b42318; }
+.jrn-bank-proposals { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid #e6b54a; border-radius: 10px; background: #fffaf0; }
+.jrn-bank-proposals > strong { color: #173247; font-size: 13px; }
+.jrn-bank-proposals > small { color: #587079; font-size: 11px; }
+.jrn-bank-proposals-scroll { max-height: 280px; overflow: auto; margin-top: 4px; }
+.jrn-bank-proposals table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.jrn-bank-proposals th { position: sticky; top: 0; padding: 5px 6px; background: #fdf3dd; color: #587079; font-size: 10px; text-align: left; text-transform: uppercase; }
+.jrn-bank-proposals td { padding: 6px; border-top: 1px solid #f0e2c0; vertical-align: top; }
+.jrn-bank-proposals td b { display: block; color: #173247; font-size: 13px; }
+.jrn-bank-proposals td small { display: block; color: #587079; font-size: 10.5px; }
+.jrn-bank-proposals tr.is-oui td { background: #ecf8f3; }
+.jrn-bank-proposals tr.is-non td { background: #f6f7f8; color: #7a8d96; }
+.jrn-bank-diff { color: #a15c07; font-weight: 700; white-space: nowrap; }
+.jrn-bank-answer { display: flex; gap: 6px; }
+.jrn-bank-confront .jrn-bank-answer button { min-height: 28px; padding: 0 12px; }
+.jrn-bank-confront .jrn-bank-answer button.is-on { background: #187d78; color: #fff; }
+.jrn-bank-confront .jrn-bank-answer button.is-on.is-no { border-color: #8a9aa3; background: #8a9aa3; }
+.jrn-bank-title.is-warn { color: #a15c07; }
+.jrn-bank-summary tr.is-warn td { color: #a15c07; font-weight: 700; }
+.jrn-bank-result { max-width: 760px; }
+.jrn-bank-pairs thead tr:first-child th { background: #f1f1f1; }
+@media (max-width: 700px) { .jrn-bank-tally { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
