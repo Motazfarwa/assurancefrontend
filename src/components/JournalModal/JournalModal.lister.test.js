@@ -58,7 +58,7 @@ test('encaissement: listed as it opens, on the journal day (the 15th, or the las
   expect(screen.getByLabelText('Date')).toHaveValue(day);
   await openDetails();
   expect(await screen.findByText('02026017527')).toBeInTheDocument();
-  expect(getReceiptsJournal).toHaveBeenCalledWith('t', expect.objectContaining({ date: day, regles: true, periode: true, comptabilises: true }));
+  expect(getReceiptsJournal).toHaveBeenCalledWith('t', expect.objectContaining({ date: day, regles: true, periode: true, comptabilises: false }));
   expect(getReceiptsJournal.mock.lastCall[1]).not.toHaveProperty('debut');
 });
 
@@ -66,7 +66,7 @@ test('encaissement: the quittances declared on the date and those to declare, ev
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
-  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15', regles: true, periode: true, comptabilises: true })));
+  await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15', regles: true, periode: true, comptabilises: false })));
   const row = (await screen.findByText('02026017527')).closest('tr');
   expect(screen.queryByRole('columnheader', { name: 'Validation' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();

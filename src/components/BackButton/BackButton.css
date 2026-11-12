@@ -1,0 +1,23 @@
+/* "Retour": always above the windows, bottom left. */
+.app-back-button {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 10050;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 8px 10px;
+  border: 1px solid #187d78;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #145f5b;
+  font: 700 13px/1 inherit;
+  font-family: inherit;
+  box-shadow: 0 6px 18px rgba(20, 60, 70, 0.22);
+  cursor: pointer;
+}
+.app-back-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.app-back-button:hover { background: #187d78; color: #ffffff; }
+.app-back-button:focus-visible { outline: 3px solid #8fd3cb; outline-offset: 2px; }
+@media print { .app-back-button { display: none !important; } }

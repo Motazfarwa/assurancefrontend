@@ -33,7 +33,7 @@ const receiptStatus = (row) => {
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'QUITTANCES DÉCLARÉES À CETTE DATE ET QUITTANCES RÉGLÉES À DÉCLARER · COCHÉES PAR DÉFAUT · « VALIDER » DANS LA FEUILLE DE CAISSE LES DÉCLARE À SA DATE',
+    heading: 'QUITTANCES RÉGLÉES (100 MILLIMES ET PLUS) À DÉCLARER · COMPTABILISER = N, SANS DATE DE COMPTABILISATION · COCHÉES PAR DÉFAUT',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     key: (row) => row.num_quittance,
@@ -47,8 +47,8 @@ const KINDS = {
     settled: true,
     // No "Comptabiliser": the lines chosen are declared by the validation of the feuille de caisse ("Valider").
     readOnly: true,
-    // The encaissements declared in the period of the date (1st-15th, 16th-end of the month) stay listed, ticked.
-    showDone: true,
+    // Only the lines still to declare (Comptabiliser N, no Date_Comptabiliser); the declared ones are in "Lister".
+    showDone: false,
     // The feuille de caisse validates the quittances chosen here.
     selection: (keys) => ({ quittances: keys }),
     // Every line, declared or not, is ticked and can be unticked; the ticks of a date are kept on the server, so the
@@ -58,15 +58,15 @@ const KINDS = {
   },
   depense: {
     title: 'Journal de dépense',
-    heading: 'SINISTRES ET RISTOURNES PAYÉS · COCHEZ « CHOIX » PUIS « COMPTABILISER »',
+    heading: 'DÉPENSES DE TYPE T À COMPTABILISER · COMPTABILISER = N, SANS DATE DE COMPTABILISATION · COCHEZ « CHOIX » PUIS « COMPTABILISER »',
     load: getExpensesJournal,
     post: (token, compagnie, date, rows) => postExpenses(token, { compagnie, date, depenses: rows.map((row) => row.num_dep) }),
     key: (row) => String(row.num_dep),
     preselect: () => true,
     text: (row) => `${row.numero || ''} ${row.num_police || ''} ${row.num_imat || ''} ${row.assure || ''} ${row.num_cheq || ''}`,
     amount: 'montant',
-    // As the legacy journal: the dépenses comptabilisées on the date are listed (and printed) from the start.
-    showDone: true,
+    // Only the dépenses still to comptabiliser (type T, Comptabiliser N, no Date_Comptabiliser).
+    showDone: false,
     // "Lister" without a company: the dépenses of every company.
     allCompanies: true,
     selection: (keys) => ({ depenses: keys.map(Number) }),
