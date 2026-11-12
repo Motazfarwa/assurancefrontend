@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { searchRecords, updateClientRecord } from '../../services/clientRecordsApi';
 import { isBordereauCompany, listCompanies } from '../../services/companyApi';
@@ -19,6 +19,20 @@ const blankFilters = () => {
     date_min: iso(new Date(now.getFullYear(), now.getMonth(), 1)), date_max: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   };
 };
+// A quittance searched by its number, its police, its client or its date de saisie is found whatever its échéance:
+// typing one of them empties the échéance dates of the month (put back once they are all emptied again).
+const SEARCH_KEYS = ['num_quittance', 'num_police', 'code_client', 'nom_client', 'date_saisie'];
+const searching = (values) => SEARCH_KEYS.some((key) => String(values[key] || '').trim());
+export function nextFilters(current, key, value, monthDates) {
+  const next = { ...current, [key]: value };
+  if (key === 'date_min' || key === 'date_max') return { ...next, autoDates: false };
+  if (!SEARCH_KEYS.includes(key)) return next;
+  if (searching(next) && !current.autoDates && current.date_min === monthDates.date_min && current.date_max === monthDates.date_max) {
+    return { ...next, date_min: '', date_max: '', autoDates: true };
+  }
+  if (!searching(next) && current.autoDates) return { ...next, ...monthDates, autoDates: false };
+  return next;
+}
 // Only the administrator modifies a quittance; another user may only correct a commission already set.
 const hasCommission = (record) => Number(record?.commission || 0) !== 0;
 
@@ -30,6 +44,7 @@ export default function QuittancesModal({ moduleId, onClose }) {
   const [companies, setCompanies] = useState([]);
   const [state, setState] = useState({ loading: true, error: '', records: [] });
   const [editing, setEditing] = useState(null);
+  const latest = useRef(0); // only the answer of the last search is shown (an older, slower one is dropped)
 
   useEffect(() => {
     let active = true;
@@ -41,12 +56,15 @@ export default function QuittancesModal({ moduleId, onClose }) {
   }, [accessToken]);
 
   async function load(current = filters) {
+    const request = latest.current + 1;
+    latest.current = request;
     setState((previous) => ({ ...previous, loading: true, error: '' }));
+    const { autoDates, ...criteria } = current;
     try {
-      const records = await searchRecords(accessToken, 'receipts', { ...current, limit: 1000 });
-      setState({ loading: false, error: '', records });
+      const records = await searchRecords(accessToken, 'receipts', { ...criteria, limit: 1000 });
+      if (latest.current === request) setState({ loading: false, error: '', records });
     } catch (error) {
-      setState({ loading: false, error: error.message, records: [] });
+      if (latest.current === request) setState({ loading: false, error: error.message, records: [] });
     }
   }
 
@@ -74,8 +92,8 @@ export default function QuittancesModal({ moduleId, onClose }) {
       columns={COLUMNS}
       {...state}
       filters={[
-        { key: 'num_quittance', label: 'N° quittance', value: filters.num_quittance, placeholder: 'Ex : 2026…' },
-        { key: 'num_police', label: 'N° police', value: filters.num_police, placeholder: 'Ex : 0522…' },
+        { key: 'num_quittance', label: 'N° quittance', value: filters.num_quittance, placeholder: 'Ex : 2026…', maxLength: 30 },
+        { key: 'num_police', label: 'N° police', value: filters.num_police, placeholder: 'Ex : 0522…', maxLength: 30 },
         { key: 'code_client', label: 'Code client', value: filters.code_client, placeholder: 'Tous', maxLength: 8 },
         { key: 'nom_client', label: 'Nom client', value: filters.nom_client, placeholder: 'Nom ou prénom' },
         { key: 'code_compagnie', label: 'Compagnie', type: 'select', value: filters.code_compagnie, options: [['', 'Toutes'], ...companies.map((item) => [String(item.code_compagnie), item.nom_compagnie])] },
@@ -83,7 +101,7 @@ export default function QuittancesModal({ moduleId, onClose }) {
         { key: 'date_max', label: 'au', type: 'date', value: filters.date_max },
         { key: 'date_saisie', label: 'Date saisie', type: 'date', value: filters.date_saisie },
       ]}
-      onFilterChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
+      onFilterChange={(key, value) => setFilters((current) => nextFilters(current, key, value, (({ date_min, date_max }) => ({ date_min, date_max }))(blankFilters())))}
       statusTabs={{ options: STATUSES, value: filters.reglement, onChange: (reglement) => setFilters((current) => ({ ...current, reglement })) }}
       onRowClick={(record) => { if (canEdit(record)) setEditing(record); }}
       onClose={onClose}
