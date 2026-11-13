@@ -60,15 +60,17 @@ const KINDS = {
   },
   depense: {
     title: 'Journal de dépense',
-    heading: 'DÉPENSES DE TYPE T À COMPTABILISER · COMPTABILISER = N, SANS DATE DE COMPTABILISATION · COCHEZ « CHOIX » PUIS « COMPTABILISER »',
+    heading: 'DÉPENSES DE TYPE T DE LA QUINZAINE · COMPTABILISÉES DANS CE JOURNAL (GRISÉES) ET À COMPTABILISER · COCHEZ « CHOIX » PUIS « COMPTABILISER »',
     load: getExpensesJournal,
     post: (token, compagnie, date, rows) => postExpenses(token, { compagnie, date, depenses: rows.map((row) => row.num_dep) }),
     key: (row) => String(row.num_dep),
     preselect: () => true,
     text: (row) => `${row.numero || ''} ${row.num_police || ''} ${row.num_imat || ''} ${row.assure || ''} ${row.num_cheq || ''}`,
     amount: 'montant',
-    // Only the dépenses still to comptabiliser (type T, Comptabiliser N, no Date_Comptabiliser).
-    showDone: false,
+    // The journal of the half month (as in "Lister"): the dépenses comptabilisées in it, and those paid in it still to
+    // comptabiliser (type T, Comptabiliser N).
+    showDone: true,
+    journal: true,
     // "Lister" without a company: the dépenses of every company.
     allCompanies: true,
     selection: (keys) => ({ depenses: keys.map(Number) }),
@@ -85,7 +87,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   // The journal day: the 15th until the 15th, then the last day of the month (11/11 -> 15/11, 16/11 -> 30/11).
   const [date, setDate] = useState(journalDay);
   // Encaissement: only the quittances a client paid something on (a date de règlement and Réglé > 0).
-  const settledParams = () => (config.settled ? { regles: true, periode: true } : {});
+  // Dépense: the journal of the half month of the date.
+  // Both: the journal of the half month of the date, as counted in "Lister" (what is still to declare from an older half
+  // month is in that half month's journal).
+  const settledParams = () => (config.settled ? { regles: true, periode: true, journal: true } : config.journal ? { journal: true } : {});
   // A line that can be ticked / unticked: every line of the journal d'encaissement of a journal day (15th, end of month),
   // the dépenses not comptabilisées.
   const editable = (row) => (config.tick ? isJournalDay(listedFor?.date) : !row.comptabilise);
@@ -154,6 +159,9 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const pending = shown.filter(editable);
   const selected = state.items.filter((row) => editable(row) && chosen.has(config.key(row)));
   const done = state.items.filter((row) => row.comptabilise);
+  // "N choisies" and "Total choisi": every line ticked, the ones already comptabilisées in the journal included (the
+  // same total as the journal in "Lister").
+  const ticked = state.items.filter((row) => chosen.has(config.key(row)));
   const allChosen = pending.length > 0 && pending.every((row) => chosen.has(config.key(row)));
 
   // Encaissement: a tick comptabilises the quittances on the journal date, an untick takes them back out; then the
@@ -221,7 +229,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
       const items = body.items || [];
       setShowDone(true);
       setState({ loading: false, error: '', items });
-      setChosen(new Set());
+      setChosen(new Set(items.filter((row) => config.preselect(row)).map(config.key)));
       setNotice(`${count} ligne${count > 1 ? 's' : ''} comptabilisée${count > 1 ? 's' : ''} au ${formatDate(date)}${groups.size > 1 ? ` (${groups.size} compagnies)` : ''}.`);
       if (company) setCashSheet(true);
     } catch (requestError) {
@@ -269,9 +277,9 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
         <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${selected.length} choisie${selected.length > 1 ? 's' : ''}`}</h3></div>
+            <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${ticked.length} choisie${ticked.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
-              <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(selected, config.amount))} TND</strong></div>
+              <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(ticked, config.amount))} TND</strong></div>
               <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (!selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
               <button type="button" className="expert-cancel" onClick={() => setCashSheet(true)} disabled={!company} title={company ? undefined : 'Choisissez une compagnie'}>Feuille de caisse</button>
               {!config.readOnly && <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>}

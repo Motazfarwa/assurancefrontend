@@ -36,7 +36,8 @@ beforeEach(() => {
     line('02026000001', { comptabilise: true, date_comptabilise: '2026-11-11' }),
     line('02026000002', { comptabilise: true, date_comptabilise: '2026-11-15' }),
   ] });
-  getJournalPeriods.mockImplementation((token, params) => Promise.resolve({ items: [period(params.date, '2026-11-01'), period('2026-10-31', '2026-10-16', { a_declarer: 0, montant_a_declarer: 0, montant: 200 })], anterieur: null }));
+  getJournalPeriods.mockImplementation((token, params) => Promise.resolve({ items: [period(params.date, '2026-11-01'), period('2026-10-31', '2026-10-16', { a_declarer: 0, montant_a_declarer: 0, montant: 200 }),
+    period('2026-10-15', '2026-10-01', { a_declarer: 0, montant_a_declarer: 0, validation: { utilisateur: 'Sami', date_saisie: '2026-10-15T17:30' } })], anterieur: null }));
   getExpensesJournal.mockResolvedValue({ items: [{ num_dep: 9037, numero: '2020007074', nature: 'S', montant: 184.111, code_compagnie: 6, nom_compagnie: 'ASTREE', comptabilise: false }] });
 });
 
@@ -145,8 +146,13 @@ test('"Lister": one line per journal of the half months; "Valider" asks, then de
   const current = (await screen.findByRole('button', { name: 'Journal d’encaissement du 15/11/2026' })).closest('tr');
   const previous = screen.getByRole('button', { name: 'Journal d’encaissement du 31/10/2026' }).closest('tr');
   expect(within(current).getByText('300,000')).toBeInTheDocument();
-  expect(within(previous).getByRole('button', { name: 'Valider' })).toBeDisabled();
-  expect(within(previous).getByText('À jour')).toBeInTheDocument();
+  // everything already comptabilisé (by the old software) but never validated: still to validate
+  expect(within(previous).getByRole('button', { name: 'Valider' })).not.toBeDisabled();
+  expect(within(previous).getByText('À valider · tout est déclaré')).toBeInTheDocument();
+  // validated in the new system: done
+  const validated = screen.getByRole('button', { name: 'Journal d’encaissement du 15/10/2026' }).closest('tr');
+  expect(within(validated).getByRole('button', { name: 'Valider' })).toBeDisabled();
+  expect(within(validated).getByText('Validé le 15/10/2026 à 17:30 par Sami')).toBeInTheDocument();
   fireEvent.click(within(current).getByRole('button', { name: 'Valider' }));
   const dialog = screen.getByRole('alertdialog', { name: 'Valider le journal d’encaissement du 15/11/2026 ?' });
   expect(validateJournal).not.toHaveBeenCalled();

@@ -8,8 +8,8 @@ const stamp = (value) => (value ? `${formatDate(value)} à ${String(value).slice
 const PAGE = 12;
 
 const NAMES = {
-  encaissement: { title: 'Journal d’encaissement', what: 'quittance', whats: 'quittances', verb: 'déclarée' },
-  depense: { title: 'Journal de dépense', what: 'dépense', whats: 'dépenses', verb: 'comptabilisée' },
+  encaissement: { title: 'Journal d’encaissement', what: 'quittance', whats: 'quittances', verb: 'déclarée', done: 'déclaré' },
+  depense: { title: 'Journal de dépense', what: 'dépense', whats: 'dépenses', verb: 'comptabilisée', done: 'comptabilisé' },
 };
 const plural = (count, one, many) => `${count} ${count > 1 ? many : one}`;
 
@@ -42,6 +42,10 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
       const result = await validateJournal(accessToken, { type: kind, jour: item.jour, compagnie: compagnie ? Number(compagnie) : null, nature });
       setAsking(null);
       setVersion((value) => value + 1);
+      if (!result.declarees && !result.retirees) {
+        onValidated?.(`${names.title} du ${formatDate(item.jour)} validé : tout était déjà ${names.done} au ${formatDate(item.jour)}.`);
+        return;
+      }
       onValidated?.(`${names.title} du ${formatDate(item.jour)} validé : ${plural(result.declarees, names.what, names.whats)} (${fmt(result.montant)} TND) ${result.declarees > 1 ? `${names.verb}s` : names.verb} au ${formatDate(item.jour)}${result.retirees ? `, ${result.retirees} retirée${result.retirees > 1 ? 's' : ''}` : ''} ; ${result.declarees > 1 ? 'elles sont' : 'elle est'} dans la feuille de caisse de ce jour.`);
     } catch (requestError) {
       setState((current) => ({ ...current, error: requestError.message }));
@@ -60,16 +64,19 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
     <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table jrn-period-table">
       <thead><tr><th>Journal</th><th className="cqi-number">Lignes</th><th className="cqi-number">Total montant</th><th>État</th><th /></tr></thead>
       <tbody>{state.items.map((item) => {
-        const open = Number(item.a_declarer) > 0;
+        // only a validation recorded in the new system makes a journal "Validé"; one whose lines are all already
+        // comptabilisées (by the old software) is still to validate
+        const open = !item.validation;
+        const pending = Number(item.a_declarer) > 0;
         return <tr key={item.jour} className={open ? 'is-open' : ''}>
           <td><button type="button" className="jrn-period-name" onClick={() => onOpen(item.jour)}>{names.title} du {formatDate(item.jour)}</button><small>du {shortDate(item.debut)} au {shortDate(item.jour)}</small></td>
           <td className="cqi-number">{item.lignes}</td>
           <td className="cqi-number"><b>{fmt(item.montant)}</b></td>
           <td>{item.validation ? <span className="jrn-period-state is-done">Validé le {stamp(item.validation.date_saisie)}{item.validation.utilisateur ? ` par ${item.validation.utilisateur}` : ''}</span>
-            : open ? <span className="jrn-period-state">À valider</span> : <span className="jrn-period-state is-done">À jour</span>}</td>
+            : <span className="jrn-period-state">À valider{pending ? '' : ` · tout est ${names.done}`}</span>}</td>
           <td className="jrn-period-actions">
             <button type="button" className="expert-cancel" onClick={() => onOpen(item.jour)}>Détails</button>
-            <button type="button" className="expert-submit" onClick={() => setAsking(item)} disabled={!open || busy} title={open ? undefined : 'Rien à déclarer dans ce journal'}>Valider</button>
+            <button type="button" className="expert-submit" onClick={() => setAsking(item)} disabled={!open || busy} title={open ? undefined : 'Journal déjà validé'}>Valider</button>
           </td>
         </tr>;
       })}</tbody>
