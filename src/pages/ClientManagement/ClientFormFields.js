@@ -63,18 +63,20 @@ export function ContactFields({ client, onChange, kind }) {
     contacts[index] = { ...(contacts[index] || {}), [property]: value };
     onChange(key, contacts);
   }
+  // On the address chosen for correspondence, the first phone and the first email are required; the others are optional.
+  const required = kind === correspondenceSide(client);
   function renderContacts(key, count, label, type) {
     return Array.from({ length: count }, (_, index) => {
       const id = `${key}-${index}`;
       const contact = client[key]?.[index] || {};
       return <div className="client-contact-entry" key={id}>
-        <label className="client-field"><span>{contact.label?.trim() || `${label} ${index + 1}`}</span><input type={type} value={contact.value || ''} onFocus={() => setActiveLabel(id)} onChange={(event) => updateContact(key, index, 'value', event.target.value)} /><FieldError name={`${key}.${index}`} /></label>
+        <label className="client-field"><span>{contact.label?.trim() || `${label} ${index + 1}`}{required && index === 0 ? ' *' : ''}</span><input type={type} value={contact.value || ''} onFocus={() => setActiveLabel(id)} onChange={(event) => updateContact(key, index, 'value', event.target.value)} /><FieldError name={`${key}.${index}`} /></label>
         {activeLabel === id && <label className="client-field client-contact-label"><span>Libellé</span><input type="text" maxLength={50} value={contact.label || ''} onChange={(event) => updateContact(key, index, 'label', event.target.value)} onBlur={() => setActiveLabel('')} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); setActiveLabel(''); } }} placeholder={`Libellé ${label.toLowerCase()} ${index + 1}`} /><button type="button" onClick={() => setActiveLabel('')} aria-label="Masquer le libellé">×</button></label>}
       </div>;
     });
   }
   return <div className="client-contact-fields client-field-wide">
-    <div className="client-contact-group"><strong>Téléphones{kind === correspondenceSide(client) ? ' *' : ''}</strong><div className="client-contact-phones">{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
+    <div className="client-contact-group"><strong>Téléphones</strong><div className="client-contact-phones">{renderContacts(phoneKey, 4, 'Téléphone', 'tel')}</div></div>
     <div className="client-contact-group"><strong>Emails</strong><div className="client-contact-emails">{renderContacts(emailKey, 3, 'Email', 'email')}</div></div>
   </div>;
 }

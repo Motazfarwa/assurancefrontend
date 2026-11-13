@@ -28,7 +28,8 @@ function fillCoordinates() {
   type('Adresse *', '4 Rue Ohod');
   type('Ville *', 'Tunis');
   type('Code postal *', '1082');
-  type('Téléphone 1', '71893000');
+  type('Téléphone 1 *', '71893000');
+  type('Email 1 *', 'sami@domaine.tn');
   next();
 }
 function fillQuittance() {
@@ -53,7 +54,8 @@ test('goes through the five steps and gives a draft with a new client', async ()
   fillIdentity();
   await screen.findByLabelText('Adresse *');
   next();
-  expect(screen.getByText('Renseignez au moins un téléphone.')).toBeTruthy();
+  expect(screen.getByText('Le téléphone 1 est obligatoire.')).toBeTruthy();
+  expect(screen.getByText('L’email 1 est obligatoire.')).toBeTruthy();
   fillCoordinates();
   await screen.findByLabelText('Immatriculation *');
   type('Immatriculation *', '123 tun 456');

@@ -26,14 +26,26 @@ function checkLengths(client, names, errors) {
   });
 }
 
+// What the old software left in an empty contact ("neant", ".", "0"): nothing entered.
+const placeholder = (value) => !/[a-z0-9]/i.test(value) || /^(0+|n[eé]ant)$/i.test(value);
+
+// The first phone and the first email are required (and checked); the others are optional: checked only when something
+// real is entered in them.
 function checkContacts(client, kind, errors) {
-  (client[`${kind}Phones`] || []).forEach((contact, index) => {
+  const phones = client[`${kind}Phones`] || [];
+  const emails = client[`${kind}Emails`] || [];
+  const first = (list) => text(list[0]?.value);
+  if (!first(phones) || placeholder(first(phones))) errors[`${kind}Phones.0`] = 'Le téléphone 1 est obligatoire.';
+  if (!first(emails) || placeholder(first(emails))) errors[`${kind}Emails.0`] = 'L’email 1 est obligatoire.';
+  phones.forEach((contact, index) => {
     const value = text(contact?.value);
-    if (value && !validPhone(value)) errors[`${kind}Phones.${index}`] = 'Numéro invalide : chiffres uniquement, 8 au minimum.';
+    if (errors[`${kind}Phones.${index}`] || !value || (index > 0 && placeholder(value))) return;
+    if (!validPhone(value)) errors[`${kind}Phones.${index}`] = 'Numéro invalide : chiffres uniquement, 8 au minimum.';
   });
-  (client[`${kind}Emails`] || []).forEach((contact, index) => {
+  emails.forEach((contact, index) => {
     const value = text(contact?.value);
-    if (value && !validEmail(value)) errors[`${kind}Emails.${index}`] = 'Adresse email invalide (exemple : nom@domaine.tn).';
+    if (errors[`${kind}Emails.${index}`] || !value || (index > 0 && placeholder(value))) return;
+    if (!validEmail(value)) errors[`${kind}Emails.${index}`] = 'Adresse email invalide (exemple : nom@domaine.tn).';
     else if (value.length > 100) errors[`${kind}Emails.${index}`] = '100 caractères maximum.';
   });
 }
@@ -62,7 +74,6 @@ export function coordinatesErrors(client) {
   if (!text(client[`${side}City`])) errors[`${side}City`] = REQUIRED_MESSAGE;
   if (!text(client[`${side}PostalCode`])) errors[`${side}PostalCode`] = REQUIRED_MESSAGE;
   else if (!isInteger(client[`${side}PostalCode`])) errors[`${side}PostalCode`] = 'Le code postal doit être numérique.';
-  if (!(client[`${side}Phones`] || []).some((contact) => text(contact?.value))) errors[`${side}Phones.0`] = 'Renseignez au moins un téléphone.';
   checkContacts(client, side, errors);
   // Both addresses still fit the columns of TClient (the record could not be saved otherwise).
   checkLengths(client, ['homeAddress', 'homeCity', 'officeAddress', 'officeCity', 'notes'], errors);
