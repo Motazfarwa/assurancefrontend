@@ -24,6 +24,22 @@ test('the statement shows the taux de recouvrement of its scope: encaissements o
   expect(box).toHaveTextContent(/65,21\s%/);
   expect(box).toHaveTextContent(/Encaissements : 2\s191\s273,555 TND/);
   expect(box).toHaveTextContent(/Primes exigibles au 11\/11\/2026 : 3\s360\s198,729 TND/);
-  // the same client / company / type of client as the statement (Particuliers by default)
-  expect(getRecoveryRate).toHaveBeenCalledWith('t', { code_client: '', type_client: 'P', code_compagnie: '' });
+  // the same client / company / type of client as the statement (every client type by default)
+  expect(getRecoveryRate).toHaveBeenCalledWith('t', { code_client: '', type_client: '', code_compagnie: '' });
+});
+
+test('every client type is read by default (the sociétés too, as the legacy report); "Type client" narrows it to one', async () => {
+  render(<EtatImpayeModal onClose={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Aperçu' }));
+  await screen.findByLabelText('Taux de recouvrement');
+  expect(getUnpaidStatement).toHaveBeenLastCalledWith('t', expect.objectContaining({ type_client: '' }));
+});
+
+test('"Type client" ticked with Société reads the sociétés only', async () => {
+  render(<EtatImpayeModal onClose={() => {}} />);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Type client' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Société' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Aperçu' }));
+  await screen.findByLabelText('Taux de recouvrement');
+  expect(getUnpaidStatement).toHaveBeenLastCalledWith('t', expect.objectContaining({ type_client: 'S' }));
 });

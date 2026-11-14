@@ -14,8 +14,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 const initialFilters = {
   code_client: '', nom_client: '', view: 'global', piece: 'avec',
   dates: false, date_debut: '2020-01-01', date_fin: today(),
-  // Type client is not on screen: always ticked, Particulier.
-  typed: true, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15, jours_autres: 60,
+  // Every client type (particuliers and sociétés), as the legacy report; "Type client" narrows it to one.
+  typed: false, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15, jours_autres: 60,
 };
 const DAY = 86400000;
 const shiftDate = (iso, days) => new Date(Date.parse(iso) + days * DAY).toISOString().slice(0, 10);
@@ -106,8 +106,8 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       date_debut: filters.dates ? filters.date_debut : '',
       // In relance the échéance is also at least as old as the shorter delay, dates ticked or not.
       date_fin: relance && (!filters.dates || filters.date_fin > overdue) ? overdue : filters.dates ? filters.date_fin : '',
-      // Particulier, except in mise en demeure (its "Autres" group holds the sociétés too) and when one client is asked
-      // for by code or name: a société's impayés are then shown too.
+      // Type client when ticked, except in mise en demeure (its "Autres" group holds the sociétés too) and when one client
+      // is asked for by code or name.
       type_client: filters.typed && !relance && !filters.code_client.trim() && !filters.nom_client.trim() ? filters.type_client : '',
       code_compagnie: filters.compagnie ? filters.code_compagnie : '',
     };
@@ -210,6 +210,10 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
                   {companies.map((company) => <option key={company.id} value={company.id}>{company.label}</option>)}
                 </select>
               </label>
+              {!relance && <fieldset className="unpaid-filter-set unpaid-choice"><legend><label><input type="checkbox" name="typed" checked={filters.typed} onChange={update} /> Type client</label></legend>
+                <label><input type="radio" name="type_client" value="P" checked={filters.type_client === 'P'} onChange={update} disabled={!filters.typed} /> Particulier</label>
+                <label><input type="radio" name="type_client" value="S" checked={filters.type_client === 'S'} onChange={update} disabled={!filters.typed} /> Société</label>
+              </fieldset>}
               <div className="eti-check">
                 <label className="eti-check"><input type="checkbox" name="mise_en_demeure" checked={filters.mise_en_demeure} onChange={update} /> Mise en demeure</label>
                 {relance && <label className="eti-check eti-days">Nombre jours<input type="number" name="jours" min={1} max={365} value={filters.jours} onChange={update} /> jours (auto particuliers)</label>}

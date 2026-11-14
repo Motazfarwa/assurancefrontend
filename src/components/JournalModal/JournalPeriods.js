@@ -13,7 +13,9 @@ const NAMES = {
 };
 const plural = (count, one, many) => `${count} ${count > 1 ? many : one}`;
 
-// "Lister": one line per journal of the half months (the 15th, the last day of the month), from the one of the date back.
+// "Lister": one line per journal of the half months (the 15th, the last day of the month), from the one of the date back,
+// and one per other day lines were declared on (the old software also declared on the 14th, the 30th...), as its JEQ:
+// a journal holds what was declared on its own date.
 // Each journal: what was declared in its half month, what was paid in it and is still to declare, its total, and
 // "Valider" (after a confirmation) declares those on its date — they are then in the feuille de caisse of that date.
 export default function JournalPeriods({ kind, accessToken, date, compagnie, nature, companyName, reloadKey, onOpen, onValidated }) {
@@ -57,7 +59,7 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
 
   return <section className="unpaid-results jrn-periods" aria-label="Journaux par quinzaine">
     <div className="unpaid-results-heading">
-      <div><span>UN JOURNAL PAR QUINZAINE (LE 15 ET LE DERNIER JOUR DU MOIS) · {companyName || 'TOUTES LES COMPAGNIES'}{kind === 'depense' && nature ? ` · ${nature === 'S' ? 'SINISTRES' : 'RISTOURNES'}` : ''}</span>
+      <div><span>UN JOURNAL PAR QUINZAINE (LE 15 ET LE DERNIER JOUR DU MOIS) ET PAR AUTRE DATE DE DÉCLARATION · {companyName || 'TOUTES LES COMPAGNIES'}{kind === 'depense' && nature ? ` · ${nature === 'S' ? 'SINISTRES' : 'RISTOURNES'}` : ''}</span>
         <h3>{state.loading && !state.items.length ? 'Chargement…' : `${plural(state.items.length, 'journal', 'journaux')}`}</h3></div>
     </div>
     {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
@@ -69,7 +71,7 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
         const open = !item.validation;
         const pending = Number(item.a_declarer) > 0;
         return <tr key={item.jour} className={open ? 'is-open' : ''}>
-          <td><button type="button" className="jrn-period-name" onClick={() => onOpen(item.jour)}>{names.title} du {formatDate(item.jour)}</button><small>du {shortDate(item.debut)} au {shortDate(item.jour)}</small></td>
+          <td><button type="button" className="jrn-period-name" onClick={() => onOpen(item.jour)}>{names.title} du {formatDate(item.jour)}</button><small>{item.quinzaine === false ? `déclaré le ${shortDate(item.jour)}` : `du ${shortDate(item.debut)} au ${shortDate(item.jour)}`}</small></td>
           <td className="cqi-number">{item.lignes}</td>
           <td className="cqi-number"><b>{fmt(item.montant)}</b></td>
           <td>{item.validation ? <span className="jrn-period-state is-done">Validé le {stamp(item.validation.date_saisie)}{item.validation.utilisateur ? ` par ${item.validation.utilisateur}` : ''}</span>
