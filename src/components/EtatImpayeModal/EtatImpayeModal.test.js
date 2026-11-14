@@ -6,7 +6,7 @@ import { getClientLinks, getMemoireContacts, getRecoveryRate, getUnpaidStatement
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Admin' } }) }));
 jest.mock('../../services/unpaidApi', () => ({
   getUnpaidStatement: jest.fn(), getRecoveryRate: jest.fn(), getClientLinks: jest.fn(), listStatementCompanies: () => Promise.resolve({ items: [] }),
-  getMemoireContacts: jest.fn(), sendMemoire: jest.fn(), downloadMemoirePdf: jest.fn(),
+  getMemoireContacts: jest.fn(), sendMemoire: jest.fn(), downloadMemoirePdf: jest.fn(), fetchMemoirePdf: jest.fn(), saveFile: jest.fn(),
 }));
 jest.mock('../../services/reglementClientApi', () => ({ getClientReglements: jest.fn(() => Promise.resolve({ client: null })) }));
 

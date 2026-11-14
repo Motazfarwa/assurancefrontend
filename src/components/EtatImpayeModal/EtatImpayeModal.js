@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { downloadMemoirePdf, getClientLinks, getMemoireContacts, getRecoveryRate, getUnpaidStatement, listStatementCompanies, sendMemoire } from '../../services/unpaidApi';
+import { downloadMemoirePdf, fetchMemoirePdf, getClientLinks, getMemoireContacts, getRecoveryRate, getUnpaidStatement, listStatementCompanies, saveFile, sendMemoire } from '../../services/unpaidApi';
 import { getClientReglements } from '../../services/reglementClientApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -295,6 +295,9 @@ const defaultMessage = (client, rows) => [
   ...AGENCY.filter((line, index) => index === 0 || /^(Tél|Cell)/.test(line)),
 ].join('\n');
 
+// The browser can give a file to another app (WhatsApp) through the share menu: phones, Windows Chrome / Edge.
+const canShareFile = (file) => Boolean(file && typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] }));
+
 function SendMemoireDialog({ channel, client, rows, criteria, onClose }) {
   const { accessToken } = useAuth();
   const email = channel === 'email';
@@ -317,11 +320,25 @@ function SendMemoireDialog({ channel, client, rows, criteria, onClose }) {
     setState({ busy: true, error: '', done: null });
     try {
       const result = await sendMemoire(accessToken, client.code_client, { canal: channel, destinataire: to.trim(), sujet: subject, message, ...criteria });
-      // No WhatsApp API on the server: the PDF is downloaded, WhatsApp opens with the message (the file is attached there).
-      if (!result.envoye) await downloadMemoirePdf(accessToken, client.code_client, criteria);
-      setState({ busy: false, error: '', done: result });
+      // WhatsApp without the (paid) API: the PDF is prepared here and given to WhatsApp through the share menu of the
+      // phone / of Windows, with the message; where the browser cannot share files it is downloaded and wa.me opens.
+      let file = null;
+      if (!result.envoye) {
+        file = await fetchMemoirePdf(accessToken, client.code_client, criteria);
+        if (!canShareFile(file)) saveFile(file);
+      }
+      setState({ busy: false, error: '', done: { ...result, file } });
     } catch (requestError) {
       setState({ busy: false, error: requestError.message, done: null });
+    }
+  }
+  const [shareError, setShareError] = useState('');
+  async function share() {
+    setShareError('');
+    try {
+      await navigator.share({ files: [state.done.file], title: state.done.fichier, text: message });
+    } catch (shareFailure) {
+      if (shareFailure?.name !== 'AbortError') { saveFile(state.done.file); setShareError('Partage impossible ici : le PDF a été téléchargé, joignez-le dans WhatsApp.'); }
     }
   }
   const preview = () => downloadMemoirePdf(accessToken, client.code_client, criteria).catch((requestError) => setState((value) => ({ ...value, error: requestError.message })));
@@ -333,9 +350,13 @@ function SendMemoireDialog({ channel, client, rows, criteria, onClose }) {
       {done ? <>
         {done.envoye
           ? <p className="eti-send-ok" role="status">Mémoire de règlement envoyé {email ? 'par email' : 'par WhatsApp'} à <b>{done.destinataire}</b>, avec le PDF « {done.fichier} ».</p>
-          : <p className="eti-send-ok" role="status">Le PDF « {done.fichier} » a été téléchargé. Ouvrez WhatsApp : le message est déjà écrit pour le <b>+{done.destinataire}</b> ; joignez-y le fichier téléchargé puis envoyez.</p>}
+          : canShareFile(done.file)
+            ? <p className="eti-send-ok" role="status">Le PDF « {done.fichier} » est prêt. Cliquez sur <b>Partager dans WhatsApp</b>, choisissez WhatsApp puis le client (<b>+{done.destinataire}</b>) : le PDF et le message sont déjà joints, il reste à appuyer sur Envoyer.</p>
+            : <p className="eti-send-ok" role="status">Le PDF « {done.fichier} » a été téléchargé. Ouvrez WhatsApp : le message est déjà écrit pour le <b>+{done.destinataire}</b> ; joignez-y le fichier téléchargé puis envoyez.</p>}
+        {shareError && <p className="expert-error" role="alert">{shareError}</p>}
         <footer>
-          {!done.envoye && done.lien && <a className="expert-submit eti-send-link" href={done.lien} target="_blank" rel="noreferrer">Ouvrir WhatsApp</a>}
+          {!done.envoye && canShareFile(done.file) && <button type="button" className="expert-submit" onClick={share}>Partager dans WhatsApp</button>}
+          {!done.envoye && done.lien && <a className={canShareFile(done.file) ? 'expert-cancel eti-send-link' : 'expert-submit eti-send-link'} href={done.lien} target="_blank" rel="noreferrer">{canShareFile(done.file) ? 'Ouvrir la discussion' : 'Ouvrir WhatsApp'}</a>}
           <button type="button" className="expert-cancel" onClick={onClose}>Fermer</button>
         </footer>
       </> : <>

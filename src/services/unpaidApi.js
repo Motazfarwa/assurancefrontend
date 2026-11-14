@@ -113,8 +113,8 @@ export const getClientLinks = (accessToken, code) => getJson(`/api/impayes-agenc
 const memoirePath = (code) => `/api/impayes-agence/memoire/${encodeURIComponent(code)}`;
 // The emails and phones stored on the client file: { code_client, nom_client, emails, telephones }.
 export const getMemoireContacts = (accessToken, code) => getJson(`${memoirePath(code)}/contacts`, accessToken);
-// The PDF, downloaded by the browser (to attach in WhatsApp when the server cannot send it).
-export async function downloadMemoirePdf(accessToken, code, criteria) {
+// The PDF as a File (shared to WhatsApp by the system share menu when the server cannot send it).
+export async function fetchMemoirePdf(accessToken, code, criteria) {
   const params = new URLSearchParams();
   Object.entries(criteria || {}).forEach(([key, value]) => { if (value !== '' && value != null) params.set(key, String(value)); });
   let response;
@@ -129,7 +129,12 @@ export async function downloadMemoirePdf(accessToken, code, criteria) {
   }
   const blob = await response.blob();
   const name = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') || '')?.[1] || `memoire_reglement_${code}.pdf`;
-  const url = URL.createObjectURL(blob);
+  return new File([blob], name, { type: 'application/pdf' });
+}
+// Saves a File through the browser download.
+export function saveFile(file) {
+  const url = URL.createObjectURL(file);
+  const name = file.name;
   const link = document.createElement('a');
   link.href = url;
   link.download = name;
@@ -138,6 +143,10 @@ export async function downloadMemoirePdf(accessToken, code, criteria) {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   return name;
+}
+// The PDF, downloaded by the browser ("Voir le PDF").
+export async function downloadMemoirePdf(accessToken, code, criteria) {
+  return saveFile(await fetchMemoirePdf(accessToken, code, criteria));
 }
 // { canal: 'email' | 'whatsapp', destinataire, sujet, message } → { envoye, destinataire, fichier, lien? } (lien: wa.me when
 // the server has no WhatsApp API: the message is written there, the PDF is attached by hand).
