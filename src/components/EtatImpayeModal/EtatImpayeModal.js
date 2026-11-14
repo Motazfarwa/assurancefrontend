@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getClientLinks, getRecoveryRate, getUnpaidStatement, listStatementCompanies } from '../../services/unpaidApi';
+import { downloadMemoirePdf, getClientLinks, getMemoireContacts, getRecoveryRate, getUnpaidStatement, listStatementCompanies, sendMemoire } from '../../services/unpaidApi';
 import { getClientReglements } from '../../services/reglementClientApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -156,7 +156,8 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       // One client asked for by code: its mémoire de règlement, then those of its liens, each in its own dossier.
       const dossiers = !relance && filters.code_client.trim() ? await linkedDossiers(filters.code_client.trim(), items) : null;
       if (dossiers ? !dossiers.some((dossier) => dossier.items.length) : !items.length) setError('Aucune quittance impayée ne correspond aux critères.');
-      else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups, dossiers, recovery });
+      else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups, dossiers, recovery,
+        criteria: { piece: params.piece, date_debut: params.date_debut, date_fin: params.date_fin, code_compagnie: params.code_compagnie } });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -283,7 +284,81 @@ function MemoirePage({ client }) {
 
 const RELATIONS = { client: 'Client recherché', lien: 'Son lien', lie: 'Client lié' };
 
-function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossiers, recovery, onBack, onClose }) {
+// "Envoyer par email" / "Envoyer par WhatsApp": the mémoire de règlement of the client shown, as a PDF (made by the server
+// from the same criteria), with a message. The addresses offered are those of the client file; they can be changed.
+const defaultMessage = (client, rows) => [
+  `Bonjour ${(client.nom_client || '').trim()},`,
+  '',
+  `Veuillez trouver ci-joint votre mémoire de règlement au ${formatDate(today())} : ${rows.length} quittance${rows.length > 1 ? 's' : ''} impayée${rows.length > 1 ? 's' : ''}, total ${money.format(total(rows))} TND.`,
+  '',
+  'Cordialement,',
+  ...AGENCY.filter((line, index) => index === 0 || /^(Tél|Cell)/.test(line)),
+].join('\n');
+
+function SendMemoireDialog({ channel, client, rows, criteria, onClose }) {
+  const { accessToken } = useAuth();
+  const email = channel === 'email';
+  const [contacts, setContacts] = useState(null);
+  const [to, setTo] = useState('');
+  const [subject, setSubject] = useState(`Mémoire de règlement – ${client.nom_client || client.code_client}`);
+  const [message, setMessage] = useState(() => defaultMessage(client, rows));
+  const [state, setState] = useState({ busy: false, error: '', done: null });
+  useEffect(() => {
+    let active = true;
+    getMemoireContacts(accessToken, client.code_client)
+      .then((body) => { if (!active) return; setContacts(body); setTo((email ? body.emails : body.telephones)[0] || ''); })
+      .catch(() => { if (active) setContacts({ emails: [], telephones: [] }); });
+    return () => { active = false; };
+  }, [accessToken, client.code_client, email]);
+  const options = contacts ? (email ? contacts.emails : contacts.telephones) : [];
+
+  async function send(event) {
+    event.preventDefault();
+    setState({ busy: true, error: '', done: null });
+    try {
+      const result = await sendMemoire(accessToken, client.code_client, { canal: channel, destinataire: to.trim(), sujet: subject, message, ...criteria });
+      // No WhatsApp API on the server: the PDF is downloaded, WhatsApp opens with the message (the file is attached there).
+      if (!result.envoye) await downloadMemoirePdf(accessToken, client.code_client, criteria);
+      setState({ busy: false, error: '', done: result });
+    } catch (requestError) {
+      setState({ busy: false, error: requestError.message, done: null });
+    }
+  }
+  const preview = () => downloadMemoirePdf(accessToken, client.code_client, criteria).catch((requestError) => setState((value) => ({ ...value, error: requestError.message })));
+
+  const done = state.done;
+  return <div className="eti-send-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !state.busy) onClose(); }}>
+    <form className="eti-send" role="dialog" aria-modal="true" aria-labelledby="eti-send-title" onSubmit={send}>
+      <h3 id="eti-send-title">{email ? 'Envoyer par email' : 'Envoyer par WhatsApp'} · {client.code_client} {client.nom_client}</h3>
+      {done ? <>
+        {done.envoye
+          ? <p className="eti-send-ok" role="status">Mémoire de règlement envoyé {email ? 'par email' : 'par WhatsApp'} à <b>{done.destinataire}</b>, avec le PDF « {done.fichier} ».</p>
+          : <p className="eti-send-ok" role="status">Le PDF « {done.fichier} » a été téléchargé. Ouvrez WhatsApp : le message est déjà écrit pour le <b>+{done.destinataire}</b> ; joignez-y le fichier téléchargé puis envoyez.</p>}
+        <footer>
+          {!done.envoye && done.lien && <a className="expert-submit eti-send-link" href={done.lien} target="_blank" rel="noreferrer">Ouvrir WhatsApp</a>}
+          <button type="button" className="expert-cancel" onClick={onClose}>Fermer</button>
+        </footer>
+      </> : <>
+        <label className="eti-send-field"><span>{email ? 'Adresse email du client' : 'Numéro WhatsApp du client'}</span>
+          <input type={email ? 'email' : 'tel'} value={to} onChange={(event) => setTo(event.target.value)} list="eti-send-options" required autoFocus placeholder={contacts ? (email ? 'nom@domaine.tn' : '22 123 456') : 'Chargement…'} />
+          <datalist id="eti-send-options">{options.map((value) => <option key={value} value={value} />)}</datalist>
+          {contacts && !options.length && <small>Aucun {email ? 'email' : 'numéro'} n’est enregistré sur la fiche du client : saisissez-le.</small>}
+        </label>
+        {email && <label className="eti-send-field"><span>Objet</span><input value={subject} maxLength={200} onChange={(event) => setSubject(event.target.value)} required /></label>}
+        <label className="eti-send-field"><span>Message</span><textarea rows={8} value={message} maxLength={email ? 4000 : 1000} onChange={(event) => setMessage(event.target.value)} /></label>
+        <p className="eti-send-attachment">Pièce jointe : <b>Mémoire de règlement (PDF)</b> · {rows.length} quittance{rows.length > 1 ? 's' : ''} · {money.format(total(rows))} TND
+          <button type="button" className="eti-send-preview" onClick={preview}>Voir le PDF</button></p>
+        {state.error && <p className="expert-error" role="alert">{state.error}</p>}
+        <footer>
+          <button type="button" className="expert-cancel" onClick={onClose} disabled={state.busy}>Annuler</button>
+          <button type="submit" className="expert-submit" disabled={state.busy || !to.trim()}>{state.busy ? 'Envoi…' : 'Envoyer'}</button>
+        </footer>
+      </>}
+    </form>
+  </div>;
+}
+
+function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossiers, recovery, criteria, onBack, onClose }) {
   // A client searched by code: one dossier at a time (the client, then its liens), "◀ / ▶" to move between them.
   const [current, setCurrent] = useState(0);
   const dossier = dossiers ? dossiers[current] : null;
@@ -300,6 +375,9 @@ function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossi
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack, dossiers]);
   const pages = dossier ? 1 : detail ? clients.length : 1;
+  // The mémoire of one client is shown: it can be sent to that client.
+  const [sending, setSending] = useState(null); // 'email' | 'whatsapp'
+  const single = (dossier || detail) && clients.length === 1 ? clients[0] : null;
   const heading = dossier || detail ? 'Mémoire de règlement' : 'Etat des impayées';
 
   return <div className="eti-preview" role="dialog" aria-modal="true" aria-label={heading}>
@@ -308,6 +386,10 @@ function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossi
       <div className="eti-preview-title"><strong>{heading}</strong>
         <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} (${money.format(total(groups[0].rows))} TND) · autres : ${groups[1].rows.length} (${money.format(total(groups[1].rows))} TND) · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail || dossier ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>
       <div className="eti-preview-actions">
+        {single && <>
+          <button type="button" className="expert-cancel eti-send-button" onClick={() => setSending('email')}>Envoyer par email</button>
+          <button type="button" className="expert-cancel eti-send-button is-whatsapp" onClick={() => setSending('whatsapp')}>Envoyer par WhatsApp</button>
+        </>}
         <button type="button" className="expert-submit" onClick={() => window.print()}>Imprimer</button>
         <button type="button" className="expert-close" onClick={onClose} aria-label="Fermer">×</button>
       </div>
@@ -321,6 +403,7 @@ function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossi
       ))}</div>
       <button type="button" className="expert-cancel" onClick={() => setCurrent(current + 1)} disabled={current === dossiers.length - 1} aria-label="Dossier suivant">▶</button>
     </nav>}
+    {sending && single && <SendMemoireDialog key={`${sending}-${single.code_client}`} channel={sending} client={single} rows={single.rows} criteria={criteria} onClose={() => setSending(null)} />}
     {dossiers && dossiers.length === 1 && <p className="eti-limit eti-preview-limit">Aucun lien de ce client n’a de quittance impayée.</p>}
     {limit > 0 && items.length >= limit && <p className="eti-limit eti-preview-limit">Résultats limités à {limit} quittances : précisez les critères.</p>}
     <div className="eti-report">

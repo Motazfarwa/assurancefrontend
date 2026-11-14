@@ -144,3 +144,20 @@
 .eti-recovery small { font-size: 9.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media print { .eti-recovery { background: none; } }
 @media (max-width: 640px) { .eti-recovery { justify-items: start; text-align: left; } }
+
+/* Mémoire de règlement sent to the client (email / WhatsApp) */
+.eti-send-button.is-whatsapp { border-color: #b7e3c6; color: #127a3c; }
+.eti-send-backdrop { position: fixed; inset: 0; z-index: 1300; display: grid; place-items: center; padding: 16px; background: rgba(20, 35, 45, .45); }
+.eti-send { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 12px; padding: 20px 22px; border-radius: 14px; background: #fff; box-shadow: 0 18px 50px rgba(15, 30, 40, .3); }
+.eti-send h3 { margin: 0; color: #1f3a4b; font-size: 16px; }
+.eti-send-field { display: grid; gap: 5px; font-size: 12px; color: #4b5d6b; }
+.eti-send-field span { font-weight: 600; }
+.eti-send-field input, .eti-send-field textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #cfdbe2; border-radius: 8px; font: inherit; font-size: 13px; color: #1f3a4b; }
+.eti-send-field textarea { resize: vertical; line-height: 1.45; }
+.eti-send-field small { color: #93600a; }
+.eti-send-attachment { margin: 0; padding: 9px 12px; border: 1px dashed #b9cfd8; border-radius: 8px; background: #f6fafb; color: #4b5d6b; font-size: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.eti-send-preview { margin-left: auto; border: 0; background: none; color: #187d78; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.eti-send-ok { margin: 0; padding: 10px 12px; border-radius: 8px; background: #eaf6f0; color: #1d5b3a; font-size: 13px; line-height: 1.5; }
+.eti-send footer { display: flex; justify-content: flex-end; gap: 10px; }
+.eti-send-link { text-decoration: none; display: inline-flex; align-items: center; }
+@media print { .eti-send-backdrop, .eti-send-button { display: none !important; } }

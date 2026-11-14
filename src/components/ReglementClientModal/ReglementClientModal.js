@@ -80,7 +80,7 @@ export default function ReglementClientModal({ onClose, moduleId = '575' }) {
     <div className="rct-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="rct-dialog rgc-dialog" role="dialog" aria-modal="true" aria-labelledby="rgc-title">
         <header className="rct-header">
-          <div><span>COMPTABILITE · MODULE {moduleId}</span><h2 id="rgc-title">Règlement client</h2></div>
+          <div><span>COMPTABILITE · MODULE {moduleId}</span><h2 id="rgc-title">Visualisation règlement client</h2></div>
           <div className="rct-header-actions">
             <button type="button" className="rct-close" onClick={onClose} aria-label="Fermer">×</button>
           </div>

@@ -203,7 +203,7 @@ function SinistreNumberPicker({ accessToken, value, ignored, missing, onChange, 
 
 // Opened from a client file, the list starts on that client's claims, closed ones included, all dates.
 const newList = (clientCode = '') => ({
-  q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byDate: false, dateMin: LIST_START, dateMax: monthsAgo(OVERDUE_MONTHS),
+  q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byEtape: false, byDate: false, dateMin: LIST_START, dateMax: monthsAgo(OVERDUE_MONTHS),
   typeSinistre: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
@@ -243,6 +243,17 @@ function byAdverseCompany(items, compagnies) {
     groups.get(code).rows.push(row);
   });
   return [...groups.values()].sort((a, b) => (!a.code ? -1 : !b.code ? 1 : a.label.localeCompare(b.label, 'fr')));
+}
+// "Répartis par étape": one table per step reached (the highest Code_Etape of its Sinistre_Suivi), in the order of the
+// steps, its libellé above it; the files with no step recorded last.
+function byStep(items) {
+  const groups = new Map();
+  items.forEach((row) => {
+    const code = row.code_etape ?? '';
+    if (!groups.has(code)) groups.set(code, { code: String(code), label: code === '' ? 'Sans étape' : `${code} · ${row.libelle_etape || `Étape ${code}`}`, rows: [] });
+    groups.get(code).rows.push(row);
+  });
+  return [...groups.values()].sort((a, b) => (a.code === '' ? 1 : b.code === '' ? -1 : Number(a.code) - Number(b.code)));
 }
 const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle ? ['Réglé', 'is-paid'] : ['En cours', 'is-open']);
 
@@ -878,6 +889,10 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                     <b className="snr-count">{list.counts ? list.counts[countKey] : '…'}</b>
                   </label>
                 ))}
+                <label className={`snr-filter-check${list.byEtape ? ' is-active' : ''}`}>
+                  <input type="checkbox" checked={list.byEtape} onChange={(event) => { const byEtape = event.target.checked; setList((value) => ({ ...value, byEtape })); }} />
+                  Répartis par étape
+                </label>
               </div>
               <label className="snr-date-filter">
                 <span>Code client</span>
@@ -917,7 +932,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             <div className="snr-table-wrap">
               {list.items === null ? <p className="snr-empty">Chargement…</p>
                 : list.items.length === 0 ? <p className="snr-empty">Aucun dossier trouvé.</p>
-                : byAdverseCompany(list.items, lookups.compagnies_adverses).map((group) => (
+                : (list.byEtape ? byStep(list.items) : byAdverseCompany(list.items, lookups.compagnies_adverses)).map((group) => (
                   <section key={group.code || 'none'} className="snr-claims-group">
                     <h4>{group.label} <b className="snr-count">{group.rows.length}</b></h4>
                     <table className="snr-table snr-claims">

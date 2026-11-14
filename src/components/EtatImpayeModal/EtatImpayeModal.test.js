@@ -1,12 +1,14 @@
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import EtatImpayeModal from './EtatImpayeModal';
-import { getRecoveryRate, getUnpaidStatement } from '../../services/unpaidApi';
+import { getClientReglements } from '../../services/reglementClientApi';
+import { getClientLinks, getMemoireContacts, getRecoveryRate, getUnpaidStatement, sendMemoire } from '../../services/unpaidApi';
 
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Admin' } }) }));
 jest.mock('../../services/unpaidApi', () => ({
   getUnpaidStatement: jest.fn(), getRecoveryRate: jest.fn(), getClientLinks: jest.fn(), listStatementCompanies: () => Promise.resolve({ items: [] }),
+  getMemoireContacts: jest.fn(), sendMemoire: jest.fn(), downloadMemoirePdf: jest.fn(),
 }));
-jest.mock('../../services/reglementClientApi', () => ({ getClientReglements: jest.fn() }));
+jest.mock('../../services/reglementClientApi', () => ({ getClientReglements: jest.fn(() => Promise.resolve({ client: null })) }));
 
 beforeEach(() => {
   getUnpaidStatement.mockResolvedValue({ limit: 5000, items: [{
@@ -43,3 +45,20 @@ test('"Type client" ticked with Société reads the sociétés only', async () =
   await screen.findByLabelText('Taux de recouvrement');
   expect(getUnpaidStatement).toHaveBeenLastCalledWith('t', expect.objectContaining({ type_client: 'S' }));
 });
+
+test('the mémoire of a client is sent by email with its PDF: the address offered is the one of the client file', async () => {
+  getClientReglements.mockResolvedValue({ client: { nom_client: 'BOUKER TAHAR' } });
+  getClientLinks.mockResolvedValue({ client: { code_client: '91', nom_client: 'BOUKER TAHAR' }, liens: [] });
+  getMemoireContacts.mockResolvedValue({ code_client: '91', nom_client: 'BOUKER TAHAR', emails: ['tahar@domaine.tn'], telephones: ['22 123 456'] });
+  sendMemoire.mockResolvedValue({ canal: 'email', destinataire: 'tahar@domaine.tn', envoye: true, fichier: 'memoire_reglement_91_20261114.pdf' });
+  render(<EtatImpayeModal onClose={() => {}} />);
+  fireEvent.change(screen.getByLabelText(/Code client/i), { target: { value: '91' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Aperçu' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Envoyer par email' }, { timeout: 5000 }));
+  const dialog = await screen.findByRole('dialog', { name: /Envoyer par email/ }, { timeout: 5000 });
+  await within(dialog).findByDisplayValue('tahar@domaine.tn', {}, { timeout: 5000 });
+  expect(within(dialog).getByLabelText('Message').value).toMatch(/1 quittance impayée, total 1\s008,159 TND/);
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer' }));
+  expect(await within(dialog).findByRole('status', {}, { timeout: 5000 })).toHaveTextContent('envoyé par email à tahar@domaine.tn');
+  expect(sendMemoire).toHaveBeenCalledWith('t', '91', expect.objectContaining({ canal: 'email', destinataire: 'tahar@domaine.tn', piece: 'avec' }));
+}, 15000);

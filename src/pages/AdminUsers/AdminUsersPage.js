@@ -18,6 +18,9 @@ export default function AdminUsersPage() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // The action waiting for its confirmation: { kind: 'supprimer' | 'archiver' | 'reactiver', item }.
+  const [confirming, setConfirming] = useState(null);
+  const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,22 +82,34 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function remove(item) {
-    if (!window.confirm(`Supprimer l’utilisateur « ${item.username} » ?`)) return;
+  // Supprimer / Archiver / Réactiver, once confirmed in the popup.
+  async function runConfirmed() {
+    const { kind, item } = confirming;
+    setActing(true);
     setError('');
     setNotice('');
     try {
-      await deleteUser(accessToken, item.username);
-      setNotice(`Utilisateur « ${item.username} » supprimé.`);
+      if (kind === 'supprimer') {
+        await deleteUser(accessToken, item.username);
+        setNotice(`Utilisateur « ${item.username} » supprimé.`);
+      } else {
+        await updateUser(accessToken, item.username, { archive: kind === 'archiver' });
+        setNotice(kind === 'archiver' ? `Utilisateur « ${item.username} » archivé : il ne peut plus se connecter.` : `Utilisateur « ${item.username} » réactivé.`);
+      }
+      setConfirming(null);
       await load();
     } catch (err) {
       setError(err.message);
+      setConfirming(null);
+    } finally {
+      setActing(false);
     }
   }
 
   const query = search.trim().toLocaleLowerCase();
   const visible = users.filter((item) => !query || `${item.username} ${item.lieu ?? ''}`.toLocaleLowerCase().includes(query));
   const adminCount = users.filter((item) => item.username.toLocaleLowerCase() === 'admin').length;
+  const archivedCount = users.filter((item) => item.archive).length;
 
   return (
     <div className="admin-shell">
@@ -144,7 +159,8 @@ export default function AdminUsersPage() {
         <div className="admin-users-stats">
           <div><strong>{users.length}</strong><span>Comptes</span></div>
           <div><strong>{adminCount}</strong><span>Administrateur</span></div>
-          <div><strong>{users.length - adminCount}</strong><span>Utilisateurs</span></div>
+          <div><strong>{users.length - adminCount - archivedCount}</strong><span>Utilisateurs actifs</span></div>
+          <div><strong>{archivedCount}</strong><span>Archivés</span></div>
         </div>
 
         {error && !dialogOpen && <p className="admin-users-message is-error" role="alert">{error}</p>}
@@ -163,12 +179,15 @@ export default function AdminUsersPage() {
                   {visible.map((item) => {
                     const isAdminAccount = item.username.toLocaleLowerCase() === 'admin';
                     return (
-                      <tr key={item.username}>
-                        <td><span className="admin-users-user"><span className="admin-users-avatar">{item.username.charAt(0).toUpperCase()}</span><span>{item.username}{isAdminAccount && <em>Administrateur</em>}</span></span></td>
+                      <tr key={item.username} className={item.archive ? 'is-archived' : undefined}>
+                        <td><span className="admin-users-user"><span className="admin-users-avatar">{item.username.charAt(0).toUpperCase()}</span><span>{item.username}{isAdminAccount && <em>Administrateur</em>}{item.archive && <em className="admin-users-archived">Archivé</em>}</span></span></td>
                         <td>{item.lieu ?? '—'}</td>
                         <td className="admin-users-row-actions">
                           <button type="button" className="admin-users-secondary" onClick={() => startEdit(item)}>Modifier</button>
-                          <button type="button" className="admin-users-danger" disabled={isAdminAccount} onClick={() => remove(item)}>Supprimer</button>
+                          {item.archive
+                            ? <button type="button" className="admin-users-secondary" onClick={() => setConfirming({ kind: 'reactiver', item })}>Réactiver</button>
+                            : <button type="button" className="admin-users-archive" disabled={isAdminAccount} onClick={() => setConfirming({ kind: 'archiver', item })}>Archiver</button>}
+                          <button type="button" className="admin-users-danger" disabled={isAdminAccount} onClick={() => setConfirming({ kind: 'supprimer', item })}>Supprimer</button>
                         </td>
                       </tr>
                     );
@@ -179,6 +198,25 @@ export default function AdminUsersPage() {
           )}
         </section>
       </section>
+
+      {confirming && (
+        <div className="admin-users-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget && !acting) setConfirming(null); }}>
+          <section className="admin-users-dialog admin-users-confirm" role="alertdialog" aria-modal="true" aria-labelledby="admin-confirm-title" aria-describedby="admin-confirm-text">
+            <h2 id="admin-confirm-title">{{ supprimer: 'Supprimer', archiver: 'Archiver', reactiver: 'Réactiver' }[confirming.kind]} l’utilisateur « {confirming.item.username} » ?</h2>
+            <p id="admin-confirm-text">{{
+              supprimer: 'Le compte sera supprimé définitivement : cette action est irréversible.',
+              archiver: 'Le compte est conservé mais ne pourra plus se connecter. Vous pourrez le réactiver à tout moment.',
+              reactiver: 'Le compte pourra de nouveau se connecter.',
+            }[confirming.kind]}</p>
+            <div className="admin-users-actions">
+              <button type="button" className="admin-users-secondary" onClick={() => setConfirming(null)} disabled={acting} autoFocus>Annuler</button>
+              <button type="button" className={confirming.kind === 'supprimer' ? 'admin-users-danger' : confirming.kind === 'archiver' ? 'admin-users-archive' : 'admin-users-primary'} onClick={runConfirmed} disabled={acting}>
+                {acting ? 'Patientez…' : `Oui, ${{ supprimer: 'supprimer', archiver: 'archiver', reactiver: 'réactiver' }[confirming.kind]}`}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {dialogOpen && (
         <div className="admin-users-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) closeDialog(); }}>

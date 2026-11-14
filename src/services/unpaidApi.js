@@ -107,3 +107,50 @@ export const getRecoveryRate = (accessToken, filters) => getJson('/api/impayes-a
 export const listStatementCompanies = (accessToken) => getJson('/api/impayes-agence/etat/compagnies', accessToken);
 // The clients linked to a client (its Lien, and the clients whose Lien it is): { client, liens: [{ code_client, nom_client, relation }] }.
 export const getClientLinks = (accessToken, code) => getJson(`/api/impayes-agence/etat/liens/${encodeURIComponent(code)}`, accessToken);
+
+// Mémoire de règlement of one client, sent to the client. criteria: { piece, date_debut, date_fin, code_compagnie } of the
+// statement shown (the server reads the same quittances again to build the PDF).
+const memoirePath = (code) => `/api/impayes-agence/memoire/${encodeURIComponent(code)}`;
+// The emails and phones stored on the client file: { code_client, nom_client, emails, telephones }.
+export const getMemoireContacts = (accessToken, code) => getJson(`${memoirePath(code)}/contacts`, accessToken);
+// The PDF, downloaded by the browser (to attach in WhatsApp when the server cannot send it).
+export async function downloadMemoirePdf(accessToken, code, criteria) {
+  const params = new URLSearchParams();
+  Object.entries(criteria || {}).forEach(([key, value]) => { if (value !== '' && value != null) params.set(key, String(value)); });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${memoirePath(code)}/pdf?${params.toString()}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  } catch {
+    throw new Error(`Impossible de joindre l'API (${API_BASE_URL}).`);
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(typeof body.detail === 'string' ? body.detail : 'Impossible de préparer le PDF.');
+  }
+  const blob = await response.blob();
+  const name = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') || '')?.[1] || `memoire_reglement_${code}.pdf`;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return name;
+}
+// { canal: 'email' | 'whatsapp', destinataire, sujet, message } → { envoye, destinataire, fichier, lien? } (lien: wa.me when
+// the server has no WhatsApp API: the message is written there, the PDF is attached by hand).
+export async function sendMemoire(accessToken, code, payload) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${memoirePath(code)}/envoyer`, {
+      method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error(`Impossible de joindre l'API (${API_BASE_URL}).`);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Envoi impossible.');
+  return body;
+}

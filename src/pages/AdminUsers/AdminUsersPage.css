@@ -5,7 +5,7 @@
 .admin-users-header h1 { margin: 6px 0; color: #1c394b; font-size: 26px; letter-spacing: -.01em; }
 .admin-users-header p { margin: 0; color: #71808b; font-size: 13px; }
 .admin-users-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.admin-users-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.admin-users-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .admin-users-stats > div { padding: 16px 18px; border: 1px solid #dfeae8; border-radius: 12px; background: linear-gradient(135deg, #f1f9f7, #fff); }
 .admin-users-stats strong { display: block; color: #187d78; font-size: 26px; line-height: 1.1; }
 .admin-users-stats span { color: #71808b; font-size: 12px; }
@@ -82,3 +82,10 @@
 }
 
 .admin-users-dialog select { height: 38px; padding: 7px 11px; border: 1px solid #d2dfe5; border-radius: 9px; background: #fff; font: inherit; font-size: 13px; }
+/* Archiver: the account is kept but can no longer log in. */
+.admin-users-archive { min-height: 36px; padding: 7px 16px; border: 1px solid #f0d9a8; border-radius: 9px; background: #fff; color: #93600a; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.admin-users-archive:hover:not(:disabled) { background: #fff8eb; }
+.admin-users-archive:disabled { opacity: .5; cursor: not-allowed; }
+.admin-users-user em.admin-users-archived { background: #fff3dc; color: #93600a; }
+tr.is-archived td { color: #8a96a0; }
+.admin-users-confirm p { margin: 0; color: #4b5d6b; font-size: 13px; line-height: 1.5; }

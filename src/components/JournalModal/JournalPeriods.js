@@ -15,7 +15,8 @@ const plural = (count, one, many) => `${count} ${count > 1 ? many : one}`;
 
 // "Lister": one line per journal of the half months (the 15th, the last day of the month), from the one of the date back,
 // and one per other day lines were declared on (the old software also declared on the 14th, the 30th...), as its JEQ:
-// a journal holds what was declared on its own date.
+// a journal holds what was declared on its own date. Journal d'encaissement: a quittance still to declare (unticked) is
+// in every journal from its payment on, until it is ticked (declared): then only in the journal of that date.
 // Each journal: what was declared in its half month, what was paid in it and is still to declare, its total, and
 // "Valider" (after a confirmation) declares those on its date — they are then in the feuille de caisse of that date.
 export default function JournalPeriods({ kind, accessToken, date, compagnie, nature, companyName, reloadKey, onOpen, onValidated }) {
@@ -89,7 +90,7 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
     {asking && <div className="jrn-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setAsking(null); }}>
       <section className="jrn-confirm" role="alertdialog" aria-modal="true" aria-labelledby="jrn-period-confirm-title" aria-describedby="jrn-period-confirm-text">
         <h3 id="jrn-period-confirm-title">Valider le {names.title.toLowerCase()} du {formatDate(asking.jour)} ?</h3>
-        <p id="jrn-period-confirm-text">Les {names.whats} réglées du {formatDate(asking.debut)} au {formatDate(asking.jour)} et encore à {kind === 'depense' ? 'comptabiliser' : 'déclarer'}{kind === 'encaissement' ? ' (sauf celles décochées dans ce journal)' : ''} seront {kind === 'depense' ? 'comptabilisées' : 'déclarées'} au <strong>{formatDate(asking.jour)}</strong>{companyName ? <> pour <strong>{companyName}</strong></> : ' pour toutes les compagnies'} et passeront dans la feuille de caisse de ce jour.</p>
+        <p id="jrn-period-confirm-text">Les {names.whats} réglées {kind === 'encaissement' ? `jusqu’au ${formatDate(asking.jour)}` : `du ${formatDate(asking.debut)} au ${formatDate(asking.jour)}`} et encore à {kind === 'depense' ? 'comptabiliser' : 'déclarer'}{kind === 'encaissement' ? ' (sauf celles décochées dans ce journal)' : ''} seront {kind === 'depense' ? 'comptabilisées' : 'déclarées'} au <strong>{formatDate(asking.jour)}</strong>{companyName ? <> pour <strong>{companyName}</strong></> : ' pour toutes les compagnies'} et passeront dans la feuille de caisse de ce jour.</p>
         <dl>
           <div><dt>À {kind === 'depense' ? 'comptabiliser' : 'déclarer'}</dt><dd>{plural(asking.a_declarer, names.what, names.whats)} · {fmt(asking.montant_a_declarer)} TND</dd></div>
           <div><dt>Déjà dans ce journal</dt><dd>{plural(asking.declarees, names.what, names.whats)} · {fmt(asking.montant_declare)} TND</dd></div>
