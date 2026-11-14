@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { navigate } from '../../navigation';
 import { createUser, deleteUser, listUsers, updateUser } from '../../services/adminUsersApi';
+import WhatsAppRobotPanel from '../../components/WhatsAppRobot/WhatsAppRobotPanel';
 import './AdminUsersPage.css';
 
 const EMPTY_FORM = { username: '', password: '', lieu: '', codeDepot: '01' };
@@ -197,6 +198,7 @@ export default function AdminUsersPage() {
             </div>
           )}
         </section>
+        <WhatsAppRobotPanel />
       </section>
 
       {confirming && (

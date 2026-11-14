@@ -353,6 +353,7 @@ function SendMemoireDialog({ channel, client, rows, criteria, onClose }) {
           : canShareFile(done.file)
             ? <p className="eti-send-ok" role="status">Le PDF « {done.fichier} » est prêt. Cliquez sur <b>Partager dans WhatsApp</b>, choisissez WhatsApp puis le client (<b>+{done.destinataire}</b>) : le PDF et le message sont déjà joints, il reste à appuyer sur Envoyer.</p>
             : <p className="eti-send-ok" role="status">Le PDF « {done.fichier} » a été téléchargé. Ouvrez WhatsApp : le message est déjà écrit pour le <b>+{done.destinataire}</b> ; joignez-y le fichier téléchargé puis envoyez.</p>}
+        {done.avertissement && <p className="expert-error">{done.avertissement}</p>}
         {shareError && <p className="expert-error" role="alert">{shareError}</p>}
         <footer>
           {!done.envoye && canShareFile(done.file) && <button type="button" className="expert-submit" onClick={share}>Partager dans WhatsApp</button>}

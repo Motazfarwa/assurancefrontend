@@ -1,0 +1,33 @@
+.wa-robot { display: grid; gap: 12px; margin-top: 18px; padding: 16px 18px; border: 1px solid #dbe7ea; border-radius: 12px; background: #fff; }
+.wa-robot header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.wa-robot h2 { margin: 0; color: #1f3a4b; font-size: 16px; }
+.wa-robot header p { margin: 4px 0 0; color: #5b6d78; font-size: 13px; }
+.wa-robot-badge { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.wa-robot-badge.is-ok { background: #e3f6ea; color: #17733e; }
+.wa-robot-badge.is-wait { background: #fff4dc; color: #8a5a00; }
+.wa-robot-badge.is-ko { background: #fde8e6; color: #b42318; }
+.wa-robot-body { display: grid; gap: 10px; color: #33495a; font-size: 13px; }
+.wa-robot-body p { margin: 0; }
+.wa-robot-link { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 14px 20px; }
+.wa-robot-qr { display: grid; gap: 8px; justify-items: center; min-width: 200px; }
+.wa-robot-qr img { width: 220px; height: 220px; image-rendering: pixelated; border: 1px solid #e1eaee; border-radius: 8px; background: #fff; }
+.wa-robot-qr p { width: 220px; height: 220px; display: grid; place-items: center; border: 1px dashed #cfdbe2; border-radius: 8px; color: #71808b; text-align: center; }
+.wa-robot-link ol { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.wa-robot-code { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid #eef3f5; }
+.wa-robot-code > span { width: 100%; color: #5b6d78; font-size: 12px; }
+.wa-robot-code input { flex: 1 1 200px; min-height: 34px; padding: 6px 10px; border: 1px solid #cfdbe2; border-radius: 8px; font: inherit; font-size: 13px; }
+.wa-robot-code p { width: 100%; }
+.wa-robot-pair { font-family: ui-monospace, Consolas, monospace; font-size: 18px; letter-spacing: .12em; color: #17733e; }
+.wa-robot-primary, .wa-robot-secondary, .wa-robot-danger { justify-self: start; min-height: 34px; padding: 6px 14px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.wa-robot-primary { border: 1px solid #1f9d55; background: #1f9d55; color: #fff; }
+.wa-robot-secondary { border: 1px solid #cfe3df; background: #f1f9f7; color: #187d78; }
+.wa-robot-danger { border: 1px solid #f1c3be; background: #fff5f4; color: #b42318; }
+.wa-robot button:disabled { opacity: .55; cursor: not-allowed; }
+.wa-robot-error { margin: 0; color: #b42318; font-size: 12px; }
+.wa-robot-note { margin: 0; color: #7a8891; font-size: 11px; }
+.wa-robot-backdrop { position: fixed; inset: 0; z-index: 1400; display: grid; place-items: center; padding: 16px; background: rgba(20, 35, 45, .45); }
+.wa-robot-dialog { width: min(440px, 100%); display: grid; gap: 10px; padding: 18px 20px; border-radius: 14px; background: #fff; box-shadow: 0 18px 50px rgba(15, 30, 40, .3); }
+.wa-robot-dialog h3 { margin: 0; color: #1f3a4b; font-size: 16px; }
+.wa-robot-dialog p { margin: 0; color: #4b5d6b; font-size: 13px; }
+.wa-robot-dialog footer { display: flex; justify-content: flex-end; gap: 10px; }
+@media (max-width: 620px) { .wa-robot-link { grid-template-columns: 1fr; } .wa-robot-qr { justify-self: center; } }
