@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import './ModuleModal.css';
 import PolicyForm from './PolicyForm';
 import ReceiptManager from './ReceiptManager';
+import ModuleLinks, { ClientPickDialog } from '../ModuleLinks/ModuleLinks';
 
 const FORM_FIELDS = {
   client: [
@@ -57,8 +58,11 @@ function Field({ field, lockedValue }) {
   return <label className="module-form-field"><span>{label}{required && ' *'}</span><input name={name} type={type} required={required} placeholder={type === 'number' ? '0.00' : undefined} /></label>;
 }
 
-export default function ModuleModal({ module, category, onClose, clientCode = '', prefill = null }) {
+export default function ModuleModal({ module, category, onClose, clientCode = '', prefill = null, onNavigate, available }) {
   const [submitted, setSubmitted] = useState(false);
+  // "Nouvelle police" (Gestion des polices): { code, nom } of the client chosen; the police then its quittance are entered.
+  const [picking, setPicking] = useState(false);
+  const [newFor, setNewFor] = useState(null);
   const [policyStep, setPolicyStep] = useState(1);
   const baseFields = FORM_FIELDS[module.form] || FORM_FIELDS.search;
   // With a client code the client field comes first and cannot be edited.
@@ -102,9 +106,14 @@ return (
             {category.label} · Module {module.id}
           </span>
           <h2 id="module-modal-title">
-            {isPolicy && clientCode && policyStep === 2 ? 'Gestion des quittances' : module.title}
+            {isPolicy && clientCode && policyStep === 2 ? 'Gestion des quittances' : newFor ? `Nouvelle police · client ${newFor.code}${newFor.nom ? ` ${newFor.nom}` : ''}` : module.title}
           </h2>
         </div>
+        {isPolicy && !clientCode && <ModuleLinks current={module.id} available={available} onNavigate={onNavigate}>
+          {newFor
+            ? <button type="button" className="module-links-action" onClick={() => { setNewFor(null); setPolicyStep(1); }}>← Retour aux polices</button>
+            : <button type="button" className="module-links-action is-primary" onClick={() => setPicking(true)}>＋ Nouvelle police</button>}
+        </ModuleLinks>}
         <button
           type="button"
           className="module-modal-close"
@@ -116,7 +125,9 @@ return (
       </header>
 
       {isPolicy ? (
-        <PolicyForm initialClient={clientCode} prefill={prefill} onStepChange={setPolicyStep} onClose={onClose} />
+        newFor
+          ? <PolicyForm key={`new-${newFor.code}`} clientCode={newFor.code} clientName={newFor.nom} onStepChange={setPolicyStep} onClose={() => { setNewFor(null); setPolicyStep(1); }} />
+          : <PolicyForm initialClient={clientCode} prefill={prefill} onStepChange={setPolicyStep} onClose={onClose} />
       ) : isReceiptManager ? (
         <ReceiptManager clientCode={clientCode} />
       ) : submitted ? (
@@ -176,6 +187,8 @@ return (
         </form>
       )}
     </section>
+    {picking && <ClientPickDialog kicker={`MODULE ${module.id} · NOUVELLE POLICE`} title="Pour quel client ?" onClose={() => setPicking(false)}
+      onPick={(client) => { setPicking(false); setPolicyStep(1); setNewFor(client); }} />}
   </div>
 );
 

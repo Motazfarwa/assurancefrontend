@@ -8,6 +8,7 @@ import { listAccounts } from '../../services/chequeApi';
 import { showToast } from '../../services/toast';
 import SinistreSuivi from './SinistreSuivi';
 import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
+import ModuleLinks from '../ModuleLinks/ModuleLinks';
 import './SinistreModal.css';
 
 // Mode de dépense of a claim settlement (TDepense.mod_dep).
@@ -260,7 +261,7 @@ const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle 
 // policyNumber: a new claim on this policy (the "Saisir sinistre" step of a new client), its client and company filled.
 // vehicle: { num_imat, code_client, nom_client } of a police flotte: the claim is on that vehicle and its client.
 // onSaved(numero) runs once a claim is stored.
-export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '', policyNumber = '', vehicle, onSaved }) {
+export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '', policyNumber = '', vehicle, onSaved, onNavigate, available }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
   const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], compagnies_adverses: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
@@ -349,6 +350,14 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   }
 
   const confirmLeave = () => !dirty || window.confirm('Les modifications non enregistrées seront perdues. Continuer ?');
+  // "Nouveau sinistre": an empty form for a new claim (after confirmation when the current one has changes).
+  function startNew() {
+    if (!confirmLeave()) return;
+    autoNumber.current = '';
+    setForm(blank()); setCurrent(''); setDirty(false); setTried(false); setClientPolicies([]); setTab('sinistre'); setReglement(null); setMessage(null);
+  }
+  // Another module (Gestion des polices / quittances): this one closes, after confirmation when it has changes.
+  const goTo = onNavigate ? (id) => { if (confirmLeave()) onNavigate(id); } : undefined;
 
   // A stored claim may lack the client name, company or branch: they are taken from its client and policy.
   async function completed(loaded) {
@@ -720,6 +729,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
         <header className="snr-header">
           <div><span>SINISTRES · MODULE {moduleId}</span><h2 id="snr-title">{mode === 'new' ? 'Déclarer un sinistre' : 'Gestion des sinistres'}</h2></div>
           <div className="snr-header-actions">
+            <ModuleLinks current={moduleId} available={available} onNavigate={goTo} />
             <input ref={fileInput} type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" hidden onChange={chooseImport} />
             <button type="button" className="snr-import" onClick={() => fileInput.current?.click()} disabled={scanning || busy || locked} title="Scanner un constat amiable ou une déclaration (image ou PDF) pour remplir le dossier">
               Importer
@@ -736,6 +746,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           </>}
           <button type="button" className="snr-tool snr-submit" onClick={() => save({ reset: true })} disabled={busy || scanning || (!dirty && Boolean(current))} title="Enregistre le sinistre puis vide le formulaire pour un nouveau sinistre">{busy && !current ? 'Patientez…' : 'Soumettre'}</button>
           <button type="button" className="snr-tool" onClick={() => setList(newList(clientCode))} disabled={busy}>Lister</button>
+          <button type="button" className="snr-tool" onClick={startNew} disabled={busy || scanning || (!current && !dirty)} title="Vider le formulaire pour saisir un nouveau sinistre">＋ Nouveau sinistre</button>
+          {!current && <button type="button" className="snr-tool" onClick={() => setList(newList(clientCode))} disabled={busy} title="Choisissez dans la liste le sinistre à modifier">Modifier</button>}
           {message && <p className={`snr-message is-${message.kind}`} role={message.kind === 'error' ? 'alert' : 'status'} title={message.text}>{message.text}</p>}
           <span className="snr-spacer" />
           <span className="snr-number">{current ? `N° ${current}` : proposed ? `Nouveau · n° ${proposed}` : 'Nouveau dossier'}{dirty && <em> · modifié</em>}</span>

@@ -145,12 +145,17 @@ export async function sendMemoire(accessToken, code, payload) {
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${memoirePath(code)}/envoyer`, {
-      method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify(payload),
+      method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      // the criteria left empty on screen ('') are not sent
+      body: JSON.stringify(Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== '' && value != null))),
     });
   } catch {
     throw new Error(`Impossible de joindre l'API (${API_BASE_URL}).`);
   }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'Envoi impossible.');
+  if (!response.ok) {
+    const detail = Array.isArray(body.detail) ? body.detail.map((item) => item.msg).join(' ; ') : body.detail;
+    throw new Error(typeof detail === 'string' && detail ? detail : 'Envoi impossible.');
+  }
   return body;
 }

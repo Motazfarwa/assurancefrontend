@@ -263,6 +263,17 @@ export default function ModulesWorkspace() {
     setSelectedModule(module);
   }
 
+  // Gestion des polices / quittances / sinistres open each other: the current one closes, the chosen one opens.
+  const visibleIds = visibleModules.map((module) => module.id);
+  function goToModule(id) {
+    const module = visibleModules.find((item) => item.id === id);
+    if (!module) return;
+    setSelectedModule(null);
+    setQuittancesModule(null);
+    setSinistreModule(null);
+    openModule(module);
+  }
+
   return (
     <main className="workspace-shell">
       <section className="workspace-window" aria-label="Gestion Assurance">
@@ -338,7 +349,7 @@ export default function ModulesWorkspace() {
         </div>
         <footer className="workspace-footer"><span>© 2026 Assurance Jemmali</span><span>Interface de gestion · Les acces dependent de votre profil</span></footer>
       </section>
-      {selectedModule && selectedCategory && <ModuleModal module={selectedModule} category={selectedCategory} onClose={() => setSelectedModule(null)} />}
+      {selectedModule && selectedCategory && <ModuleModal key={selectedModule.id} module={selectedModule} category={selectedCategory} onClose={() => setSelectedModule(null)} onNavigate={goToModule} available={visibleIds} />}
       {showExpertModal && <ExpertManagementModal onClose={() => setShowExpertModal(false)} />}
       {showCompanyModal && <CompanyManagementModal moduleId={activeModuleId} onClose={() => setShowCompanyModal(false)} />}
       {showHistory && <HistoriqueModal onClose={() => setShowHistory(false)} />}
@@ -357,7 +368,7 @@ export default function ModulesWorkspace() {
       {feuilleCaisseModule && <FeuilleCaisseModal moduleId={feuilleCaisseModule.id} onClose={() => setFeuilleCaisseModule(null)} />}
       {percusModule && <EtatPercusModal moduleId={percusModule.id} onClose={() => setPercusModule(null)} />}
       {comptesModule && <EtatComptesClientsModal moduleId={comptesModule.id} onClose={() => setComptesModule(null)} />}
-      {quittancesModule && <QuittancesModal moduleId={quittancesModule.id} onClose={() => setQuittancesModule(null)} />}
+      {quittancesModule && <QuittancesModal moduleId={quittancesModule.id} onClose={() => setQuittancesModule(null)} onNavigate={goToModule} available={visibleIds} />}
       {retourModule && <RetourQuittancesModal moduleId={retourModule.id} onClose={() => setRetourModule(null)} />}
       {termeModule && <EtatTermeModal moduleId={termeModule.id} onClose={() => setTermeModule(null)} />}
       {bankModule && <EtatComptesBanqueModal moduleId={bankModule.id} onClose={() => setBankModule(null)} />}
@@ -372,7 +383,7 @@ export default function ModulesWorkspace() {
       {chequeInstanceModule && <ChequeInstanceModal moduleId={chequeInstanceModule.id} onClose={() => setChequeInstanceModule(null)} />}
       {showRecetteModal && <RecetteModal onClose={() => setShowRecetteModal(false)} />}
       {reglementClientModule && <ReglementClientModal moduleId={reglementClientModule.id} onClose={() => setReglementClientModule(null)} />}
-      {sinistreModule && <SinistreModal moduleId={sinistreModule.id} mode={sinistreModule.form === 'sinistre-new' ? 'new' : 'manage'} onClose={() => setSinistreModule(null)} />}
+      {sinistreModule && <SinistreModal key={sinistreModule.id} moduleId={sinistreModule.id} mode={sinistreModule.form === 'sinistre-new' ? 'new' : 'manage'} onClose={() => setSinistreModule(null)} onNavigate={sinistreModule.id === '620' ? goToModule : undefined} available={visibleIds} />}
     </main>
   );
 }

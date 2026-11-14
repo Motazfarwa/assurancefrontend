@@ -87,11 +87,11 @@ const POLICY_DETAILS = [
   ['obser', 'Observation'],
 ];
 
-export function RecordsDialog({ kicker, title, subtitle, columns: fixedColumns, records, loading, error, onClose, actions, nested = false, wide = false, className = "", filters, onFilterChange, statusTabs, onRowClick }) {
+export function RecordsDialog({ kicker, title, subtitle, columns: fixedColumns, records, loading, error, onClose, actions, nested = false, wide = false, className = "", filters, onFilterChange, statusTabs, onRowClick, headerActions }) {
   const columns = fixedColumns || Object.keys(records[0] || {}).map((key) => [key, key]);
   return <div className={`client-records-backdrop${nested ? ' is-nested' : ''}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className={`client-records-dialog${wide ? " is-wide" : ""}${className ? ` ${className}` : ""}`} role="dialog" aria-modal="true" aria-label={title}>
-      <header><div><span>{kicker}</span><h2>{title}</h2>{subtitle && <p className="client-records-subtitle">{subtitle}</p>}</div><button type="button" onClick={onClose} aria-label="Fermer">×</button></header>
+      <header><div><span>{kicker}</span><h2>{title}</h2>{subtitle && <p className="client-records-subtitle">{subtitle}</p>}</div>{headerActions}<button type="button" onClick={onClose} aria-label="Fermer">×</button></header>
       {(filters || statusTabs) && <div className="client-records-filters">
         {filters?.map((filter) => <label key={filter.key}><span>{filter.label}</span>{filter.type === 'select'
           ? <select value={filter.value} onChange={(event) => onFilterChange(filter.key, event.target.value)}>{filter.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>

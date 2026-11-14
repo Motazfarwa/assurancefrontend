@@ -3,6 +3,8 @@ import { useAuth } from '../../auth/AuthContext';
 import { searchRecords, updateClientRecord } from '../../services/clientRecordsApi';
 import { isBordereauCompany, listCompanies } from '../../services/companyApi';
 import { EditRecordDialog, RECEIPT_FIELDS, RecordsDialog } from '../../pages/ClientPreview/ClientPreviewPage';
+import ModuleLinks from '../ModuleLinks/ModuleLinks';
+import NewQuittanceDialog from './NewQuittanceDialog';
 
 const COLUMNS = [
   ['num_quittance', 'N° quittance'], ['num_police', 'N° police'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
@@ -38,12 +40,14 @@ const hasCommission = (record) => Number(record?.commission || 0) !== 0;
 
 // Module "Gestion des quittances": the quittances of every client, found by client, police, quittance, company,
 // échéance or date de saisie, like the policies window of Gestion des polices; a row opens its modification.
-export default function QuittancesModal({ moduleId, onClose }) {
+export default function QuittancesModal({ moduleId, onClose, onNavigate, available }) {
   const { accessToken, user } = useAuth();
   const [filters, setFilters] = useState(blankFilters);
   const [companies, setCompanies] = useState([]);
   const [state, setState] = useState({ loading: true, error: '', records: [] });
   const [editing, setEditing] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [notice, setNotice] = useState('');
   const latest = useRef(0); // only the answer of the last search is shown (an older, slower one is dropped)
 
   useEffect(() => {
@@ -89,6 +93,11 @@ export default function QuittancesModal({ moduleId, onClose }) {
       className="quittances-dialog"
       kicker={`PRODUCTION · MODULE ${moduleId}`}
       title="Gestion des quittances"
+      subtitle={notice || undefined}
+      headerActions={<ModuleLinks current={moduleId} available={available} onNavigate={onNavigate}>
+        <button type="button" className="module-links-action is-primary" onClick={() => { setNotice(''); setCreating(true); }}>＋ Nouvelle quittance</button>
+        <button type="button" className="module-links-action" onClick={() => setNotice(user?.isAdmin ? 'Modifier : cliquez sur la quittance à modifier dans la liste.' : 'Modifier : seule la commission d’une quittance peut être corrigée, cliquez sur la quittance dans la liste.')}>Modifier</button>
+      </ModuleLinks>}
       columns={COLUMNS}
       {...state}
       filters={[
@@ -107,6 +116,12 @@ export default function QuittancesModal({ moduleId, onClose }) {
       onClose={onClose}
       actions={(record) => canEdit(record) && <button type="button" onClick={() => setEditing(record)}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}
     />
+    {creating && <NewQuittanceDialog moduleId={moduleId} onClose={() => setCreating(false)}
+      onSaved={(number, client) => {
+        setCreating(false);
+        setNotice(`Quittance ${number} enregistrée pour le client ${client.code}${client.nom ? ` ${client.nom}` : ''}.`);
+        setFilters((current) => nextFilters(current, 'num_quittance', number, (({ date_min, date_max }) => ({ date_min, date_max }))(blankFilters())));
+      }} />}
     {editing && <EditRecordDialog key={editing.num_quittance} kicker={`MODULE ${moduleId}`} title={`Modifier la quittance ${editing.num_quittance}`} fields={fields} record={editing} onSave={save} onClose={() => setEditing(null)} />}
   </>;
 }

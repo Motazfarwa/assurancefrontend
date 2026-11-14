@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { getClientReglements, getReglement } from '../../services/reglementClientApi';
+import { searchClients } from '../../services/clientApi';
 import '../RecetteModal/RecetteModal.css';
 import './ReglementClientModal.css';
 
@@ -21,6 +22,25 @@ export default function ReglementClientModal({ onClose, moduleId = '575' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const wanted = useRef(null); // règlement to show once the client's list is loaded (opened by its number)
+  // "Nom client" also searches: the text typed (null: it shows the client of the code) and the clients it matches.
+  const [nameQuery, setNameQuery] = useState(null);
+  const [matches, setMatches] = useState([]);
+  useEffect(() => {
+    const text = (nameQuery || '').trim();
+    if (text.length < 2) { setMatches([]); return undefined; }
+    let active = true;
+    const timer = setTimeout(() => {
+      searchClients(accessToken, text, 12)
+        .then((items) => { if (active) setMatches(items); })
+        .catch(() => { if (active) setMatches([]); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [accessToken, nameQuery]);
+  const nameOf = (item) => [item.lastName, item.firstName].filter(Boolean).join(' ') || item.nom_client || '';
+  function pickClient(item) {
+    setNameQuery(null); setMatches([]); setNumero('');
+    setCode(String(item.clientCode).trim());
+  }
 
   async function show(numReg) {
     setError('');
@@ -95,7 +115,17 @@ export default function ReglementClientModal({ onClose, moduleId = '575' }) {
             </label>
             <datalist id="rgc-numbers">{reglements.map((row) => <option key={row.num_reg_cli} value={row.num_reg_cli}>{`${shortDate(row.date_reg_cli)} · ${money(row.mont_reg_cli)}`}</option>)}</datalist>
             <label>Code client<input value={code} onChange={(event) => setCode(event.target.value)} maxLength={8} placeholder="Ex : 4717" autoFocus className="rgc-search" /></label>
-            <label className="rct-wide">Nom client<input value={client?.nom_client || ''} readOnly placeholder={loading ? 'Recherche…' : 'Détecté automatiquement'} /></label>
+            <div className="rct-wide rgc-name">
+              <label>Nom client<input value={nameQuery ?? (client?.nom_client || '')} onChange={(event) => setNameQuery(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter' && matches[0]) { event.preventDefault(); pickClient(matches[0]); } if (event.key === 'Escape' && nameQuery !== null) { event.stopPropagation(); setNameQuery(null); } }}
+                onBlur={() => setTimeout(() => { setNameQuery(null); setMatches([]); }, 200)}
+                placeholder={loading ? 'Recherche…' : 'Rechercher par nom ou prénom'} className="rgc-search" autoComplete="off" /></label>
+              {nameQuery !== null && nameQuery.trim().length >= 2 && <ul className="rgc-name-list" role="listbox" aria-label="Clients trouvés">
+                {matches.length ? matches.map((item) => <li key={item.clientCode}><button type="button" role="option" aria-selected={false} onMouseDown={(event) => { event.preventDefault(); pickClient(item); }}>
+                  <b>{item.clientCode}</b> {nameOf(item)}</button></li>)
+                  : <li className="rgc-name-empty">Aucun client trouvé.</li>}
+              </ul>}
+            </div>
             <label>Date règlement<input value={shortDate(reglement?.date_reg_cli)} readOnly /></label>
           </fieldset>
 
