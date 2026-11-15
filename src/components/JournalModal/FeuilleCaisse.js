@@ -251,7 +251,8 @@ export function CashValidation({ company, jour, selection, summary, onValidated 
 
 // The printable feuille de caisse of a company: one day (date), a period (debut, fin) or, without dates, every day.
 // On one day it can be validated (selection: the lines chosen in the journal it is opened from).
-export function CashSheet({ company, date, debut = date, fin = date, selection, onValidated, onClose }) {
+// canValidate: false in the module Feuille de caisse (590), which only shows the feuille.
+export function CashSheet({ company, date, debut = date, fin = date, selection, onValidated, onClose, canValidate = true }) {
   const { accessToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: '', sheet: null });
   const [version, setVersion] = useState(0); // read again once validated
@@ -279,7 +280,7 @@ export function CashSheet({ company, date, debut = date, fin = date, selection, 
   return <div className="jrn-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="jrn-sheet-frame">
       <div className="jrn-sheet-tools">
-        {jour && <CashValidation company={company} jour={jour} selection={selection} onValidated={(validation) => { setVersion((value) => value + 1); onValidated?.(validation); }} />}
+        {jour && canValidate && <CashValidation company={company} jour={jour} selection={selection} onValidated={(validation) => { setVersion((value) => value + 1); onValidated?.(validation); }} />}
         <button type="button" className="expert-cancel" onClick={openDetails} disabled={!sheet}>Détails</button>
         <button type="button" className="expert-submit" onClick={() => window.print()} disabled={!sheet}>Imprimer</button>
         <button type="button" className="expert-cancel" onClick={onClose}>Fermer</button>
@@ -339,7 +340,7 @@ function CashLines({ lines }) {
 }
 
 // Module "Feuille de caisse": the company and one day (the 15th or the end of the month by default); "Lister" shows its
-// lines, "Aperçu" the printable feuille, "Valider" declares on that day what is still to declare.
+// lines, "Aperçu" the printable feuille (no "Valider" here: the journals are validated from their own modules).
 export default function FeuilleCaisseModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
@@ -349,7 +350,6 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
   const [error, setError] = useState('');
   const [lines, setLines] = useState(null); // { compagnie, jour, receipts, expenses } once listed
   const [listing, setListing] = useState(false);
-  const [sheetValidated, setSheetValidated] = useState(0); // validated from the Aperçu: the bar reads its state again
 
   useEffect(() => { setLines(null); }, [compagnie, jour]);
 
@@ -382,11 +382,6 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
   }, [open, onClose]);
 
   const company = companies.find((item) => String(item.code_compagnie) === String(compagnie));
-  const declarable = lines ? lines.receipts.filter((row) => !row.comptabilise && (row.paye || row.a_s === 'A')) : [];
-  const pendingExpenses = lines ? lines.expenses.filter((row) => !row.comptabilise) : [];
-  const summary = lines && { quittances: declarable.length, encaissements: sum(declarable, 'montant'), depenses: pendingExpenses.length, montant_depenses: sum(pendingExpenses, 'montant') };
-  // Once validated: the lines are read again (those declared stay listed, declared on the day).
-  const refresh = () => { if (lines) list(); };
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !open) onClose(); }}>
     <section className={`unpaid-modal ${lines ? 'jrn-modal' : 'jrn-small'}`} role="dialog" aria-modal="true" aria-labelledby="fc-title">
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>COMPTABILITÉ · MODULE {moduleId}</span><h2 id="fc-title">Feuille de caisse</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
@@ -401,14 +396,13 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
           <label className="acompte-field jrn-date"><span>Date</span><input type="date" value={jour} onChange={(event) => setJour(event.target.value)} /></label>
           <button type="button" className="expert-cancel jrn-open" onClick={list} disabled={!company || !jour || listing}>{listing ? 'Chargement…' : 'Lister'}</button>
           <button type="button" className="expert-submit jrn-open" onClick={() => setOpen(true)} disabled={!company || !jour}>Aperçu</button>
-          {company && jour && <span className="jrn-cash-bar"><CashValidation key={sheetValidated} company={company} jour={jour} summary={summary} onValidated={refresh} /></span>}
         </div>
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
         {jour && !isJournalDay(jour) && <p className="jrn-cash-warn">Le {formatDate(jour)} n’est ni le 15 ni le dernier jour du mois.</p>}
         {lines && <CashLines lines={lines} />}
-        <p className="jrn-hint">La feuille reprend ce qui est déclaré à cette date dans le journal d’encaissement (montants réglés par les clients, commission des quittances soldées) et dans le journal de dépense (sinistres et ristournes), quel que soit le jour du paiement. « Valider » déclare à cette date les encaissements et les dépenses encore à déclarer, qui passent alors dans cette feuille. « Détails » ouvre la page A4, où le solde et le montant à déclarer peuvent être arrondis de 1 DT au plus.</p>
+        <p className="jrn-hint">La feuille reprend ce qui est déclaré à cette date dans le journal d’encaissement (montants réglés par les clients, commission des quittances soldées) et dans le journal de dépense (sinistres et ristournes), quel que soit le jour du paiement. « Détails » ouvre la page A4, où le solde et le montant à déclarer peuvent être arrondis de 1 DT au plus.</p>
       </div>
     </section>
-    {open && company && <CashSheet company={company} date={jour} onValidated={() => { setSheetValidated((value) => value + 1); refresh(); }} onClose={() => setOpen(false)} />}
+    {open && company && <CashSheet company={company} date={jour} canValidate={false} onClose={() => setOpen(false)} />}
   </div>;
 }

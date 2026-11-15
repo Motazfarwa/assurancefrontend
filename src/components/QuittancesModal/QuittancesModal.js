@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
+import { getClientByCode } from '../../services/clientApi';
 import { searchRecords, updateClientRecord } from '../../services/clientRecordsApi';
 import { isBordereauCompany, listCompanies } from '../../services/companyApi';
 import { EditRecordDialog, RECEIPT_FIELDS, RecordsDialog } from '../../pages/ClientPreview/ClientPreviewPage';
@@ -9,7 +10,7 @@ import NewQuittanceDialog from './NewQuittanceDialog';
 const COLUMNS = [
   ['num_quittance', 'N° quittance'], ['num_police', 'N° police'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
   ['nom_compagnie', 'Compagnie'], ['echeance', 'Échéance'], ['tc', 'TC'], ['Periode', 'Période'], ['prime_total', 'Prime totale'],
-  ['commission', 'Commission'], ['solde_quittance', 'Solde'], ['Date_Reglement', 'Date Reg'],
+  ['commission', 'Commission'], ['solde_quittance', 'Solde'], ['Date_Reglement', 'Date Reg'], ['feuille_caisse', 'Feuille de caisse'],
 ];
 const STATUSES = [['tous', 'Toutes'], ['impayees', 'Impayées'], ['reglees', 'Réglées']];
 const iso = (day) => `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
@@ -64,6 +65,8 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
     latest.current = request;
     setState((previous) => ({ ...previous, loading: true, error: '' }));
     const { autoDates, ...criteria } = current;
+    // A typed code finds the client by its code: the name shown beside it is not a second filter.
+    if (criteria.code_client.trim()) criteria.nom_client = '';
     try {
       const records = await searchRecords(accessToken, 'receipts', { ...criteria, limit: 1000 });
       if (latest.current === request) setState({ loading: false, error: '', records });
@@ -77,6 +80,19 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  // A typed code brings the client's name into "Nom client" (cleared with the code).
+  const code = filters.code_client.trim();
+  useEffect(() => {
+    if (!code) return undefined;
+    let active = true;
+    const timer = setTimeout(() => {
+      getClientByCode(accessToken, code)
+        .then((client) => { if (active) setFilters((current) => (current.code_client.trim() === code ? { ...current, nom_client: (client?.nom_client || '').trim() } : current)); })
+        .catch(() => { if (active) setFilters((current) => (current.code_client.trim() === code ? { ...current, nom_client: '' } : current)); });
+    }, 350);
+    return () => { active = false; clearTimeout(timer); };
+  }, [accessToken, code]);
 
   const canEdit = (record) => Boolean(user?.isAdmin) || hasCommission(record);
   const fields = user?.isAdmin ? RECEIPT_FIELDS : RECEIPT_FIELDS.filter((field) => field.key === 'commission');
@@ -110,7 +126,10 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
         { key: 'date_max', label: 'au', type: 'date', value: filters.date_max },
         { key: 'date_saisie', label: 'Date saisie', type: 'date', value: filters.date_saisie },
       ]}
-      onFilterChange={(key, value) => setFilters((current) => nextFilters(current, key, value, (({ date_min, date_max }) => ({ date_min, date_max }))(blankFilters())))}
+      onFilterChange={(key, value) => setFilters((current) => {
+        const next = nextFilters(current, key, value, (({ date_min, date_max }) => ({ date_min, date_max }))(blankFilters()));
+        return key === 'code_client' && !String(value).trim() && current.code_client.trim() ? { ...next, nom_client: '' } : next;
+      })}
       statusTabs={{ options: STATUSES, value: filters.reglement, onChange: (reglement) => setFilters((current) => ({ ...current, reglement })) }}
       onRowClick={(record) => { if (canEdit(record)) setEditing(record); }}
       onClose={onClose}

@@ -49,3 +49,9 @@
 .rst-import-table .rst-warning-row td { padding-top: 0; border-top: 0; background: #fffdf7; color: #9a6514; font-size: 10px; }
 .rst-ok { color: #1c7a5e; font-size: 10px; font-weight: 700; }
 .rst-import-table .rst-columns-row td { padding-top: 0; border-top: 0; color: #4f6672; font-size: 10px; }
+
+/* "Lister" with its two dates, in the toolbar */
+.rst-lister { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rst-between { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: #34505d; white-space: nowrap; }
+.rst-lister input[type="date"] { height: 36px; padding: 0 8px; border: 1px solid #c9d6dc; border-radius: 8px; font: inherit; font-size: 12.5px; }
+.rst-lister input[type="date"]:disabled { background: #f1f4f5; color: #8a9aa2; }

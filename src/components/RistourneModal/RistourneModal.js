@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { createRistourne, deleteRistourne, extractRistournes, getRistourne, getRistournePolicy, searchRistournes, updateRistourne } from '../../services/ristourneApi';
+import { createRistourne, deleteRistourne, extractRistournes, getRistourne, getRistournePolicy, listRistournes, searchRistournes, updateRistourne } from '../../services/ristourneApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
 import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
@@ -36,6 +36,11 @@ export default function RistourneModal({ moduleId, onClose }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState(null); // { q, items, loading }
+  // "Lister": every ristourne (the latest 1000), or with "Entre deux dates" those entered between the two dates.
+  const [between, setBetween] = useState(false);
+  const [debut, setDebut] = useState(() => `${today().slice(0, 8)}01`);
+  const [fin, setFin] = useState(today);
+  const [list, setList] = useState(null); // { items, loading, error, debut, fin }
   const [imported, setImported] = useState(null); // the document read: { compagnie, type_document, date_document, source, lignes }
   const [showImport, setShowImport] = useState(false);
   const [importFile, setImportFile] = useState(null); // the document being read in the import window
@@ -165,6 +170,16 @@ export default function RistourneModal({ moduleId, onClose }) {
     finally { setBusy(false); }
   }
 
+  async function runList() {
+    if (between && (!debut || !fin || debut > fin)) { setError(!debut || !fin ? 'Choisissez les deux dates.' : 'La date de début doit précéder la date de fin.'); return; }
+    const id = ++searchId.current;
+    const period = between ? { debut, fin } : {};
+    setError(''); setSearch(null);
+    setList({ items: [], loading: true, ...period });
+    try { const body = await listRistournes(accessToken, period); if (id === searchId.current) setList({ items: body.items || [], loading: false, ...period }); }
+    catch (listError) { if (id === searchId.current) setList({ items: [], loading: false, error: listError.message, ...period }); }
+  }
+
   async function runSearch(q) {
     const id = ++searchId.current; // only the latest search fills the list
     setSearch({ q, items: search?.items || [], loading: true });
@@ -192,7 +207,13 @@ export default function RistourneModal({ moduleId, onClose }) {
             <button type="button" className="expert-submit" onClick={startNew} disabled={busy}>Ajouter</button>
             <button type="button" className="expert-cancel" onClick={() => { setMode('edit'); setNotice(''); }} disabled={busy || !current || locked}>Modifier</button>
             <button type="button" className="catalog-delete" onClick={remove} disabled={busy || !current || locked}>Supprimer</button>
-            <button type="button" className="expert-cancel" onClick={() => runSearch('')} disabled={busy}>Chercher</button>
+            <button type="button" className="expert-cancel" onClick={() => { setList(null); runSearch(''); }} disabled={busy}>Chercher</button>
+            <span className="rst-lister">
+              <button type="button" className="expert-cancel" onClick={runList} disabled={busy}>Lister</button>
+              <label className="rst-between"><input type="checkbox" checked={between} onChange={(event) => setBetween(event.target.checked)} /> Entre deux dates</label>
+              <input type="date" aria-label="Date début" value={debut} onChange={(event) => setDebut(event.target.value)} disabled={!between} />
+              <input type="date" aria-label="Date fin" value={fin} onChange={(event) => setFin(event.target.value)} disabled={!between} />
+            </span>
             <button type="button" className="expert-cancel rst-import" onClick={() => fileRef.current?.click()} disabled={busy} title="PDF ou image (JPG, PNG) d’un avis ou bordereau de ristourne">⬆ Importer un document</button>
             {imported && <button type="button" className="expert-cancel" onClick={() => setShowImport(true)} disabled={busy}>Lignes importées ({savedLines.length}/{imported.lignes.length})</button>}
           </>}
@@ -258,6 +279,27 @@ export default function RistourneModal({ moduleId, onClose }) {
             <thead><tr><th>N° ristourne</th><th>Date saisie</th><th>Police</th><th>Client</th><th>Compagnie</th><th className="num">Totale</th><th className="num">Solde</th></tr></thead>
             <tbody>{search.items.map((item) => <tr key={item.num_ristourne} onClick={() => open(item.num_ristourne)}>
               <td>{item.num_ristourne}</td><td>{formatDate(item.date_saisie)}</td><td>{item.num_police}</td><td>{item.nom_client}</td><td>{item.nom_compagnie}</td><td className="num">{fmt(item.totale)}</td><td className="num">{fmt(item.solde)}</td>
+            </tr>)}</tbody>
+          </table>}
+        </div>
+      </div>}
+
+      {list && <div className="rst-search" role="dialog" aria-label="Liste des ristournes">
+        <div className="rst-search-head rst-import-head">
+          <div>
+            <strong>{list.loading ? 'Chargement…' : `${list.items.length} ristourne${list.items.length > 1 ? 's' : ''}`}</strong>
+            <small>{list.debut ? `Saisies du ${formatDate(list.debut)} au ${formatDate(list.fin)}` : 'Toutes les ristournes, les plus récentes d’abord'}
+              {!list.loading && list.items.length > 0 && ` · Totale ${fmt(list.items.reduce((total, item) => total + Number(item.totale || 0), 0))} · Solde ${fmt(list.items.reduce((total, item) => total + Number(item.solde || 0), 0))}`}</small>
+          </div>
+          <button type="button" className="expert-cancel" onClick={() => setList(null)}>Fermer</button>
+        </div>
+        <div className="rst-search-list">
+          {list.error ? <p className="rst-empty" role="alert">{list.error}</p> : !list.items.length ? <p className="rst-empty">{list.loading ? 'Chargement…' : 'Aucune ristourne pour cette période.'}</p> : <table>
+            <thead><tr><th>N° ristourne</th><th>Date saisie</th><th>Date du</th><th>Police</th><th>Client</th><th>Compagnie</th><th className="num">Totale</th><th className="num">Solde</th><th>Comptabilisée</th></tr></thead>
+            <tbody>{list.items.map((item) => <tr key={item.num_ristourne} onClick={() => { setList(null); open(item.num_ristourne); }}>
+              <td>{item.num_ristourne}</td><td>{formatDate(item.date_saisie)}</td><td>{formatDate(item.date_du)}</td><td>{item.num_police || item.num_int}</td>
+              <td>{item.code_client} {item.nom_client}</td><td>{item.nom_compagnie}</td><td className="num">{fmt(item.totale)}</td><td className="num">{fmt(item.solde)}</td>
+              <td>{item.comptabilise ? formatDate(item.date_comptabilise) || 'Oui' : '—'}</td>
             </tr>)}</tbody>
           </table>}
         </div>

@@ -16,7 +16,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const firstOfMonth = () => `${today().slice(0, 8)}01`;
 const SCOPES = { tous: 'Tous', compagnie: 'Compagnie', client: 'Client', police: 'Police' };
 const ETATS = { tous: 'Tous', comptabilise: 'Comptabilisées', instance: 'En instance', ristourne: 'Ristournes' };
-const COLUMNS = [['prime', 'Prime'], ['ristourne', 'Ristourne'], ['sinistre', 'Sinistre'], ['reglement', 'Règlement'], ['commission', 'Commission']];
+const COLUMNS = [['prime', 'Prime'], ['ristourne', 'Ristourne'], ['sinistre', 'Sinistre'], ['reglement', 'Règlement'], ['reste', 'Reste à payer'], ['commission', 'Commission']];
 
 // The detail lines (client, company, quittance) grouped client by client, then company by company, with their totals.
 export function groupAccountLines(lines) {
@@ -24,18 +24,21 @@ export function groupAccountLines(lines) {
   lines.forEach((line) => {
     let client = clients[clients.length - 1];
     if (!client || client.code !== line.code_client) {
-      client = { code: line.code_client, nom: line.nom_client, companies: [], total: 0 };
+      client = { code: line.code_client, nom: line.nom_client, companies: [], total: 0, regle: 0, reste: 0 };
       clients.push(client);
     }
     const name = line.nom_compagnie || 'Compagnie non renseignée';
     let company = client.companies[client.companies.length - 1];
     if (!company || company.name !== name) {
-      company = { name, lines: [], total: 0 };
+      company = { name, lines: [], total: 0, regle: 0, reste: 0 };
       client.companies.push(company);
     }
     company.lines.push(line);
-    company.total += Number(line.prime || 0);
-    client.total += Number(line.prime || 0);
+    [company, client].forEach((group) => {
+      group.total += Number(line.prime || 0);
+      group.regle += Number(line.regle || 0);
+      group.reste += Number(line.reste || 0);
+    });
   });
   return clients;
 }
@@ -70,14 +73,16 @@ function DetailTables({ data }) {
       {client.companies.map((company) => <Fragment key={company.name}>
         <h3>Compagnie : {company.name}</h3>
         <table className="jrn-sheet-table jrn-account-lines">
-          <thead><tr><th>Date</th><th>N° Police</th><th>N° Quittance</th><th>Primes</th></tr></thead>
-          <tbody>{company.lines.map((line) => <tr key={line.num_quittance}><td>{formatDate(line.echeance)}</td><td>{line.num_police}</td><td>{line.num_quittance}</td><td className="num">{fmt(line.prime)}</td></tr>)}</tbody>
-          <tfoot><tr><td colSpan={3}>Total {company.name}</td><td className="num">{fmt(company.total)}</td></tr></tfoot>
+          <thead><tr><th>Date</th><th>N° Police</th><th>N° Quittance</th><th>Primes</th><th>Réglé</th><th>Reste à payer</th></tr></thead>
+          <tbody>{company.lines.map((line) => <tr key={line.num_quittance}><td>{formatDate(line.echeance)}</td><td>{line.num_police}</td><td>{line.num_quittance}</td><td className="num">{fmt(line.prime)}</td><td className="num">{fmt(line.regle)}</td><td className="num">{fmt(line.reste)}</td></tr>)}</tbody>
+          <tfoot><tr><td colSpan={3}>Total {company.name}</td><td className="num">{fmt(company.total)}</td><td className="num">{fmt(company.regle)}</td><td className="num">{fmt(company.reste)}</td></tr></tfoot>
         </table>
       </Fragment>)}
       <p className="jrn-account-total"><span>Total {client.nom || client.code}</span><strong>{fmt(client.total)}</strong></p>
+      <p className="jrn-account-total"><span>Réglé · Reste à payer</span><strong>{fmt(client.regle)} · {fmt(client.reste)}</strong></p>
     </section>)}
     <p className="jrn-account-total is-grand"><span>Total général ({clients.length} client{clients.length > 1 ? 's' : ''})</span><strong>{fmt(data.total)}</strong></p>
+    {data.total_reste != null && <p className="jrn-account-total is-grand"><span>Réglé · Reste à payer</span><strong>{fmt(data.total_regle)} · {fmt(data.total_reste)}</strong></p>}
   </div>;
 }
 
@@ -192,8 +197,8 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
         {reversed && <div className="expert-error unpaid-error" role="alert">La date de fin précède la date de début.</div>}
         <p className="jrn-hint">{isAdmin && presentation === 'synthese'
-          ? 'Synthèse : une ligne par client — prime, ristourne, règlements reçus, commission (quittances d’échéance dans la période, sauf celles retournées à la compagnie) et sinistres payés dans la période.'
-          : 'Détail : pour chaque client, ses quittances d’échéance dans la période, compagnie par compagnie, avec la prime de chacune et les totaux.'}</p>
+          ? 'Synthèse : une ligne par client — prime, ristourne, montant réglé, reste à payer, commission (quittances d’échéance dans la période, sauf celles retournées à la compagnie) et sinistres payés dans la période.'
+          : 'Détail : pour chaque client, ses quittances d’échéance dans la période, compagnie par compagnie, avec la prime, le montant réglé et le reste à payer de chacune, et les totaux.'}</p>
       </div>
     </section>
     {report && <NewWindow popup={report.popup} title="Etat des comptes client" onClose={() => setReport(null)}>

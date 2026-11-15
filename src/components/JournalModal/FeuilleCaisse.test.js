@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import FeuilleCaisseModal, { journalDay } from './FeuilleCaisse';
 import { getCashValidation, getExpensesJournal, getReceiptsJournal, listJournalCompanies, validateCashSheet } from '../../services/journalApi';
 
@@ -19,7 +19,7 @@ beforeEach(() => {
   validateCashSheet.mockResolvedValue({ validation: { jour: journalDay(), quittances: 1, encaissements: 100, depenses: 1, montant_depenses: 40, utilisateur: 'Sami', date_saisie: '2026-11-11T16:00' } });
 });
 
-test('the feuille de caisse: on the 15th / end of month, "Lister" shows its lines, "Valider" declares them after a confirmation', async () => {
+test('the feuille de caisse: on the 15th / end of month, "Lister" shows its lines; there is no "Valider"', async () => {
   render(<FeuilleCaisseModal moduleId="590" onClose={() => {}} />);
   expect(screen.getByLabelText('Date')).toHaveValue(journalDay());
   await screen.findByRole('option', { name: 'CARTE' });
@@ -32,12 +32,6 @@ test('the feuille de caisse: on the 15th / end of month, "Lister" shows its line
   expect(screen.getByText('Q3').closest('tr')).toHaveClass('is-offday');
   expect(screen.getByText('S5')).toBeInTheDocument();
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
-  const dialog = screen.getByRole('alertdialog', { name: 'Valider la feuille de caisse ?' });
-  expect(dialog).toHaveTextContent('Êtes-vous sûr de vouloir valider la feuille de caisse de CARTE');
-  expect(within(dialog).getByText(/^1 · 100,000/)).toBeInTheDocument();
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, valider' }));
-  await waitFor(() => expect(validateCashSheet).toHaveBeenCalledWith('t', { compagnie: 4, jour: journalDay() }));
-  expect(await screen.findByText(/Feuille validée le/)).toBeInTheDocument();
+  // no "Valider" in this module: it only lists and shows the feuille
   expect(screen.queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();
 });

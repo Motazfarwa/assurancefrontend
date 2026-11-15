@@ -27,13 +27,14 @@ const termOf = (row) => (row.tc === 'T' && row.periode ? `T${row.periode}` : row
 const total = (rows) => rows.reduce((sum, row) => sum + amount(row.solde), 0);
 const sumOf = (rows, key) => rows.reduce((sum, row) => sum + amount(row[key]), 0);
 const percent = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// Taux de recouvrement = encaissements de l'année en cours / primes de l'année en cours exigibles; under it, the rate of
-// the whole previous year.
+// Taux de recouvrement = (primes exigibles - reste impayé) / primes exigibles, of the quittances due this year; under it,
+// the rate of the whole previous year and, when the statement has an échéance interval, the rate of that interval.
 export const RecoveryRate = ({ rate }) => <div className="eti-recovery" aria-label="Taux de recouvrement">
   <span>Taux de recouvrement {rate.annee}</span>
   <strong>{rate.taux == null ? '—' : `${percent.format(rate.taux)} %`}</strong>
-  <small>Encaissements : {money.format(rate.encaissements)} TND</small>
   <small>Primes exigibles au {formatDate(rate.au)} : {money.format(rate.primes_exigibles)} TND</small>
+  <small>Recouvré : {money.format(rate.encaissements)} TND · Reste impayé : {money.format(rate.reste ?? 0)} TND</small>
+  {rate.periode && <em className="eti-recovery-before">Taux {rate.periode.du ? `du ${formatDate(rate.periode.du)} ` : 'jusqu’'}au {formatDate(rate.periode.au)} : <b>{rate.periode.taux == null ? '—' : `${percent.format(rate.periode.taux)} %`}</b></em>}
   {rate.precedente && <em className="eti-recovery-before">Taux {rate.precedente.annee} : <b>{rate.precedente.taux == null ? '—' : `${percent.format(rate.precedente.taux)} %`}</b></em>}
 </div>;
 // summary: [label, amount] lines printed under the date (the mise en demeure totals, on its first page);
@@ -144,7 +145,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       // The taux de recouvrement of the same client / company / type of client (the report is shown without it if it fails).
       const [body, recovery] = await Promise.all([
         getUnpaidStatement(accessToken, params),
-        getRecoveryRate(accessToken, { code_client: params.code_client, type_client: params.type_client, code_compagnie: params.code_compagnie }).catch(() => null),
+        getRecoveryRate(accessToken, { code_client: params.code_client, type_client: params.type_client, code_compagnie: params.code_compagnie, tc: params.tc, piece: params.piece, date_debut: params.date_debut, date_fin: params.date_fin }).catch(() => null),
       ]);
       // Mise en demeure: automobile particuliers past "jours" days; every other quittance (particulier non automobile,
       // société) past "jours_autres" days. "Entre deux dates" only narrows the échéances: the delays still apply.

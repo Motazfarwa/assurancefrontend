@@ -15,7 +15,7 @@ beforeEach(() => {
     code_client: '91', nom_client: 'BOUKER TAHAR', num_quittance: '02026094429', num_int: '5219970021', tc: 'T', periode: '09/2026',
     echeance: '2026-09-01', montant_quittance: 1008.159, regle: 0, solde: 1008.159, type_client: 'P',
   }] });
-  getRecoveryRate.mockResolvedValue({ annee: 2026, du: '2026-01-01', au: '2026-11-11', encaissements: 2191273.555, primes_exigibles: 3360198.729, quittances_exigibles: 1570, taux: 65.21, precedente: { annee: 2025, taux: 70.97 } });
+  getRecoveryRate.mockResolvedValue({ annee: 2026, du: '2026-01-01', au: '2026-11-11', encaissements: 2191273.555, primes_exigibles: 3360198.729, quittances_exigibles: 1570, reste: 145160.243, taux: 65.21, precedente: { annee: 2025, taux: 70.97 }, periode: { du: '2022-01-01', au: '2022-12-31', taux: 99.98 } });
 });
 
 test('the statement shows the taux de recouvrement of its scope: encaissements of the year / primes exigibles of the year', async () => {
@@ -24,11 +24,12 @@ test('the statement shows the taux de recouvrement of its scope: encaissements o
   const box = await screen.findByLabelText('Taux de recouvrement');
   expect(within(box).getByText('Taux de recouvrement 2026')).toBeInTheDocument();
   expect(box).toHaveTextContent(/65,21\s%/);
-  expect(box).toHaveTextContent(/Encaissements : 2\s191\s273,555 TND/);
+  expect(box).toHaveTextContent(/Recouvré : 2\s191\s273,555 TND/);
   expect(box).toHaveTextContent(/Primes exigibles au 11\/11\/2026 : 3\s360\s198,729 TND/);
   expect(box).toHaveTextContent(/Taux 2025 : 70,97\s%/);
+  expect(box).toHaveTextContent(/Taux du 01\/01\/2022 au 31\/12\/2022 : 99,98\s%/);
   // the same client / company / type of client as the statement (every client type by default)
-  expect(getRecoveryRate).toHaveBeenCalledWith('t', { code_client: '', type_client: '', code_compagnie: '' });
+  expect(getRecoveryRate).toHaveBeenCalledWith('t', expect.objectContaining({ code_client: '', type_client: '', code_compagnie: '', tc: '' }));
 });
 
 test('every client type is read by default (the sociétés too, as the legacy report); "Type client" narrows it to one', async () => {
