@@ -35,6 +35,19 @@ test('counts the clients with missing coordonnées, without police, and their to
   expect(screen.queryByRole('button', { name: /Quittances/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /^Polices/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Sans police 893/ }));
-  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', q: '', offset: 0, limit: 100 }));
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
   await waitFor(() => expect(screen.queryByText('CAMBONI IGNAZIO')).not.toBeInTheDocument());
+});
+
+test('the filter shows the clients without police, or those without one coordonnée', async () => {
+  listIncompleteClientsPage.mockResolvedValue({ ...counters, manques: { adresse: 95, ville: 123, 'code postal': 327, téléphone: 1773 }, found: 1,
+    items: [client('5056', 'BORGHINI ANTONELLO', { coordonnees: ['ville'] })] });
+  render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} />);
+  const filter = await screen.findByLabelText('Afficher');
+  expect(await screen.findByRole('option', { name: /Sans téléphone \(1773\)/ })).toBeInTheDocument();
+  fireEvent.change(filter, { target: { value: 'coordonnees:ville' } });
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'coordonnees', manque: 'ville', q: '', offset: 0, limit: 100 }));
+  expect(screen.getByRole('button', { name: /Coordonnées 1845/ })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.change(filter, { target: { value: 'sans_police' } });
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
 });

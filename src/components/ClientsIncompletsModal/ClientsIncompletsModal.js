@@ -15,12 +15,18 @@ export const CATEGORIES = [
   ['coordonnees', 'Coordonnées'],
   ['sans_police', 'Sans police'],
 ];
+// The coordonnée missing, to show only the clients without it.
+export const MANQUES = [['adresse', 'Sans adresse'], ['ville', 'Sans ville'], ['code postal', 'Sans code postal'], ['téléphone', 'Sans téléphone']];
+// The filter list: every client, one kind, or one missing coordonnée ("coordonnees:ville").
+const filterValue = (categorie, manque) => (manque ? `coordonnees:${manque}` : categorie);
 
 // Module "Clients à compléter" (administrator only): every client with missing information, what is missing, by kind.
 export default function ClientsIncompletsModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const { setClient } = useClient();
   const [categorie, setCategorie] = useState('');
+  const [manque, setManque] = useState('');
+  const choose = (value) => { const [kind, missing = ''] = value.split(':'); setCategorie(kind); setManque(missing); };
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [state, setState] = useState({ loading: true, error: '', data: null, items: [] });
@@ -35,11 +41,11 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
   useEffect(() => {
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
-    listIncompleteClientsPage(accessToken, { categorie, q: query, offset: 0, limit: PAGE })
+    listIncompleteClientsPage(accessToken, { categorie, manque, q: query, offset: 0, limit: PAGE })
       .then((data) => { if (active) setState({ loading: false, error: '', data, items: data.items || [] }); })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, data: null, items: [] }); });
     return () => { active = false; };
-  }, [accessToken, categorie, query]);
+  }, [accessToken, categorie, manque, query]);
 
   useEffect(() => {
     const onKey = (event) => { if (event.key === 'Escape') onClose(); };
@@ -50,7 +56,7 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
   async function more() {
     setLoadingMore(true);
     try {
-      const data = await listIncompleteClientsPage(accessToken, { categorie, q: query, offset: state.items.length, limit: PAGE });
+      const data = await listIncompleteClientsPage(accessToken, { categorie, manque, q: query, offset: state.items.length, limit: PAGE });
       setState((current) => ({ ...current, items: [...current.items, ...(data.items || [])] }));
     } catch (requestError) {
       setState((current) => ({ ...current, error: requestError.message }));
@@ -77,14 +83,21 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE {moduleId} · ADMINISTRATEUR</span><h2 id="cim-title">Clients à compléter</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
         <div className="cim-cards" role="group" aria-label="Type d’information manquante">
-          <button type="button" className={`cim-card${categorie === '' ? ' is-active' : ''}`} onClick={() => setCategorie('')}><span>Tous les clients</span><strong>{data ? data.total : '…'}</strong></button>
-          {CATEGORIES.map(([key, label]) => <button type="button" key={key} className={`cim-card${categorie === key ? ' is-active' : ''}`} onClick={() => setCategorie(key)} aria-pressed={categorie === key}>
+          <button type="button" className={`cim-card${categorie === '' ? ' is-active' : ''}`} onClick={() => choose('')}><span>Tous les clients</span><strong>{data ? data.total : '…'}</strong></button>
+          {CATEGORIES.map(([key, label]) => <button type="button" key={key} className={`cim-card${categorie === key ? ' is-active' : ''}`} onClick={() => choose(key)} aria-pressed={categorie === key}>
             <span>{label}</span><strong>{data ? data[key] : '…'}</strong>
           </button>)}
         </div>
         <div className="unpaid-filter-form acompte-filters cim-filters">
+          <label className="acompte-field cim-filter"><span>Afficher</span>
+            <select value={filterValue(categorie, manque)} onChange={(event) => choose(event.target.value)}>
+              <option value="">Tous les clients à compléter{data ? ` (${data.total})` : ''}</option>
+              <option value="sans_police">Sans police{data ? ` (${data.sans_police})` : ''}</option>
+              <option value="coordonnees">Coordonnées manquantes{data ? ` (${data.coordonnees})` : ''}</option>
+              {MANQUES.map(([key, label]) => <option key={key} value={`coordonnees:${key}`}>{'  '}{label}{data?.manques ? ` (${data.manques[key]})` : ''}</option>)}
+            </select></label>
           <label className="acompte-field cim-search"><span>Rechercher un client</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Code ou nom du client" autoFocus /></label>
-          <p className="cim-count" role="status">{state.loading ? 'Chargement…' : `${found} client${found > 1 ? 's' : ''}${categorie ? ` · ${CATEGORIES.find(([key]) => key === categorie)[1].toLowerCase()}` : ''}${items.length < found ? ` · ${items.length} affichés` : ''}`}</p>
+          <p className="cim-count" role="status">{state.loading ? 'Chargement…' : `${found} client${found > 1 ? 's' : ''}${manque ? ` · ${MANQUES.find(([key]) => key === manque)[1].toLowerCase()}` : categorie ? ` · ${CATEGORIES.find(([key]) => key === categorie)[1].toLowerCase()}` : ''}${items.length < found ? ` · ${items.length} affichés` : ''}`}</p>
         </div>
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         <div className="cim-table-wrap">

@@ -13,6 +13,8 @@
 
 .cim-filters { align-items: end; }
 .cim-search { flex: 1 1 320px; }
+.cim-filter { flex: 0 1 280px; }
+.cim-filter select { width: 100%; }
 .cim-count { margin: 0 0 8px; color: #587079; font-size: 12px; font-weight: 600; }
 
 /* The list: one row per client, the gaps by kind */
