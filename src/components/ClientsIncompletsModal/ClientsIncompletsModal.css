@@ -56,3 +56,9 @@
 }
 .cim-table .cim-open { padding: 6px 12px; border: 1px solid #b9d8d2; border-radius: 7px; background: #f1faf7; color: #1d7a6b; font-size: 11.5px; font-weight: 700; cursor: pointer; }
 .cim-table .cim-open:hover { background: #e2f3ee; }
+
+/* "Créés entre deux dates" */
+.cim-dates { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; align-self: end; }
+.cim-between { display: inline-flex; align-items: center; gap: 5px; color: #34505d; font-size: 11px; font-weight: 650; white-space: nowrap; }
+.cim-dates input[type="date"] { height: 36px; padding: 0 8px; border: 1px solid #d9e2e5; border-radius: 6px; font: inherit; font-size: 11px; }
+.cim-dates input[type="date"]:disabled { background: #f1f4f5; color: #8a9aa2; }

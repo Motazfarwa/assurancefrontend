@@ -51,3 +51,14 @@ test('the filter shows the clients without police, or those without one coordonn
   fireEvent.change(filter, { target: { value: 'sans_police' } });
   await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
 });
+
+test('"Créés entre deux dates" lists the clients created in the period (sans police from 2000 to 2022)', async () => {
+  render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} />);
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenCalled());
+  expect(screen.getByLabelText('Date de création du')).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Afficher'), { target: { value: 'sans_police' } });
+  fireEvent.click(screen.getByLabelText('Créés entre deux dates'));
+  fireEvent.change(screen.getByLabelText('Date de création du'), { target: { value: '2000-01-01' } });
+  fireEvent.change(screen.getByLabelText('Date de création au'), { target: { value: '2022-12-31' } });
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100, date_debut: '2000-01-01', date_fin: '2022-12-31' }));
+});

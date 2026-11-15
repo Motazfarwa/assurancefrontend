@@ -28,6 +28,13 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
   const [manque, setManque] = useState('');
   const choose = (value) => { const [kind, missing = ''] = value.split(':'); setCategorie(kind); setManque(missing); };
   const [search, setSearch] = useState('');
+  // "Entre deux dates": the clients created (date de création) between the two dates; the counters follow.
+  const [between, setBetween] = useState(false);
+  const [debut, setDebut] = useState('2000-01-01');
+  const [fin, setFin] = useState(() => new Date().toISOString().slice(0, 10));
+  const reversed = between && Boolean(debut && fin && debut > fin);
+  const period = between && debut && fin && !reversed ? { date_debut: debut, date_fin: fin } : {};
+  const periodKey = `${period.date_debut || ''}|${period.date_fin || ''}`;
   const [query, setQuery] = useState('');
   const [state, setState] = useState({ loading: true, error: '', data: null, items: [] });
   const [loadingMore, setLoadingMore] = useState(false);
@@ -41,11 +48,12 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
   useEffect(() => {
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
-    listIncompleteClientsPage(accessToken, { categorie, manque, q: query, offset: 0, limit: PAGE })
+    listIncompleteClientsPage(accessToken, { categorie, manque, q: query, offset: 0, limit: PAGE, ...period })
       .then((data) => { if (active) setState({ loading: false, error: '', data, items: data.items || [] }); })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, data: null, items: [] }); });
     return () => { active = false; };
-  }, [accessToken, categorie, manque, query]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the period is read through periodKey
+  }, [accessToken, categorie, manque, query, periodKey]);
 
   useEffect(() => {
     const onKey = (event) => { if (event.key === 'Escape') onClose(); };
@@ -56,7 +64,7 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
   async function more() {
     setLoadingMore(true);
     try {
-      const data = await listIncompleteClientsPage(accessToken, { categorie, manque, q: query, offset: state.items.length, limit: PAGE });
+      const data = await listIncompleteClientsPage(accessToken, { categorie, manque, q: query, offset: state.items.length, limit: PAGE, ...period });
       setState((current) => ({ ...current, items: [...current.items, ...(data.items || [])] }));
     } catch (requestError) {
       setState((current) => ({ ...current, error: requestError.message }));
@@ -96,26 +104,33 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
               <option value="coordonnees">Coordonnées manquantes{data ? ` (${data.coordonnees})` : ''}</option>
               {MANQUES.map(([key, label]) => <option key={key} value={`coordonnees:${key}`}>{'  '}{label}{data?.manques ? ` (${data.manques[key]})` : ''}</option>)}
             </select></label>
+          <span className="cim-dates">
+            <label className="cim-between"><input type="checkbox" checked={between} onChange={(event) => setBetween(event.target.checked)} /> Créés entre deux dates</label>
+            <input type="date" aria-label="Date de création du" value={debut} onChange={(event) => setDebut(event.target.value)} disabled={!between} />
+            <input type="date" aria-label="Date de création au" value={fin} onChange={(event) => setFin(event.target.value)} disabled={!between} />
+          </span>
           <label className="acompte-field cim-search"><span>Rechercher un client</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Code ou nom du client" autoFocus /></label>
-          <p className="cim-count" role="status">{state.loading ? 'Chargement…' : `${found} client${found > 1 ? 's' : ''}${manque ? ` · ${MANQUES.find(([key]) => key === manque)[1].toLowerCase()}` : categorie ? ` · ${CATEGORIES.find(([key]) => key === categorie)[1].toLowerCase()}` : ''}${items.length < found ? ` · ${items.length} affichés` : ''}`}</p>
+          <p className="cim-count" role="status">{state.loading ? 'Chargement…' : `${found} client${found > 1 ? 's' : ''}${period.date_debut ? ` créé${found > 1 ? 's' : ''} du ${period.date_debut.split('-').reverse().join('/')} au ${period.date_fin.split('-').reverse().join('/')}` : ''}${manque ? ` · ${MANQUES.find(([key]) => key === manque)[1].toLowerCase()}` : categorie ? ` · ${CATEGORIES.find(([key]) => key === categorie)[1].toLowerCase()}` : ''}${items.length < found ? ` · ${items.length} affichés` : ''}`}</p>
         </div>
+        {reversed && <div className="expert-error unpaid-error" role="alert">La date de début doit précéder la date de fin.</div>}
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         <div className="cim-table-wrap">
           <table className="cim-table">
-            <thead><tr><th>Client</th><th>Coordonnées manquantes</th><th>Police</th><th aria-label="Action" /></tr></thead>
+            <thead><tr><th>Client</th><th>Créé le</th><th>Coordonnées manquantes</th><th>Police</th><th aria-label="Action" /></tr></thead>
             <tbody>
               {items.map((item) => { const d = item.details || {}; return <tr key={item.code_client}>
                 <td className="cim-client"><b>{item.code_client}</b><span>{item.nom_client || 'Client sans nom'}</span></td>
+                <td>{!item.date_creation ? '—' : item.date_creation.startsWith('1900') ? <span className="cim-none" title="Date inconnue dans l’ancien logiciel (01/01/1900)">Inconnue</span> : item.date_creation.split('-').reverse().join('/')}</td>
                 <td>{d.coordonnees?.length ? <ul className="cim-entries">{d.coordonnees.map((text) => <li key={text}><span>{text}</span></li>)}</ul> : <span className="cim-none">Complètes</span>}</td>
                 <td>{d.sans_police ? <span className="cim-tag">Aucune police</span> : <span className="cim-none">—</span>}</td>
                 <td><button type="button" className="expert-cancel cim-open" onClick={() => openClient(item.code_client)}>Ouvrir la fiche</button></td>
               </tr>; })}
-              {!state.loading && !items.length && <tr><td colSpan={4} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
+              {!state.loading && !items.length && <tr><td colSpan={5} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
             </tbody>
           </table>
         </div>
         {items.length < found && <button type="button" className="expert-cancel cim-more" onClick={more} disabled={loadingMore}>{loadingMore ? 'Chargement…' : `Afficher ${Math.min(PAGE, found - items.length)} clients de plus`}</button>}
-        <p className="cim-hint">Coordonnées manquantes : pas d’adresse, de ville ou de code postal (ni au domicile ni au bureau), ou aucun numéro de téléphone. Sans police : le client n’a aucune police. Un client à qui il manque les deux est compté dans chaque catégorie, mais une seule fois dans « Tous les clients ».</p>
+        <p className="cim-hint">Coordonnées manquantes : pas d’adresse, de ville ou de code postal (ni au domicile ni au bureau), ou aucun numéro de téléphone. Sans police : le client n’a aucune police. Un client à qui il manque les deux est compté dans chaque catégorie, mais une seule fois dans « Tous les clients ». « Créés entre deux dates » se base sur la date de création du client (les compteurs suivent) ; l’ancien logiciel a mis le 01/01/1900 (« Inconnue ») aux clients dont la date n’était pas connue.</p>
       </div>
     </section>
   </div>;
