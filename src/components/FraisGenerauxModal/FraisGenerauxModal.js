@@ -56,7 +56,7 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
   </div>;
 }
 
-// Module "Saisie frais généraux" (administrateur): the agency's expenses (salaires, loyers, téléphone…), entered by
+// Module "Saisie frais généraux": the agency's expenses (salaires, loyers, téléphone…), entered by
 // nature and type; the frais of a period open as an aperçu in a tab of their own.
 export default function FraisGenerauxModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
