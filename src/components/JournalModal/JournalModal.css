@@ -296,3 +296,7 @@
 .jrn-bank-result { max-width: 760px; }
 .jrn-bank-pairs thead tr:first-child th { background: #f1f1f1; }
 @media (max-width: 700px) { .jrn-bank-tally { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Journal d'encaissement: the totals row of the legacy JEQ, kept in view at the bottom of the list */
+.jrn-table tfoot td { position: sticky; bottom: 0; padding: 9px 8px; border-top: 2px solid #1d7d71; background: #eef6f4; color: #19394d; font-weight: 700; white-space: nowrap; }
+.unpaid-total small + strong + small { color: #71838d; }

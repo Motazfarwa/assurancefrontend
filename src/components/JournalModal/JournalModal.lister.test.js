@@ -95,7 +95,7 @@ test('encaissement: nothing declared or to declare at the date', async () => {
   expect(await screen.findByText('Aucune quittance déclarée ou à déclarer au 15/11/2026.')).toBeInTheDocument();
 });
 
-test('the feuille de caisse opened from the journal: the quittances ticked are already comptabilisées, nothing more to validate', async () => {
+test('the feuille de caisse opened from the journal is the whole journal of the date (as the legacy JEQ): no selection', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   await openDetails();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
@@ -104,7 +104,8 @@ test('the feuille de caisse opened from the journal: the quittances ticked are a
   await waitFor(() => expect(getReceiptsJournal).toHaveBeenLastCalledWith('t', expect.objectContaining({ compagnie: '4' })));
   await screen.findByText('02026017527');
   fireEvent.click(screen.getByRole('button', { name: 'Feuille de caisse' }));
-  expect(CashSheet.mock.lastCall[0]).toMatchObject({ date: '2026-11-15', selection: { quittances: [] } });
+  expect(CashSheet.mock.lastCall[0]).toMatchObject({ date: '2026-11-15' });
+  expect(CashSheet.mock.lastCall[0].selection).toBeUndefined();
 });
 
 test('dépense: the journal opened lists every company; "Lister" lists the journals again with the filters', async () => {
@@ -137,7 +138,7 @@ test('a tick comptabilises the quittance at once on the journal date, an untick 
   expect(await screen.findByText('Quittance 02026000002 retirée du journal du 15/11/2026 : à déclarer.')).toBeInTheDocument();
 });
 
-test('"Lister": one line per journal of the half months; "Valider" asks, then validates the journal as it is', async () => {
+test('"Lister": one line per journal of the half months; "Valider" asks, then declares the journal on its date', async () => {
   validateJournal.mockResolvedValue({ jour: '2026-11-15', declarees: 1, montant: 100, retirees: 0 });
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
@@ -148,7 +149,7 @@ test('"Lister": one line per journal of the half months; "Valider" asks, then va
   expect(within(current).getByText('300,000')).toBeInTheDocument();
   // everything already comptabilisé (by the old software) but never validated: still to validate
   expect(within(previous).getByRole('button', { name: 'Valider' })).not.toBeDisabled();
-  expect(within(previous).getByText('À valider')).toBeInTheDocument();
+  expect(within(previous).getByText('À valider · tout est déclaré')).toBeInTheDocument();
   // validated in the new system: done
   const validated = screen.getByRole('button', { name: 'Journal d’encaissement du 15/10/2026' }).closest('tr');
   expect(within(validated).getByRole('button', { name: 'Valider' })).toBeDisabled();

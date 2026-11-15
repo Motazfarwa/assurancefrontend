@@ -33,7 +33,7 @@ const receiptStatus = (row) => {
 const KINDS = {
   encaissement: {
     title: 'Journal d’encaissement',
-    heading: 'COCHÉES : COMPTABILISÉES DANS CE JOURNAL · NON COCHÉES : RÉGLÉES (100 MILLIMES ET PLUS), À DÉCLARER · COCHER COMPTABILISE À LA DATE DU JOURNAL',
+    heading: 'COMME LE JEQ DE L’ANCIEN LOGICIEL : DÉCLARÉES À CETTE DATE (COCHÉES) ET RÉGLÉES À DÉCLARER (NON COCHÉES) · « VALIDER » (LISTER) LES DÉCLARE À LA DATE DU JOURNAL',
     load: getReceiptsJournal,
     post: (token, compagnie, date, rows) => postReceipts(token, { compagnie, date, quittances: rows.map((row) => row.num_quittance) }),
     // A quittance declared in the journal and paid again since has two lines: the part declared, the part to declare.
@@ -163,6 +163,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   // same total as the journal in "Lister").
   const ticked = state.items.filter((row) => chosen.has(config.key(row)));
   const allChosen = pending.length > 0 && pending.every((row) => chosen.has(config.key(row)));
+  // Encaissement, as the legacy JEQ: the journal is every line listed (declared on the date and still to declare); its
+  // Total général is Solde + Acompte.
+  const solde = (rows) => sum(rows.filter((row) => row.a_s === 'S'), 'montant');
+  const acompte = (rows) => sum(rows.filter((row) => row.a_s === 'A'), 'montant');
 
   // Encaissement: a tick comptabilises the quittances on the journal date, an untick takes them back out; then the
   // journal is read again.
@@ -240,14 +244,14 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   }
 
   // The feuille de caisse validates the lines ticked here (once listed); otherwise every line still to declare.
-  const cashSelection = listed && config.selection ? config.selection(selected.filter((row) => !row.comptabilise).map(config.number || config.key)) : undefined;
+  const cashSelection = listed && config.selection && !config.tick ? config.selection(selected.filter((row) => !row.comptabilise).map(config.number || config.key)) : undefined;
   // After its validation the journal is read again: the lines declared stay listed, ticked.
   const afterCashValidation = () => { if (listed) setListedFor((current) => ({ ...current, at: Date.now() })); };
 
   // The feuille: what is comptabilisé on the date, or else a preview of the chosen lines.
   function openSheet() {
-    // Encaissement: the lines ticked (a preview while some are still to declare).
-    if (config.tick) setSheet({ rows: selected, preview: selected.some((row) => !row.comptabilise) });
+    // Encaissement: the whole journal, as the legacy JEQ (not validated while some lines are still to declare).
+    if (config.tick) setSheet({ rows: state.items, preview: state.items.some((row) => !row.comptabilise) });
     else if (showDone && done.length) setSheet({ rows: done, preview: false });
     else setSheet({ rows: selected, preview: true });
   }
@@ -279,8 +283,11 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
           <div className="unpaid-results-heading">
             <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${ticked.length} choisie${ticked.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
-              <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(ticked, config.amount))} TND</strong></div>
-              <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (!selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
+              {kind === 'encaissement'
+                ? <div className="unpaid-total"><small>Total général du journal</small><strong>{fmt(sum(shown, 'montant'))} TND</strong>
+                  <small>dont déclaré {fmt(sum(shown.filter((row) => row.comptabilise), 'montant'))} · à déclarer {fmt(sum(shown.filter((row) => !row.comptabilise), 'montant'))}</small></div>
+                : <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(ticked, config.amount))} TND</strong></div>}
+              <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (config.tick ? !state.items.length : !selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
               <button type="button" className="expert-cancel" onClick={() => setCashSheet(true)} disabled={!company} title={company ? undefined : 'Choisissez une compagnie'}>Feuille de caisse</button>
               {!config.readOnly && <button type="button" className="expert-submit" onClick={comptabiliser} disabled={saving || !selected.length}>{saving ? 'Comptabilisation…' : 'Comptabiliser'}</button>}
             </div>
@@ -292,7 +299,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               <thead><tr>
                 <th className="cqi-verser"><input type="checkbox" aria-label="Tout choisir" checked={allChosen} onChange={toggleAll} disabled={!pending.length} /> Choix</th>
                 {kind === 'encaissement'
-                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime</th><th>A/S</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th></>
+                  ? <>{allListed && <th>Compagnie</th>}<th>TC</th><th>N° quittance</th><th>Échéance</th><th>N° contrat</th><th>Agence</th><th className="cqi-number">Prime nette + coût quitt.</th><th className="cqi-number">Solde</th><th className="cqi-number">Acompte</th><th className="cqi-number">Frais</th><th className="cqi-number">Timbre</th><th className="cqi-number">Comm.</th><th>Assuré</th><th className="cqi-number">Réglé</th><th>Dernier règlement</th></>
                   : <>{allListed && <th>Compagnie</th>}<th>N° sinistre / ristourne</th><th>Type</th><th>Date</th><th>N° contrat</th><th>Immatriculation</th><th className="cqi-number">Montant</th><th>Assuré</th><th>Chèque</th><th>Comptabilisé</th></>}
               </tr></thead>
               <tbody>{shown.map((row) => {
@@ -305,13 +312,19 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                   <td className="cqi-verser"><input type="checkbox" checked={on} disabled={!editable(row) || ticking} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
                   {kind === 'encaissement'
                     ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
-                      <td className="cqi-number">{fmt(row.montant)}</td><td>{row.a_s}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
+                      <td className="cqi-number">{fmt(row.prime_cout)}</td><td className="cqi-number">{fmt(row.a_s === 'S' ? row.montant : 0)}</td><td className="cqi-number">{fmt(row.a_s === 'A' ? row.montant : 0)}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
                       <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}</td>
                       <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td></>
                     : <>{allListed && <td>{row.nom_compagnie}</td>}<td><strong>{row.numero}</strong></td><td>{row.nature === 'R' ? 'Ristourne' : 'Sinistre'}</td><td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.num_imat}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.assure}</td><td>{row.num_cheq}</td><td>{row.comptabilise ? `Oui · ${formatDate(row.date_comptabilise)}` : 'Non'}</td></>}
                 </tr>;
               })}</tbody>
+              {kind === 'encaissement' && <tfoot><tr className="jrn-total-row">
+                <td colSpan={allListed ? 7 : 6}>Total ({shown.length} ligne{shown.length > 1 ? 's' : ''})</td>
+                <td className="cqi-number">{fmt(sum(shown, 'prime_cout'))}</td><td className="cqi-number">{fmt(solde(shown))}</td><td className="cqi-number">{fmt(acompte(shown))}</td>
+                <td className="cqi-number">{fmt(sum(shown, 'frais'))}</td><td className="cqi-number">{fmt(sum(shown, 'timbre'))}</td><td className="cqi-number">{fmt(sum(shown, 'comm'))}</td>
+                <td colSpan={3}>Total général : <b>{fmt(solde(shown) + acompte(shown))}</b></td>
+              </tr></tfoot>}
             </table></div>}
         </section>
       </div>
@@ -358,7 +371,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
               <td className="num">{fmt(sum(sheet.rows.filter((row) => row.a_s === 'S'), 'montant'))}</td><td className="num">{fmt(sum(sheet.rows.filter((row) => row.a_s === 'A'), 'montant'))}</td>
               <td className="num">{fmt(sum(sheet.rows, 'frais'))}</td><td className="num">{fmt(sum(sheet.rows, 'timbre'))}</td><td className="num">{fmt(sum(sheet.rows, 'comm'))}</td><td />
             </tr></tfoot>
-          </table> : <table className="jrn-sheet-table">
+          </table> : null}
+          {kind !== 'encaissement' && <table className="jrn-sheet-table">
             <thead><tr><th>Sinistre / ristourne</th><th>SR</th><th>N° police</th><th>Assuré</th><th>Montant</th><th>D.Com</th><th>N° chèque</th><th>Immatriculation</th></tr></thead>
             <tbody>{sheet.rows.map((row) => <tr key={config.key(row)}>
               <td>{row.numero}</td><td>{row.nature === 'R' ? 'RIS' : 'SIN'}</td><td>{row.num_police}</td><td>{row.assure}</td>
