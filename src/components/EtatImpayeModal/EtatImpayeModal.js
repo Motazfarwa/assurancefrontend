@@ -27,12 +27,14 @@ const termOf = (row) => (row.tc === 'T' && row.periode ? `T${row.periode}` : row
 const total = (rows) => rows.reduce((sum, row) => sum + amount(row.solde), 0);
 const sumOf = (rows, key) => rows.reduce((sum, row) => sum + amount(row[key]), 0);
 const percent = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-// Taux de recouvrement = encaissements de l'année en cours / primes de l'année en cours exigibles.
+// Taux de recouvrement = encaissements de l'année en cours / primes de l'année en cours exigibles; under it, the rate of
+// the whole previous year.
 export const RecoveryRate = ({ rate }) => <div className="eti-recovery" aria-label="Taux de recouvrement">
   <span>Taux de recouvrement {rate.annee}</span>
   <strong>{rate.taux == null ? '—' : `${percent.format(rate.taux)} %`}</strong>
   <small>Encaissements : {money.format(rate.encaissements)} TND</small>
   <small>Primes exigibles au {formatDate(rate.au)} : {money.format(rate.primes_exigibles)} TND</small>
+  {rate.precedente && <em className="eti-recovery-before">Taux {rate.precedente.annee} : <b>{rate.precedente.taux == null ? '—' : `${percent.format(rate.precedente.taux)} %`}</b></em>}
 </div>;
 // summary: [label, amount] lines printed under the date (the mise en demeure totals, on its first page);
 // recovery: the taux de recouvrement of the statement's scope.

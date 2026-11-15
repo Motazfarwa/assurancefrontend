@@ -22,7 +22,7 @@ function BranchForm({ value, onChange, readOnly = false, disableCode = false }) 
   </label>)}</div>;
 }
 
-export default function BranchManagementModal({ onClose }) {
+export default function BranchManagementModal({ moduleId = '735', onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [companyCode, setCompanyCode] = useState('');
@@ -106,7 +106,7 @@ export default function BranchManagementModal({ onClose }) {
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
     <section className="branch-modal" role="dialog" aria-modal="true" aria-labelledby="branch-title">
-      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali · Siège</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE 740</span><h2 id="branch-title">Tables Branche</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
+      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali · Siège</small></span></div><div className="expert-title"><span>PARAMÉTRAGE · MODULE {moduleId}</span><h2 id="branch-title">Table Branche</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="branch-content">
         <div className="branch-toolbar"><label className="catalog-picker"><span>Compagnie</span><select value={companyCode} onChange={selectCompany} disabled={loadingCompanies || saving}><option value="">Sélectionner une compagnie</option>{companies.map((company) => <option key={company.code_compagnie} value={company.code_compagnie}>{company.code_compagnie} · {company.nom_compagnie}</option>)}</select></label><div className="branch-toolbar-actions"><button type="button" className="expert-submit" onClick={startAdd} disabled={!companyCode || saving}>＋ Ajouter</button><button type="button" className="expert-cancel" onClick={() => selectedBranch && setMode(mode === 'preview' ? 'view' : 'preview')} disabled={!selectedBranch || saving}>Aperçu</button></div></div>
         {error && <div className="expert-error branch-message">{error}</div>}{notice && <div className="catalog-notice branch-message" role="status">{notice}</div>}

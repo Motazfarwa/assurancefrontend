@@ -355,7 +355,7 @@ export default function ModulesWorkspace() {
       {showHistory && <HistoriqueModal onClose={() => setShowHistory(false)} />}
       {showAccessModal && <AccessUsersModal onClose={() => setShowAccessModal(false)} />}
       {banqueModule && <BanqueModal moduleId={banqueModule.id} onClose={() => setBanqueModule(null)} />}
-      {showBranchModal && <BranchManagementModal onClose={() => setShowBranchModal(false)} />}
+      {showBranchModal && <BranchManagementModal moduleId={activeModuleId} onClose={() => setShowBranchModal(false)} />}
       {showDocumentModal && <DocumentEntryModal onClose={() => setShowDocumentModal(false)} />}
       {showUnpaidModal && <AgencyUnpaidModal onClose={() => setShowUnpaidModal(false)} />}
       {acompteModule && <AcompteModal moduleId={acompteModule.id} onClose={() => setAcompteModule(null)} />}
