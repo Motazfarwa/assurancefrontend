@@ -13,6 +13,8 @@ const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').rev
 const today = () => new Date().toISOString().slice(0, 10);
 const initialFilters = {
   code_client: '', nom_client: '', view: 'global', piece: 'avec',
+  // TC of the quittances: '' every one, 'C' comptant, 'T' terme
+  tc: '',
   dates: false, date_debut: '2020-01-01', date_fin: today(),
   // Every client type (particuliers and sociétés), as the legacy report; "Type client" narrows it to one.
   typed: false, type_client: 'P', compagnie: false, code_compagnie: '', mise_en_demeure: false, jours: 15, jours_autres: 60,
@@ -103,6 +105,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       code_client: filters.code_client.trim(),
       nom_client: filters.code_client.trim() ? '' : filters.nom_client.trim(),
       piece: filters.piece,
+      tc: filters.tc,
       date_debut: filters.dates ? filters.date_debut : '',
       // In relance the échéance is also at least as old as the shorter delay, dates ticked or not.
       date_fin: relance && (!filters.dates || filters.date_fin > overdue) ? overdue : filters.dates ? filters.date_fin : '',
@@ -157,7 +160,7 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
       const dossiers = !relance && filters.code_client.trim() ? await linkedDossiers(filters.code_client.trim(), items) : null;
       if (dossiers ? !dossiers.some((dossier) => dossier.items.length) : !items.length) setError('Aucune quittance impayée ne correspond aux critères.');
       else setPreview({ items, limit: body.limit, detail: !relance && filters.view === 'detail', sans: filters.piece === 'sans', groups, dossiers, recovery,
-        criteria: { piece: params.piece, date_debut: params.date_debut, date_fin: params.date_fin, code_compagnie: params.code_compagnie } });
+        criteria: { piece: params.piece, date_debut: params.date_debut, date_fin: params.date_fin, code_compagnie: params.code_compagnie, tc: params.tc } });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -197,6 +200,11 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
             <fieldset className="unpaid-filter-set unpaid-choice"><legend>Pièce</legend>
               <label><input type="radio" name="piece" value="avec" checked={!sans} onChange={update} /> Avec pièce</label>
               <label><input type="radio" name="piece" value="sans" checked={sans} onChange={update} /> Sans pièce</label>
+            </fieldset>
+            <fieldset className="unpaid-filter-set unpaid-choice"><legend>Quittances</legend>
+              <label><input type="radio" name="tc" value="" checked={!filters.tc} onChange={update} /> Tous</label>
+              <label><input type="radio" name="tc" value="C" checked={filters.tc === 'C'} onChange={update} /> Comptant</label>
+              <label><input type="radio" name="tc" value="T" checked={filters.tc === 'T'} onChange={update} /> Terme</label>
             </fieldset>
             <fieldset className="unpaid-filter-set eti-dates"><legend><label><input type="checkbox" name="dates" checked={filters.dates} onChange={update} /> Entre deux dates</label></legend>
               <label className="eti-field"><span>Date début</span><input type="date" name="date_debut" value={filters.date_debut} onChange={update} disabled={!filters.dates} /></label>

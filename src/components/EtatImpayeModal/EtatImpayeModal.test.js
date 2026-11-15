@@ -46,6 +46,22 @@ test('"Type client" ticked with Société reads the sociétés only', async () =
   expect(getUnpaidStatement).toHaveBeenLastCalledWith('t', expect.objectContaining({ type_client: 'S' }));
 });
 
+test('"Quittances": every one by default, or only the comptant / the terme', async () => {
+  render(<EtatImpayeModal onClose={() => {}} />);
+  expect(screen.getByRole('radio', { name: 'Tous' })).toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: 'Aperçu' }));
+  await screen.findByLabelText('Taux de recouvrement');
+  expect(getUnpaidStatement).toHaveBeenLastCalledWith('t', expect.objectContaining({ tc: '' }));
+});
+
+test('"Comptant" reads the quittances au comptant only', async () => {
+  render(<EtatImpayeModal onClose={() => {}} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Comptant' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Aperçu' }));
+  await screen.findByLabelText('Taux de recouvrement');
+  expect(getUnpaidStatement).toHaveBeenLastCalledWith('t', expect.objectContaining({ tc: 'C' }));
+});
+
 test('the mémoire of a client is sent by email with its PDF: the address offered is the one of the client file', async () => {
   getClientReglements.mockResolvedValue({ client: { nom_client: 'BOUKER TAHAR' } });
   getClientLinks.mockResolvedValue({ client: { code_client: '91', nom_client: 'BOUKER TAHAR' }, liens: [] });
