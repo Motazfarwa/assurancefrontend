@@ -62,3 +62,14 @@
 .cim-between { display: inline-flex; align-items: center; gap: 5px; color: #34505d; font-size: 11px; font-weight: 650; white-space: nowrap; }
 .cim-dates input[type="date"] { height: 36px; padding: 0 8px; border: 1px solid #d9e2e5; border-radius: 6px; font: inherit; font-size: 11px; }
 .cim-dates input[type="date"]:disabled { background: #f1f4f5; color: #8a9aa2; }
+
+/* "Chargement des clients…": over the list while the data is read */
+.cim-table-box { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; }
+.cim-table-box.is-loading { min-height: 190px; }
+.cim-table-box.is-loading .cim-table { opacity: .35; }
+.cim-loading { position: absolute; inset: 0; border-radius: 10px; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(255, 255, 255, .72); color: #19394d; text-align: center; }
+.cim-loading b { font-size: 14px; }
+.cim-loading small { color: #6b808b; font-size: 11px; }
+.cim-spinner { width: 34px; height: 34px; border: 3px solid #d6e6e3; border-top-color: #1d7d71; border-radius: 50%; animation: cim-spin .8s linear infinite; }
+@keyframes cim-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cim-spinner { animation-duration: 2.4s; } }

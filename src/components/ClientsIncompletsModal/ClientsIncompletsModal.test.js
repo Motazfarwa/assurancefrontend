@@ -62,3 +62,12 @@ test('"Créés entre deux dates" lists the clients created in the period (sans p
   fireEvent.change(screen.getByLabelText('Date de création au'), { target: { value: '2022-12-31' } });
   await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100, date_debut: '2000-01-01', date_fin: '2022-12-31' }));
 });
+
+test('"Chargement des clients…" is shown over the list while the clients are read', async () => {
+  let finish;
+  listIncompleteClientsPage.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} />);
+  expect(await screen.findByText('Chargement des clients…')).toBeInTheDocument();
+  finish({ total: 0, found: 0, coordonnees: 0, sans_police: 0, manques: {}, items: [] });
+  await waitFor(() => expect(screen.queryByText('Chargement des clients…')).not.toBeInTheDocument());
+});

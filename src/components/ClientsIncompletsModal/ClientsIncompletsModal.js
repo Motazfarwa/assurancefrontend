@@ -114,6 +114,9 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
         </div>
         {reversed && <div className="expert-error unpaid-error" role="alert">La date de début doit précéder la date de fin.</div>}
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
+        <div className={`cim-table-box${state.loading ? ' is-loading' : ''}`} aria-busy={state.loading}>
+        {/* while the clients are read (opening, a filter, the dates, a search): over the visible list, so it is seen */}
+        {state.loading && <div className="cim-loading" role="status"><span className="cim-spinner" aria-hidden="true" /><b>Chargement des clients…</b><small>Lecture des données en cours, veuillez patienter.</small></div>}
         <div className="cim-table-wrap">
           <table className="cim-table">
             <thead><tr><th>Client</th><th>Créé le</th><th>Coordonnées manquantes</th><th>Police</th><th aria-label="Action" /></tr></thead>
@@ -128,6 +131,7 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
               {!state.loading && !items.length && <tr><td colSpan={5} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
             </tbody>
           </table>
+        </div>
         </div>
         {items.length < found && <button type="button" className="expert-cancel cim-more" onClick={more} disabled={loadingMore}>{loadingMore ? 'Chargement…' : `Afficher ${Math.min(PAGE, found - items.length)} clients de plus`}</button>}
         <p className="cim-hint">Coordonnées manquantes : pas d’adresse, de ville ou de code postal (ni au domicile ni au bureau), ou aucun numéro de téléphone. Sans police : le client n’a aucune police. Un client à qui il manque les deux est compté dans chaque catégorie, mais une seule fois dans « Tous les clients ». « Créés entre deux dates » se base sur la date de création du client (les compteurs suivent) ; l’ancien logiciel a mis le 01/01/1900 (« Inconnue ») aux clients dont la date n’était pas connue.</p>

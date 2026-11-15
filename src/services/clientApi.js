@@ -143,18 +143,45 @@ export async function saveClient(accessToken, client, isUpdate = false) {
   return normalizeClientRecord(body);
 }
 
-// Live client search on a normalized record: digits look up the client code (from its start),
-// words must each begin a word of the nom or prénom ("walid" finds every Walid).
-// Rank: 0 = every word is a whole nom/prénom word (or the exact code), 1 = partial match, -1 = no match.
+// A name folded for the "similar" search: no case, accents, spaces or punctuation, and a doubled letter counts once
+// ("Ben Abdennour" and "BENABDENOUR" both give "benabdenour").
+export const foldName = (value) => String(value ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  .replace(/[^a-z0-9]/g, '').replace(/(.)\1+/g, '$1');
+// Whether `pattern` is in `text` with at most `errors` letters wrong, missing or extra (approximate substring search).
+function nearlyContains(pattern, text, errors) {
+  const column = Array.from({ length: pattern.length + 1 }, (_, index) => index);
+  for (const letter of text) {
+    let diagonal = column[0];
+    column[0] = 0;
+    for (let index = 1; index <= pattern.length; index += 1) {
+      const above = column[index];
+      column[index] = Math.min(column[index] + 1, column[index - 1] + 1, diagonal + (pattern[index - 1] === letter ? 0 : 1));
+      diagonal = above;
+    }
+    if (column[pattern.length] <= errors) return true;
+  }
+  return false;
+}
+
+// Live client search on a normalized record: digits look up the client code (from its start); words are looked up in
+// the nom and prénom, from the closest to the most distant match.
+// Rank: 0 = every word is a whole nom/prénom word (or the exact code), 1 = every word begins a word of the name,
+// 2 = similar: every word is somewhere in the name, spaces, accents and doubled letters aside ("abdenour" finds
+// BEN ABDENNOUR and BENABDENNOUR), 3 = the same with one letter wrong in a word of 5 letters or more, -1 = no match.
 export function clientQueryRank(record, query) {
   const text = String(query || '').trim().toLocaleLowerCase();
   if (!text) return 0;
   const code = String(record.clientCode || '');
   if (/^\d+$/.test(text)) return code === text ? 0 : code.startsWith(text) ? 1 : -1;
-  const words = `${record.firstName} ${record.lastName}`.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const fullName = `${record.firstName || ''} ${record.lastName || ''} ${record.nom_client || ''}`;
+  const words = fullName.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const parts = text.split(/\s+/);
-  if (!parts.every((part) => words.some((word) => word.startsWith(part)))) return -1;
-  return parts.every((part) => words.includes(part)) ? 0 : 1;
+  if (parts.every((part) => words.some((word) => word.startsWith(part)))) return parts.every((part) => words.includes(part)) ? 0 : 1;
+  const name = foldName(fullName);
+  const folded = parts.map(foldName).filter(Boolean);
+  if (!folded.length) return -1;
+  if (folded.every((part) => name.includes(part)) || name.includes(folded.join(''))) return 2;
+  return folded.every((part) => name.includes(part) || (part.length >= 5 && nearlyContains(part, name, 1))) ? 3 : -1;
 }
 
 export function matchesClientQuery(record, query) {
