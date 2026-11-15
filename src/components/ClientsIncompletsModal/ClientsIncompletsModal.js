@@ -14,20 +14,7 @@ const PAGE = 100;
 export const CATEGORIES = [
   ['coordonnees', 'Coordonnées'],
   ['sans_police', 'Sans police'],
-  ['polices', 'Polices'],
-  ['quittances', 'Quittances'],
 ];
-
-// "011202651268 : date effet, risque" -> { ref: "011202651268", what: "date effet, risque" }
-function entry(text) {
-  const at = text.indexOf(' : ');
-  return at < 0 ? { ref: text, what: '' } : { ref: text.slice(0, at), what: text.slice(at + 3) };
-}
-
-function Entries({ items, empty = '—' }) {
-  if (!items.length) return <span className="cim-none">{empty}</span>;
-  return <ul className="cim-entries">{items.map((text) => { const { ref, what } = entry(text); return <li key={text}><b>{ref}</b>{what && <span>{what}</span>}</li>; })}</ul>;
-}
 
 // Module "Clients à compléter" (administrator only): every client with missing information, what is missing, by kind.
 export default function ClientsIncompletsModal({ moduleId, onClose }) {
@@ -102,21 +89,20 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
         <div className="cim-table-wrap">
           <table className="cim-table">
-            <thead><tr><th>Client</th><th>Coordonnées</th><th>Polices</th><th>Quittances</th><th aria-label="Action" /></tr></thead>
+            <thead><tr><th>Client</th><th>Coordonnées manquantes</th><th>Police</th><th aria-label="Action" /></tr></thead>
             <tbody>
               {items.map((item) => { const d = item.details || {}; return <tr key={item.code_client}>
                 <td className="cim-client"><b>{item.code_client}</b><span>{item.nom_client || 'Client sans nom'}</span></td>
                 <td>{d.coordonnees?.length ? <ul className="cim-entries">{d.coordonnees.map((text) => <li key={text}><span>{text}</span></li>)}</ul> : <span className="cim-none">Complètes</span>}</td>
-                <td>{d.sans_police ? <span className="cim-tag">Aucune police</span> : <Entries items={d.polices || []} />}</td>
-                <td><Entries items={d.quittances || []} /></td>
+                <td>{d.sans_police ? <span className="cim-tag">Aucune police</span> : <span className="cim-none">—</span>}</td>
                 <td><button type="button" className="expert-cancel cim-open" onClick={() => openClient(item.code_client)}>Ouvrir la fiche</button></td>
               </tr>; })}
-              {!state.loading && !items.length && <tr><td colSpan={5} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
+              {!state.loading && !items.length && <tr><td colSpan={4} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
             </tbody>
           </table>
         </div>
         {items.length < found && <button type="button" className="expert-cancel cim-more" onClick={more} disabled={loadingMore}>{loadingMore ? 'Chargement…' : `Afficher ${Math.min(PAGE, found - items.length)} clients de plus`}</button>}
-        <p className="cim-hint">Coordonnées : adresse, ville, code postal, et au moins un téléphone et un email du côté choisi pour la correspondance. Polices en cours : compagnie, date d’effet, risque, échéance ou expiration. Quittances des polices en cours : leurs informations obligatoires. Un client peut manquer de plusieurs choses : il est alors compté dans chaque catégorie, mais une seule fois dans « Tous les clients ».</p>
+        <p className="cim-hint">Coordonnées manquantes : pas d’adresse, de ville ou de code postal (ni au domicile ni au bureau), ou aucun numéro de téléphone. Sans police : le client n’a aucune police. Un client à qui il manque les deux est compté dans chaque catégorie, mais une seule fois dans « Tous les clients ».</p>
       </div>
     </section>
   </div>;

@@ -14,7 +14,7 @@ jest.mock('../../services/notificationApi', () => ({
 }));
 
 const client = (code, name) => ({ code_client: code, nom_client: name, manques: ['email (domicile)'] });
-const counters = { total: 2, coordonnees: 2, sans_police: 0, polices: 0 };
+const counters = { total: 2, coordonnees: 2, sans_police: 0 };
 
 async function openList() {
   render(<NotificationBell />);
