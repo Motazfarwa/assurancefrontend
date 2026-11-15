@@ -17,8 +17,8 @@ const plural = (count, one, many) => `${count} ${count > 1 ? many : one}`;
 // and one per other day lines were declared on (the old software also declared on the 14th, the 30th...), as its JEQ:
 // a journal holds what was declared on its own date. Journal d'encaissement: a quittance still to declare (unticked) is
 // in every journal from its payment on, until it is ticked (declared): then only in the journal of that date.
-// Each journal: what was declared in its half month, what was paid in it and is still to declare, its total, and
-// "Valider" (after a confirmation) declares those on its date — they are then in the feuille de caisse of that date.
+// Each journal: what is declared (comptabilisé) on its date and its total — what is still to declare is not counted —
+// and "Valider" (after a confirmation) validates it as it is, without declaring anything else.
 export default function JournalPeriods({ kind, accessToken, date, compagnie, nature, companyName, reloadKey, onOpen, onValidated }) {
   const names = NAMES[kind];
   const [count, setCount] = useState(PAGE);
@@ -45,11 +45,7 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
       const result = await validateJournal(accessToken, { type: kind, jour: item.jour, compagnie: compagnie ? Number(compagnie) : null, nature });
       setAsking(null);
       setVersion((value) => value + 1);
-      if (!result.declarees && !result.retirees) {
-        onValidated?.(`${names.title} du ${formatDate(item.jour)} validé : tout était déjà ${names.done} au ${formatDate(item.jour)}.`);
-        return;
-      }
-      onValidated?.(`${names.title} du ${formatDate(item.jour)} validé : ${plural(result.declarees, names.what, names.whats)} (${fmt(result.montant)} TND) ${result.declarees > 1 ? `${names.verb}s` : names.verb} au ${formatDate(item.jour)}${result.retirees ? `, ${result.retirees} retirée${result.retirees > 1 ? 's' : ''}` : ''} ; ${result.declarees > 1 ? 'elles sont' : 'elle est'} dans la feuille de caisse de ce jour.`);
+      onValidated?.(`${names.title} du ${formatDate(item.jour)} validé : ${plural(result.declarees, names.what, names.whats)} · ${fmt(result.montant)} TND${result.retirees ? ` (${result.retirees} retirée${result.retirees > 1 ? 's' : ''})` : ''}.`);
     } catch (requestError) {
       setState((current) => ({ ...current, error: requestError.message }));
       setAsking(null);
@@ -70,13 +66,12 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
         // only a validation recorded in the new system makes a journal "Validé"; one whose lines are all already
         // comptabilisées (by the old software) is still to validate
         const open = !item.validation;
-        const pending = Number(item.a_declarer) > 0;
         return <tr key={item.jour} className={open ? 'is-open' : ''}>
           <td><button type="button" className="jrn-period-name" onClick={() => onOpen(item.jour)}>{names.title} du {formatDate(item.jour)}</button><small>{item.quinzaine === false ? `déclaré le ${shortDate(item.jour)}` : `du ${shortDate(item.debut)} au ${shortDate(item.jour)}`}</small></td>
           <td className="cqi-number">{item.lignes}</td>
           <td className="cqi-number"><b>{fmt(item.montant)}</b></td>
           <td>{item.validation ? <span className="jrn-period-state is-done">Validé le {stamp(item.validation.date_saisie)}{item.validation.utilisateur ? ` par ${item.validation.utilisateur}` : ''}</span>
-            : <span className="jrn-period-state">À valider{pending ? '' : ` · tout est ${names.done}`}</span>}</td>
+            : <span className="jrn-period-state">À valider</span>}</td>
           <td className="jrn-period-actions">
             <button type="button" className="expert-cancel" onClick={() => onOpen(item.jour)}>Détails</button>
             <button type="button" className="expert-submit" onClick={() => setAsking(item)} disabled={!open || busy} title={open ? undefined : 'Journal déjà validé'}>Valider</button>
@@ -84,16 +79,14 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
         </tr>;
       })}</tbody>
     </table></div>
-    {state.older && Number(state.older.a_declarer) > 0 && <p className="jrn-period-older">{plural(state.older.a_declarer, names.what, names.whats)} ({fmt(state.older.montant_a_declarer)} TND) réglée{state.older.a_declarer > 1 ? 's' : ''} avant le {formatDate(state.older.avant)} reste{state.older.a_declarer > 1 ? 'nt' : ''} à déclarer dans un journal plus ancien.</p>}
     <div className="jrn-period-more"><button type="button" className="expert-cancel" onClick={() => setCount((value) => value + PAGE)} disabled={state.loading}>{state.loading ? 'Chargement…' : 'Journaux plus anciens'}</button></div>
 
     {asking && <div className="jrn-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setAsking(null); }}>
       <section className="jrn-confirm" role="alertdialog" aria-modal="true" aria-labelledby="jrn-period-confirm-title" aria-describedby="jrn-period-confirm-text">
         <h3 id="jrn-period-confirm-title">Valider le {names.title.toLowerCase()} du {formatDate(asking.jour)} ?</h3>
-        <p id="jrn-period-confirm-text">Les {names.whats} réglées {kind === 'encaissement' ? `jusqu’au ${formatDate(asking.jour)}` : `du ${formatDate(asking.debut)} au ${formatDate(asking.jour)}`} et encore à {kind === 'depense' ? 'comptabiliser' : 'déclarer'}{kind === 'encaissement' ? ' (sauf celles décochées dans ce journal)' : ''} seront {kind === 'depense' ? 'comptabilisées' : 'déclarées'} au <strong>{formatDate(asking.jour)}</strong>{companyName ? <> pour <strong>{companyName}</strong></> : ' pour toutes les compagnies'} et passeront dans la feuille de caisse de ce jour.</p>
+        <p id="jrn-period-confirm-text">Le journal est validé tel qu’il est : les {names.whats} {kind === 'depense' ? 'comptabilisées' : 'déclarées'} au <strong>{formatDate(asking.jour)}</strong>{companyName ? <> pour <strong>{companyName}</strong></> : ' pour toutes les compagnies'}. Celles encore à {kind === 'depense' ? 'comptabiliser' : 'déclarer'} ne sont pas comptées et restent en attente.</p>
         <dl>
-          <div><dt>À {kind === 'depense' ? 'comptabiliser' : 'déclarer'}</dt><dd>{plural(asking.a_declarer, names.what, names.whats)} · {fmt(asking.montant_a_declarer)} TND</dd></div>
-          <div><dt>Déjà dans ce journal</dt><dd>{plural(asking.declarees, names.what, names.whats)} · {fmt(asking.montant_declare)} TND</dd></div>
+          <div><dt>Dans ce journal</dt><dd>{plural(asking.lignes, names.what, names.whats)}</dd></div>
           <div><dt>Total du journal</dt><dd>{fmt(asking.montant)} TND</dd></div>
         </dl>
         <footer>
