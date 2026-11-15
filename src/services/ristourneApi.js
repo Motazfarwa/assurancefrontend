@@ -26,10 +26,9 @@ async function request(path, accessToken, options = {}) {
 const path = (number) => `/api/ristournes/${encodeURIComponent(String(number).trim())}`;
 
 // Ristournes (TQuittance of type R): search, one ristourne, the policy it is entered on, and its changes.
-export const searchRistournes = (token, q = '') => request(`/api/ristournes?${new URLSearchParams({ q })}`, token);
 // "Lister": the latest ristournes, or those entered (date de saisie) between two dates.
-export const listRistournes = (token, { debut = '', fin = '' } = {}) => request(`/api/ristournes?${new URLSearchParams({
-  limit: '1000', ...(debut ? { date_debut: debut } : {}), ...(fin ? { date_fin: fin } : {}) })}`, token);
+export const listRistournes = (token, { debut = '', fin = '', q = '' } = {}) => request(`/api/ristournes?${new URLSearchParams({
+  limit: '1000', ...(q ? { q } : {}), ...(debut ? { date_debut: debut } : {}), ...(fin ? { date_fin: fin } : {}) })}`, token);
 export const getRistourne = (token, number) => request(path(number), token);
 export const getRistournePolicy = (token, police) => request(`/api/ristournes/police/${encodeURIComponent(String(police).trim())}`, token);
 export const createRistourne = (token, values) => request('/api/ristournes', token, { method: 'POST', body: JSON.stringify(values) });

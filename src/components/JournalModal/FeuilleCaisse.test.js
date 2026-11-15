@@ -1,6 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import FeuilleCaisseModal, { journalDay } from './FeuilleCaisse';
-import { getCashValidation, getExpensesJournal, getReceiptsJournal, listJournalCompanies, validateCashSheet } from '../../services/journalApi';
+import { getCashSheet, getCashValidation, getExpensesJournal, getReceiptsJournal, listJournalCompanies, validateCashSheet } from '../../services/journalApi';
 
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Sami' } }) }));
 jest.mock('../NewWindow/NewWindow', () => ({ __esModule: true, default: () => null, openReportWindow: jest.fn() }));
@@ -34,4 +34,19 @@ test('the feuille de caisse: on the 15th / end of month, "Lister" shows its line
 
   // no "Valider" in this module: it only lists and shows the feuille
   expect(screen.queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();
+});
+
+test('the Aperçu of the feuille de caisse has "Valider": after a confirmation the feuille of the day is validated', async () => {
+  getCashSheet.mockResolvedValue({ journaux: [{ jour: journalDay(), quittances: 1, primes: 100, tq: 0, commission: 10, frais: 0 }], depenses: [{ num_dep: 5, nature: 'S', jour: journalDay(), montant: 40, numero: 'S5', d_com: 0 }] });
+  render(<FeuilleCaisseModal moduleId="590" onClose={() => {}} />);
+  await screen.findByRole('option', { name: 'CARTE' });
+  fireEvent.change(screen.getByLabelText('Compagnie'), { target: { value: '4' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Aperçu' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
+  const dialog = screen.getByRole('alertdialog', { name: 'Valider la feuille de caisse ?' });
+  expect(dialog).toHaveTextContent(/Encaissements de la feuille1 · 100,000 TND/);
+  expect(dialog).toHaveTextContent(/Dépenses de la feuille1 · 40,000 TND/);
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, valider' }));
+  await waitFor(() => expect(validateCashSheet).toHaveBeenCalledWith('t', { compagnie: 4, jour: journalDay() }));
+  expect(await screen.findByText(/Feuille validée le/)).toBeInTheDocument();
 });

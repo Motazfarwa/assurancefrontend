@@ -234,10 +234,10 @@ export function CashValidation({ company, jour, selection, summary, onValidated 
         <p id="jrn-cash-confirm-text">Êtes-vous sûr de vouloir valider la feuille de caisse de <strong>{company.nom_compagnie}</strong> du <strong>{formatDate(jour)}</strong> ?
           {selection?.quittances ? ` Les ${chosen.length} quittance${chosen.length > 1 ? 's' : ''} cochée${chosen.length > 1 ? 's' : ''} dans le journal d’encaissement et toutes les dépenses encore à comptabiliser`
             : selection?.depenses ? ` Tous les encaissements encore à déclarer et les ${chosen.length} dépense${chosen.length > 1 ? 's' : ''} cochée${chosen.length > 1 ? 's' : ''} dans le journal de dépense`
-              : ' Tous les encaissements et toutes les dépenses encore à déclarer'} seront déclarés à cette date. La feuille ne pourra être validée qu’une fois.</p>
+              : ' Les quittances réglées intégralement et les dépenses encore à déclarer (les acomptes non déclarés restent hors journal)'} seront déclarées à cette date. La feuille ne pourra être validée qu’une fois.</p>
         {summary && <dl>
-          <div><dt>Encaissements</dt><dd>{summary.quittances} · {fmt(summary.encaissements)} TND</dd></div>
-          <div><dt>Dépenses</dt><dd>{summary.depenses} · {fmt(summary.montant_depenses)} TND</dd></div>
+          <div><dt>Encaissements de la feuille</dt><dd>{summary.quittances} · {fmt(summary.encaissements)} TND</dd></div>
+          <div><dt>Dépenses de la feuille</dt><dd>{summary.depenses} · {fmt(summary.montant_depenses)} TND</dd></div>
         </dl>}
         {!isJournalDay(jour) && <p className="jrn-cash-warn">Attention : le {formatDate(jour)} n’est ni le 15 ni le dernier jour du mois.</p>}
         <footer>
@@ -251,10 +251,10 @@ export function CashValidation({ company, jour, selection, summary, onValidated 
 
 // The printable feuille de caisse of a company: one day (date), a period (debut, fin) or, without dates, every day.
 // On one day it can be validated (selection: the lines chosen in the journal it is opened from).
-// canValidate: false in the module Feuille de caisse (590), which only shows the feuille.
+// The feuille of one day can be validated ("Valider" in its toolbar, after a confirmation), as in the legacy software.
 export function CashSheet({ company, date, debut = date, fin = date, selection, onValidated, onClose, canValidate = true }) {
   const { accessToken } = useAuth();
-  const [state, setState] = useState({ loading: true, error: '', sheet: null });
+  const [state, setState] = useState({ loading: true, error: '', sheet: null, summary: null });
   const [version, setVersion] = useState(0); // read again once validated
   const [details, setDetails] = useState(null); // { popup } of the "Détails" tab
   const [detailsError, setDetailsError] = useState('');
@@ -271,8 +271,16 @@ export function CashSheet({ company, date, debut = date, fin = date, selection, 
     let active = true;
     setState({ loading: true, error: '', sheet: null });
     getCashSheet(accessToken, { compagnie: company.code_compagnie, debut: debut || '', fin: fin || '' })
-      .then((body) => { if (active) setState({ loading: false, error: '', sheet: cashSheetLines(body.journaux || [], body.depenses || []) }); })
-      .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, sheet: null }); });
+      .then((body) => {
+        if (!active) return;
+        const journals = body.journaux || [];
+        const expenses = body.depenses || [];
+        // what the validation declares on the day (shown in its confirmation): the whole feuille of the day
+        const summary = { quittances: journals.reduce((total, row) => total + Number(row.quittances || 0), 0), encaissements: sum(journals, 'primes'),
+          depenses: expenses.length, montant_depenses: sum(expenses, 'montant') };
+        setState({ loading: false, error: '', sheet: cashSheetLines(journals, expenses), summary });
+      })
+      .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, sheet: null, summary: null }); });
     return () => { active = false; };
   }, [accessToken, company.code_compagnie, debut, fin, version]);
 
@@ -280,7 +288,7 @@ export function CashSheet({ company, date, debut = date, fin = date, selection, 
   return <div className="jrn-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="jrn-sheet-frame">
       <div className="jrn-sheet-tools">
-        {jour && canValidate && <CashValidation company={company} jour={jour} selection={selection} onValidated={(validation) => { setVersion((value) => value + 1); onValidated?.(validation); }} />}
+        {jour && canValidate && <CashValidation company={company} jour={jour} selection={selection} summary={state.summary} onValidated={(validation) => { setVersion((value) => value + 1); onValidated?.(validation); }} />}
         <button type="button" className="expert-cancel" onClick={openDetails} disabled={!sheet}>Détails</button>
         <button type="button" className="expert-submit" onClick={() => window.print()} disabled={!sheet}>Imprimer</button>
         <button type="button" className="expert-cancel" onClick={onClose}>Fermer</button>
@@ -340,7 +348,7 @@ function CashLines({ lines }) {
 }
 
 // Module "Feuille de caisse": the company and one day (the 15th or the end of the month by default); "Lister" shows its
-// lines, "Aperçu" the printable feuille (no "Valider" here: the journals are validated from their own modules).
+// lines, "Aperçu" the printable feuille (with "Valider" in its toolbar, after a confirmation).
 export default function FeuilleCaisseModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
@@ -403,6 +411,6 @@ export default function FeuilleCaisseModal({ moduleId, onClose }) {
         <p className="jrn-hint">La feuille reprend ce qui est déclaré à cette date dans le journal d’encaissement (montants réglés par les clients, commission des quittances soldées) et dans le journal de dépense (sinistres et ristournes), quel que soit le jour du paiement. « Détails » ouvre la page A4, où le solde et le montant à déclarer peuvent être arrondis de 1 DT au plus.</p>
       </div>
     </section>
-    {open && company && <CashSheet company={company} date={jour} canValidate={false} onClose={() => setOpen(false)} />}
+    {open && company && <CashSheet company={company} date={jour} onValidated={() => { if (lines) list(); }} onClose={() => setOpen(false)} />}
   </div>;
 }

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { createRistourne, deleteRistourne, extractRistournes, getRistourne, getRistournePolicy, listRistournes, searchRistournes, updateRistourne } from '../../services/ristourneApi';
+import { createRistourne, deleteRistourne, extractRistournes, getRistourne, getRistournePolicy, listRistournes, updateRistourne } from '../../services/ristourneApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
 import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
@@ -35,12 +35,13 @@ export default function RistourneModal({ moduleId, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [search, setSearch] = useState(null); // { q, items, loading }
   // "Lister": every ristourne (the latest 1000), or with "Entre deux dates" those entered between the two dates.
   const [between, setBetween] = useState(false);
   const [debut, setDebut] = useState(() => `${today().slice(0, 8)}01`);
   const [fin, setFin] = useState(today);
   const [list, setList] = useState(null); // { items, loading, error, debut, fin }
+  // The search of the list: N° ristourne, N° police, code or name of the client (in every ristourne).
+  const [query, setQuery] = useState('');
   const [imported, setImported] = useState(null); // the document read: { compagnie, type_document, date_document, source, lignes }
   const [showImport, setShowImport] = useState(false);
   const [importFile, setImportFile] = useState(null); // the document being read in the import window
@@ -54,7 +55,7 @@ export default function RistourneModal({ moduleId, onClose }) {
   useEffect(() => {
     const onKey = (event) => {
       if (event.key !== 'Escape') return;
-      if (search) setSearch(null); else if (showImport) setShowImport(false); else if (editing) cancel(); else onClose();
+      if (list) setList(null); else if (showImport) setShowImport(false); else if (editing) cancel(); else onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -110,7 +111,7 @@ export default function RistourneModal({ moduleId, onClose }) {
   async function open(number) {
     if (!String(number).trim()) return;
     setBusy(true); setError(''); setNotice('');
-    try { show(await getRistourne(accessToken, number)); setSearch(null); }
+    try { show(await getRistourne(accessToken, number)); }
     catch (openError) { setError(openError.message); }
     finally { setBusy(false); }
   }
@@ -170,22 +171,24 @@ export default function RistourneModal({ moduleId, onClose }) {
     finally { setBusy(false); }
   }
 
-  async function runList() {
+  // "Lister" (and each search typed in the list): only the latest request fills the list.
+  async function runList(q = query) {
     if (between && (!debut || !fin || debut > fin)) { setError(!debut || !fin ? 'Choisissez les deux dates.' : 'La date de début doit précéder la date de fin.'); return; }
     const id = ++searchId.current;
     const period = between ? { debut, fin } : {};
-    setError(''); setSearch(null);
-    setList({ items: [], loading: true, ...period });
-    try { const body = await listRistournes(accessToken, period); if (id === searchId.current) setList({ items: body.items || [], loading: false, ...period }); }
+    setError('');
+    setList((current) => ({ items: current?.items || [], loading: true, ...period }));
+    try { const body = await listRistournes(accessToken, { ...period, q: q.trim() }); if (id === searchId.current) setList({ items: body.items || [], loading: false, ...period }); }
     catch (listError) { if (id === searchId.current) setList({ items: [], loading: false, error: listError.message, ...period }); }
   }
-
-  async function runSearch(q) {
-    const id = ++searchId.current; // only the latest search fills the list
-    setSearch({ q, items: search?.items || [], loading: true });
-    try { const body = await searchRistournes(accessToken, q); if (id === searchId.current) setSearch({ q, items: body.items || [], loading: false }); }
-    catch (searchError) { if (id === searchId.current) setSearch({ q, items: [], loading: false, error: searchError.message }); }
-  }
+  // The search is sent once typing pauses.
+  const typed = useRef(false);
+  useEffect(() => {
+    if (!typed.current) return undefined;
+    const timer = setTimeout(() => runList(query), 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new search text reads the list again
+  }, [query]);
 
   // Ristourne totale: the Prime Totale of the imported quittance, else nette + détaxe.
   const totale = editing ? (form.totale !== '' && form.totale != null ? round3(form.totale) : round3(Number(form.nette || 0) + Number(form.detaxe || 0))) : current?.totale;
@@ -207,9 +210,8 @@ export default function RistourneModal({ moduleId, onClose }) {
             <button type="button" className="expert-submit" onClick={startNew} disabled={busy}>Ajouter</button>
             <button type="button" className="expert-cancel" onClick={() => { setMode('edit'); setNotice(''); }} disabled={busy || !current || locked}>Modifier</button>
             <button type="button" className="catalog-delete" onClick={remove} disabled={busy || !current || locked}>Supprimer</button>
-            <button type="button" className="expert-cancel" onClick={() => { setList(null); runSearch(''); }} disabled={busy}>Chercher</button>
             <span className="rst-lister">
-              <button type="button" className="expert-cancel" onClick={runList} disabled={busy}>Lister</button>
+              <button type="button" className="expert-cancel" onClick={() => runList()} disabled={busy}>Lister</button>
               <label className="rst-between"><input type="checkbox" checked={between} onChange={(event) => setBetween(event.target.checked)} /> Entre deux dates</label>
               <input type="date" aria-label="Date début" value={debut} onChange={(event) => setDebut(event.target.value)} disabled={!between} />
               <input type="date" aria-label="Date fin" value={fin} onChange={(event) => setFin(event.target.value)} disabled={!between} />
@@ -269,32 +271,19 @@ export default function RistourneModal({ moduleId, onClose }) {
         <div className="rst-spacer" />
       </form>
 
-      {search && <div className="rst-search" role="dialog" aria-label="Chercher une ristourne">
-        <div className="rst-search-head">
-          <input value={search.q} onChange={(event) => runSearch(event.target.value)} placeholder="N° ristourne, police, code ou nom client" autoFocus />
-          <button type="button" className="expert-cancel" onClick={() => setSearch(null)}>Fermer</button>
-        </div>
-        <div className="rst-search-list">
-          {search.error ? <p className="rst-empty" role="alert">{search.error}</p> : !search.items.length ? <p className="rst-empty">{search.loading ? 'Recherche…' : 'Aucune ristourne.'}</p> : <table>
-            <thead><tr><th>N° ristourne</th><th>Date saisie</th><th>Police</th><th>Client</th><th>Compagnie</th><th className="num">Totale</th><th className="num">Solde</th></tr></thead>
-            <tbody>{search.items.map((item) => <tr key={item.num_ristourne} onClick={() => open(item.num_ristourne)}>
-              <td>{item.num_ristourne}</td><td>{formatDate(item.date_saisie)}</td><td>{item.num_police}</td><td>{item.nom_client}</td><td>{item.nom_compagnie}</td><td className="num">{fmt(item.totale)}</td><td className="num">{fmt(item.solde)}</td>
-            </tr>)}</tbody>
-          </table>}
-        </div>
-      </div>}
-
       {list && <div className="rst-search" role="dialog" aria-label="Liste des ristournes">
         <div className="rst-search-head rst-import-head">
           <div>
             <strong>{list.loading ? 'Chargement…' : `${list.items.length} ristourne${list.items.length > 1 ? 's' : ''}`}</strong>
-            <small>{list.debut ? `Saisies du ${formatDate(list.debut)} au ${formatDate(list.fin)}` : 'Toutes les ristournes, les plus récentes d’abord'}
+            <small>{list.debut ? `Saisies du ${formatDate(list.debut)} au ${formatDate(list.fin)}` : 'Toutes les ristournes, les plus récentes d’abord'}{query.trim() ? ` · recherche « ${query.trim()} »` : ''}
               {!list.loading && list.items.length > 0 && ` · Totale ${fmt(list.items.reduce((total, item) => total + Number(item.totale || 0), 0))} · Solde ${fmt(list.items.reduce((total, item) => total + Number(item.solde || 0), 0))}`}</small>
           </div>
+          <input type="search" className="rst-list-search" aria-label="Rechercher une ristourne" value={query} autoFocus
+            onChange={(event) => { typed.current = true; setQuery(event.target.value); }} placeholder="N° ristourne, N° police, code ou nom client" />
           <button type="button" className="expert-cancel" onClick={() => setList(null)}>Fermer</button>
         </div>
         <div className="rst-search-list">
-          {list.error ? <p className="rst-empty" role="alert">{list.error}</p> : !list.items.length ? <p className="rst-empty">{list.loading ? 'Chargement…' : 'Aucune ristourne pour cette période.'}</p> : <table>
+          {list.error ? <p className="rst-empty" role="alert">{list.error}</p> : !list.items.length ? <p className="rst-empty">{list.loading ? 'Chargement…' : query.trim() ? 'Aucune ristourne pour cette recherche.' : 'Aucune ristourne pour cette période.'}</p> : <table>
             <thead><tr><th>N° ristourne</th><th>Date saisie</th><th>Date du</th><th>Police</th><th>Client</th><th>Compagnie</th><th className="num">Totale</th><th className="num">Solde</th><th>Comptabilisée</th></tr></thead>
             <tbody>{list.items.map((item) => <tr key={item.num_ristourne} onClick={() => { setList(null); open(item.num_ristourne); }}>
               <td>{item.num_ristourne}</td><td>{formatDate(item.date_saisie)}</td><td>{formatDate(item.date_du)}</td><td>{item.num_police || item.num_int}</td>
