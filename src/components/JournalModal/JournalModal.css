@@ -300,3 +300,6 @@
 /* Journal d'encaissement: the totals row of the legacy JEQ, kept in view at the bottom of the list */
 .jrn-table tfoot td { position: sticky; bottom: 0; padding: 9px 8px; border-top: 2px solid #1d7d71; background: #eef6f4; color: #19394d; font-weight: 700; white-space: nowrap; }
 .unpaid-total small + strong + small { color: #71838d; }
+/* An acompte still to declare: listed, but outside the journal (as the legacy JEQ) */
+.jrn-table tr.is-outside td { color: #8a9aa2; font-style: italic; }
+.jrn-outside-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: #fff3e0; color: #a35a00; font-size: 8px; font-style: normal; font-weight: 700; }

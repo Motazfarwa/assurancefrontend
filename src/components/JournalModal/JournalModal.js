@@ -165,6 +165,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const allChosen = pending.length > 0 && pending.every((row) => chosen.has(config.key(row)));
   // Encaissement, as the legacy JEQ: the journal is every line listed (declared on the date and still to declare); its
   // Total général is Solde + Acompte.
+  // An acompte still to declare (the quittance not fully paid) is listed but, as in the legacy JEQ, not in the journal.
+  const journalRows = shown.filter((row) => !row.hors_journal);
   const solde = (rows) => sum(rows.filter((row) => row.a_s === 'S'), 'montant');
   const acompte = (rows) => sum(rows.filter((row) => row.a_s === 'A'), 'montant');
 
@@ -251,7 +253,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   // The feuille: what is comptabilisé on the date, or else a preview of the chosen lines.
   function openSheet() {
     // Encaissement: the whole journal, as the legacy JEQ (not validated while some lines are still to declare).
-    if (config.tick) setSheet({ rows: state.items, preview: state.items.some((row) => !row.comptabilise) });
+    if (config.tick) { const rows = state.items.filter((row) => !row.hors_journal); setSheet({ rows, preview: rows.some((row) => !row.comptabilise) }); }
     else if (showDone && done.length) setSheet({ rows: done, preview: false });
     else setSheet({ rows: selected, preview: true });
   }
@@ -284,8 +286,8 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
             <div><span>{config.heading}</span><h3>{!listed ? 'Choisissez la date' : state.loading ? 'Chargement…' : `${shown.length} ligne${shown.length > 1 ? 's' : ''} · ${ticked.length} choisie${ticked.length > 1 ? 's' : ''}`}</h3></div>
             <div className="jrn-actions">
               {kind === 'encaissement'
-                ? <div className="unpaid-total"><small>Total général du journal</small><strong>{fmt(sum(shown, 'montant'))} TND</strong>
-                  <small>dont déclaré {fmt(sum(shown.filter((row) => row.comptabilise), 'montant'))} · à déclarer {fmt(sum(shown.filter((row) => !row.comptabilise), 'montant'))}</small></div>
+                ? <div className="unpaid-total"><small>Total général du journal</small><strong>{fmt(sum(journalRows, 'montant'))} TND</strong>
+                  <small>dont déclaré {fmt(sum(journalRows.filter((row) => row.comptabilise), 'montant'))} · à déclarer {fmt(sum(journalRows.filter((row) => !row.comptabilise), 'montant'))}</small></div>
                 : <div className="unpaid-total"><small>Total choisi</small><strong>{fmt(sum(ticked, config.amount))} TND</strong></div>}
               <button type="button" className="expert-cancel" onClick={openSheet} disabled={!listed || !listedFor.compagnie || (config.tick ? !state.items.length : !selected.length && !(showDone && done.length))} title={listed && listedFor.compagnie ? undefined : 'Choisissez une compagnie puis « Lister »'}>Imprimer le journal</button>
               <button type="button" className="expert-cancel" onClick={() => setCashSheet(true)} disabled={!company} title={company ? undefined : 'Choisissez une compagnie'}>Feuille de caisse</button>
@@ -307,23 +309,23 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
                 const on = editable(row) ? chosen.has(key) : row.comptabilise;
                 const red = kind === 'encaissement' && offDay(row, listedFor.date);
                 const status = kind === 'encaissement' ? receiptStatus(row) : null;
-                return <tr key={key} className={`${!editable(row) ? 'is-done' : on ? 'is-chosen' : ''}${red ? ' is-offday' : ''}`} onClick={() => { if (editable(row)) toggle(row); }}
+                return <tr key={key} className={`${!editable(row) ? 'is-done' : on ? 'is-chosen' : ''}${red ? ' is-offday' : ''}${row.hors_journal ? ' is-outside' : ''}`} onClick={() => { if (editable(row)) toggle(row); }}
                   title={status ? `${status[0]} : ${status[1]}${row.comptabilise && row.date_comptabilise ? ` Déclarée le ${formatDate(row.date_comptabilise)}.` : ''}` : undefined}>
                   <td className="cqi-verser"><input type="checkbox" checked={on} disabled={!editable(row) || ticking} onChange={() => toggle(row)} onClick={(event) => event.stopPropagation()} aria-label={`Choisir ${key}`} /></td>
                   {kind === 'encaissement'
                     ? <>{allListed && <td>{row.nom_compagnie}</td>}<td>{row.tc}</td><td><strong>{row.num_quittance}</strong></td><td>{formatDate(row.echeance)}</td><td>{row.num_police}</td><td>{row.code_agence || '00'}</td>
                       <td className="cqi-number">{fmt(row.prime_cout)}</td><td className="cqi-number">{fmt(row.a_s === 'S' ? row.montant : 0)}</td><td className="cqi-number">{fmt(row.a_s === 'A' ? row.montant : 0)}</td><td className="cqi-number">{fmt(row.frais)}</td><td className="cqi-number">{fmt(row.timbre)}</td>
-                      <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}</td>
+                      <td className="cqi-number">{fmt(row.comm)}</td><td>{row.assure}{row.hors_journal && <small className="jrn-outside-tag" title="Acompte encore à déclarer : comme dans l’ancien logiciel, il n’entre dans le journal qu’une fois déclaré (cochez-le pour le déclarer).">acompte hors journal</small>}</td>
                       <td className="cqi-number" title={row.pieces_reglement ? `Pièce(s) : ${row.pieces_reglement}` : undefined}>{fmt(row.regle)}</td><td>{formatDate(row.date_reglement)}</td></>
                     : <>{allListed && <td>{row.nom_compagnie}</td>}<td><strong>{row.numero}</strong></td><td>{row.nature === 'R' ? 'Ristourne' : 'Sinistre'}</td><td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.num_imat}</td>
                       <td className="cqi-number">{fmt(row.montant)}</td><td>{row.assure}</td><td>{row.num_cheq}</td><td>{row.comptabilise ? `Oui · ${formatDate(row.date_comptabilise)}` : 'Non'}</td></>}
                 </tr>;
               })}</tbody>
               {kind === 'encaissement' && <tfoot><tr className="jrn-total-row">
-                <td colSpan={allListed ? 7 : 6}>Total ({shown.length} ligne{shown.length > 1 ? 's' : ''})</td>
-                <td className="cqi-number">{fmt(sum(shown, 'prime_cout'))}</td><td className="cqi-number">{fmt(solde(shown))}</td><td className="cqi-number">{fmt(acompte(shown))}</td>
-                <td className="cqi-number">{fmt(sum(shown, 'frais'))}</td><td className="cqi-number">{fmt(sum(shown, 'timbre'))}</td><td className="cqi-number">{fmt(sum(shown, 'comm'))}</td>
-                <td colSpan={3}>Total général : <b>{fmt(solde(shown) + acompte(shown))}</b></td>
+                <td colSpan={allListed ? 7 : 6}>Total du journal ({journalRows.length} ligne{journalRows.length > 1 ? 's' : ''})</td>
+                <td className="cqi-number">{fmt(sum(journalRows, 'prime_cout'))}</td><td className="cqi-number">{fmt(solde(journalRows))}</td><td className="cqi-number">{fmt(acompte(journalRows))}</td>
+                <td className="cqi-number">{fmt(sum(journalRows, 'frais'))}</td><td className="cqi-number">{fmt(sum(journalRows, 'timbre'))}</td><td className="cqi-number">{fmt(sum(journalRows, 'comm'))}</td>
+                <td colSpan={3}>Total général : <b>{fmt(solde(journalRows) + acompte(journalRows))}</b></td>
               </tr></tfoot>}
             </table></div>}
         </section>
