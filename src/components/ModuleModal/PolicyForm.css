@@ -726,3 +726,19 @@ fieldset.pf-lock-contents { display: contents; }
 .pf-toolbar-actions { display: flex; gap: 6px; align-items: center; }
 .pf-modify-button { background: #1f7a6d !important; border-color: #1f7a6d !important; color: #fff !important; }
 .pf-num-count .pf-link-button { padding: 0; font-size: inherit; }
+
+/* A field with its error message keeps its label: the label and the input never shrink (the label was squeezed to a
+   thin line when the message was added under the input). */
+.policy-modal-expanded .pf-field > span,
+.policy-modal-expanded .pf-field > input,
+.policy-modal-expanded .pf-field > select,
+.policy-modal-expanded .pf-field > .pf-field-error { flex-shrink: 0; }
+
+/* "+" above the N° police: a new police */
+.pf-num-add { margin-left: 6px; width: 20px; height: 20px; padding: 0; border: 1px solid #9bcfc3; border-radius: 50%; background: #eaf6f3; color: #187d78; font-size: 13px; font-weight: 800; line-height: 18px; cursor: pointer; vertical-align: middle; }
+.pf-num-add:hover { background: #187d78; color: #fff; }
+/* Police flotte: the prefix of its automatic number */
+.pf-flotte-prefix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.pf-flotte-prefix span { font-weight: 700; }
+.pf-flotte-prefix select { width: auto; min-width: 200px; }
+.pf-flotte-prefix small { color: #6b808b; font-weight: 500; }

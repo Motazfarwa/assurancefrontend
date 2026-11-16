@@ -27,13 +27,14 @@ function importedAlloc(list, request) {
   return Object.fromEntries(parts.map((part) => [part.row.num_quittance, part.amount.toFixed(3)]));
 }
 
-export default function ChequeModal({ onClose }) {
+// initialClientCode: opened for one client (the last step of a new client's file, of a police fictive).
+export default function ChequeModal({ onClose, initialClientCode = '' }) {
   const { accessToken } = useAuth();
   const importInput = useRef(null);
   const skipCode = useRef(''); // a client opened from the list is loaded there, not by the typing effect
   const [banks, setBanks] = useState([]);
   const [accounts, setAccounts] = useState([]); // agency accounts a piece "à verser" is paid into
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(String(initialClientCode || '').trim());
   const [client, setClient] = useState(null);
   const [quittances, setQuittances] = useState([]);
   const [due, setDue] = useState('toutes'); // quittances shown: toutes, échues (échéance passed) or non échues

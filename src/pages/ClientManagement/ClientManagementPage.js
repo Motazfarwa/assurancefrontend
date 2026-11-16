@@ -6,6 +6,7 @@ import ModuleModal from '../../components/ModuleModal/ModuleModal';
 import PolicyForm from '../../components/ModuleModal/PolicyForm';
 import FicheImportModal from '../../components/FicheImportModal/FicheImportModal';
 import SinistreModal from '../../components/SinistreModal/SinistreModal';
+import ChequeModal from '../../components/ChequeModal/ChequeModal';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
 import ClientListModal from '../ClientListModal/ClientListModal';
 import ClientListerModal from '../ClientListModal/ClientListerModal';
@@ -36,13 +37,13 @@ export default function ClientManagementPage({ modal = false }) {
   const [policyPrefill, setPolicyPrefill] = useState(null);
   // New client = one flow: identity (1), coordinates (2), then policy and first receipt (3, shown as steps 3 and 4).
   const [policyStep, setPolicyStep] = useState(1);
-  // Step 5 "Saisir sinistre" (step === 4), where the whole flow is stored: the police once stored, and whether its claim form is open.
+  // Step 5 "Saisir pièce de règlement" (step === 4), where the whole flow is stored: the police once stored, and whether the
+  // window "Saisir les pièces de règlement" is open on the client (its new quittance can be paid at once).
   const policySaveRef = useRef(null);
   const fleetRetryRef = useRef(null);
-  const [claimQueue, setClaimQueue] = useState([]); // the vehicles of a flotte with a claim to declare, one form after the other
+  const [pieceQueue, setPieceQueue] = useState([]); // the vehicles of a flotte whose règlement is to enter, one after the other
   const [savedPolicy, setSavedPolicy] = useState(null);
-  const [claimOpen, setClaimOpen] = useState(false);
-  const claimNumber = useRef('');
+  const [pieceOpen, setPieceOpen] = useState(false);
   const [prefillKey, setPrefillKey] = useState(0);
   const [flowStarted, setFlowStarted] = useState(false);
   const clientSavedRef = useRef(false);
@@ -109,9 +110,7 @@ export default function ClientManagementPage({ modal = false }) {
   async function createClientBeforePolicy() {
     if (clientSavedRef.current) return;
     if (!client.clientCode.trim()) throw new Error('Le code client est obligatoire.');
-    if (client.homePostalCode === '' || !Number.isInteger(Number(client.homePostalCode))) {
-      throw new Error('Le code postal du domicile (étape Coordonnées) est obligatoire et doit être un nombre.');
-    }
+    // The coordinates (postal code of the correspondence address included) are checked at their own step, not here.
     setFlowStarted(true);
     if (!client._persisted) createdHereRef.current = true;
     const saved = await saveClient(accessToken, client, Boolean(client._persisted)); // Modifier: the changes are saved, the client is not created again
@@ -121,30 +120,30 @@ export default function ClientManagementPage({ modal = false }) {
     setClients((current) => [...current.filter((item) => item.clientCode !== record.clientCode), record]);
   }
 
-  // Last step: stores the client, its police and quittance. The claim form needs the stored police, so it opens afterwards.
-  async function saveWholeFlow(withClaim) {
+  // Last step: stores the client, its police and quittance; "Saisir les pièces de règlement" then opens on the client.
+  async function saveWholeFlow(withPiece) {
     setSaving(true);
     const result = await policySaveRef.current?.();
     setSaving(false);
     if (!result) { changeStep(3); return; } // the error is shown on the receipt form
     setSavedPolicy(result);
     if (result.fleetRefused?.length) return; // shown on this step, with "Réessayer"
-    if (result.fleetClaims?.length) { setClaimQueue(result.fleetClaims); return; }
-    if (withClaim) setClaimOpen(true);
+    if (result.fleetPieces?.length) { setPieceQueue(result.fleetPieces); return; }
+    if (withPiece) setPieceOpen(true);
     else finishFlow();
   }
 
   async function retryFleet() {
     setSaving(true);
-    const { refused, claims, stored } = await fleetRetryRef.current();
+    const { refused, pieces, stored } = await fleetRetryRef.current();
     setSaving(false);
-    setSavedPolicy((current) => ({ ...current, fleetRefused: refused, fleetCount: (current.fleetCount || 0) + stored, fleetClaims: claims }));
-    if (claims.length) setClaimQueue(claims);
+    setSavedPolicy((current) => ({ ...current, fleetRefused: refused, fleetCount: (current.fleetCount || 0) + stored, fleetPieces: pieces }));
+    if (pieces.length) setPieceQueue(pieces);
   }
 
-  function finishFlow(numeroSinistre = '') {
+  function finishFlow() {
     const done = editingClient ? 'Client modifié, police et quittance enregistrées' : 'Client, police et quittance enregistrés';
-    setSuccessToast(`${done}${numeroSinistre ? `, sinistre N° ${numeroSinistre} créé` : ''} avec succès.`);
+    setSuccessToast(`${done} avec succès.`);
   }
 
   function changeStep(nextStep) {
@@ -247,7 +246,7 @@ export default function ClientManagementPage({ modal = false }) {
           <span>Gérer pour ce client</span>
           {CLIENT_ACTIONS.map((action) => <button key={action.key} type="button" className="client-action-button" disabled={!client.clientCode} title={client.clientCode ? `Code client ${client.clientCode}` : 'Code client en cours de chargement…'} onClick={() => setActiveAction(action)}>{action.label}</button>)}
         </div>
-        <div className="client-form-progress" aria-label={`Étape ${step === 4 ? 5 : step === 3 ? 2 + policyStep : step} sur 5`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div><><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step >= 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : step === 4 ? 'is-complete' : ''}><span>4</span><strong>Saisir quittance</strong></div><i /><div className={step === 4 ? 'is-active' : ''}><span>5</span><strong>Saisir sinistre</strong></div></></div>
+        <div className="client-form-progress" aria-label={`Étape ${step === 4 ? 5 : step === 3 ? 2 + policyStep : step} sur 5`}><div className={step === 1 ? 'is-active' : 'is-complete'}><span>1</span><strong>Identité du client</strong></div><i /><div className={step === 2 ? 'is-active' : step > 2 ? 'is-complete' : ''}><span>2</span><strong>Coordonnées</strong></div><><i /><div className={step === 3 && policyStep === 1 ? 'is-active' : step >= 3 ? 'is-complete' : ''}><span>3</span><strong>Saisir police</strong></div><i /><div className={step === 3 && policyStep === 2 ? 'is-active' : step === 4 ? 'is-complete' : ''}><span>4</span><strong>Saisir quittance</strong></div><i /><div className={step === 4 ? 'is-active' : ''}><span>5</span><strong>Saisir pièce de règlement</strong></div></></div>
         <div className="client-current-summary" aria-live="polite"><div><span>Code client</span><strong>{client.clientCode || '—'}</strong></div><i /><div><span>Nom du client</span><strong>{clientDisplayName}</strong></div></div>
         {step <= 2 && <FieldErrors.Provider value={triedSteps[step] ? clientStepErrors(client, step) : {}}><form noValidate className={`client-record-form${step === 2 ? ' client-record-form-step-two' : ''}`} onSubmit={handleSubmit}>
           {step === 1 && <IdentityFields client={client} updateField={updateField} changeClientType={changeClientType} accessToken={accessToken} pickExistingClient={pickExistingClient} />}
@@ -269,37 +268,36 @@ export default function ClientManagementPage({ modal = false }) {
               saveRef={policySaveRef}
               fleetRetryRef={fleetRetryRef}
               onReceiptReady={() => changeStep(4)}
-              finalLabel="Suivant : sinistre →"
+              finalLabel="Suivant : règlement →"
               clientName={clientDisplayName}
             />
           </div>
         )}
         {step === 4 && <div className="client-claim-step">
-          <h3>Saisir sinistre</h3>
+          <h3>Saisir pièce de règlement</h3>
           {savedPolicy ? <>
             <p>Police <b>{savedPolicy.num_police || savedPolicy.num_int || '—'}</b>{savedPolicy.num_quittance ? <> et quittance <b>{savedPolicy.num_quittance}</b></> : null} enregistrées pour le client <b>{client.clientCode}</b>{savedPolicy.fleetCount ? <>, avec <b>{savedPolicy.fleetCount}</b> police(s) fictive(s)</> : null}.</p>
             {savedPolicy.fleetRefused?.length > 0 && <p className="client-save-notice" role="alert">Polices fictives non enregistrées : {savedPolicy.fleetRefused.map((item) => `${item.num_imat} (${item.message})`).join(', ')}. <button type="button" className="client-secondary-button" disabled={saving} onClick={retryFleet}>{saving ? 'Enregistrement…' : 'Réessayer'}</button></p>}
-            <p>Le client a-t-il un sinistre à déclarer sur cette police ? Le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
+            <p>Le client règle-t-il sa quittance maintenant ? « Saisir les pièces de règlement » s’ouvre sur ce client, avec sa quittance à régler.</p>
             <div className="client-form-actions">
-              <button type="button" className="client-secondary-button" onClick={() => finishFlow()}>Terminer sans sinistre</button>
-              <button type="button" className="client-primary-button" onClick={() => setClaimOpen(true)}>Saisir le sinistre →</button>
+              <button type="button" className="client-secondary-button" onClick={() => finishFlow()}>Terminer sans règlement</button>
+              <button type="button" className="client-primary-button" onClick={() => setPieceOpen(true)}>Saisir la pièce de règlement →</button>
             </div>
           </> : <>
             <p>Dernière étape : le client <b>{client.clientCode}</b>, sa police et sa quittance ne sont pas encore enregistrés.</p>
-            <p>Le client a-t-il un sinistre à déclarer sur cette police ? Après l’enregistrement, le formulaire s’ouvre avec la police, le client et la compagnie déjà remplis.</p>
+            <p>Le client règle-t-il sa quittance maintenant ? Après l’enregistrement, « Saisir les pièces de règlement » s’ouvre sur ce client, avec sa quittance à régler (chèque, traite, espèces… à verser ou en instance).</p>
             <div className="client-form-actions">
               <button type="button" className="client-secondary-button" disabled={saving} onClick={() => changeStep(3)}>← Précédent</button>
-              <button type="button" className="client-secondary-button" disabled={saving} onClick={() => saveWholeFlow(false)}>{saving ? 'Enregistrement…' : 'Enregistrer sans sinistre'}</button>
-              <button type="button" className="client-primary-button" disabled={saving} onClick={() => saveWholeFlow(true)}>{saving ? 'Enregistrement…' : 'Enregistrer et saisir le sinistre →'}</button>
+              <button type="button" className="client-secondary-button" disabled={saving} onClick={() => saveWholeFlow(false)}>{saving ? 'Enregistrement…' : 'Enregistrer sans règlement'}</button>
+              <button type="button" className="client-primary-button" disabled={saving} onClick={() => saveWholeFlow(true)}>{saving ? 'Enregistrement…' : 'Enregistrer et saisir la pièce de règlement →'}</button>
             </div>
           </>}
         </div>}
       </section>
-      {claimQueue[0] && <SinistreModal key={claimQueue[0].num_imat} mode="new" moduleId="620" clientCode={claimQueue[0].code_client} policyNumber={savedPolicy?.num_int || savedPolicy?.num_police || ''} vehicle={claimQueue[0]}
-        onClose={() => setClaimQueue((current) => current.slice(1))} />}
-      {claimOpen && <SinistreModal mode="new" moduleId="620" clientCode={client.clientCode} policyNumber={savedPolicy?.num_int || savedPolicy?.num_police || ''}
-        onSaved={(numero) => { claimNumber.current = numero; }}
-        onClose={() => { setClaimOpen(false); if (claimNumber.current) finishFlow(claimNumber.current); }} />}
+      {/* "Saisir les pièces de règlement" on the client of each police fictive asked for, one after the other, then on the client */}
+      {pieceQueue[0] && <ChequeModal key={`${pieceQueue[0].num_imat}-${pieceQueue.length}`} initialClientCode={pieceQueue[0].code_client}
+        onClose={() => setPieceQueue((current) => { const rest = current.slice(1); if (!rest.length) finishFlow(); return rest; })} />}
+      {pieceOpen && <ChequeModal initialClientCode={client.clientCode} onClose={() => { setPieceOpen(false); finishFlow(); }} />}
       {/* Gestion sinistre: the claims module, its list on the client's claims */}
       {activeAction?.key === 'claim' && <SinistreModal moduleId={activeAction.module.id} clientCode={client.clientCode} onClose={() => setActiveAction(null)} />}
       {activeAction && activeAction.key !== 'claim' && <ModuleModal module={activeAction.module} category={MODULE_CATEGORIES.find((item) => item.id === activeAction.category)} clientCode={client.clientCode} prefill={policyPrefill} onClose={() => setActiveAction(null)} />}

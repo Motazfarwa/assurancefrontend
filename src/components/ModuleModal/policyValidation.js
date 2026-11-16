@@ -33,6 +33,8 @@ export function policeErrors(values, dcKeys = [], branchLength = 3) {
   const number = text(values.num_police);
   const branch = text(values.code_branche);
   if (number.length > 15) errors.num_police = '15 caractères au maximum.';
+  // a police flotte numbered as the legacy software: flotte prefix (555, 666, 777, 888, 999) + year + 5-digit counter
+  else if (values.flotte_auto && /^(555|666|777|888|999)\d{4}\d{5}$/.test(number)) { /* valid as given */ }
   else if (number && !/^\d{4}/.test(number)) errors.num_police = 'Le numéro commence par l’année (4 chiffres).';
   else if (number && text(values.code_compagnie) && !branch) errors.num_police = `Après l’année, le code d’une branche de cette compagnie (${branchLength} caractères), puis des chiffres.`;
   else if (number && branch && number.slice(4, 4 + branch.length) !== branch) errors.num_police = `Après l’année vient le code branche (${branch}).`;

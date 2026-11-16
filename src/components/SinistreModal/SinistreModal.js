@@ -11,6 +11,14 @@ import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import ModuleLinks from '../ModuleLinks/ModuleLinks';
 import './SinistreModal.css';
 
+// The journal day of a date: the 15th until the 15th, then the last day of the month (the feuille de caisse it goes in).
+export const journalDayOf = (value) => {
+  const [year, month, dayOfMonth] = String(value || '').slice(0, 10).split('-').map(Number);
+  if (!year || !month || !dayOfMonth) return '';
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(dayOfMonth <= 15 ? 15 : last).padStart(2, '0')}`;
+};
+const frenchDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 // Mode de dépense of a claim settlement (TDepense.mod_dep).
 const DEPENSE_MODES = [['C', 'Chèque'], ['T', 'Traite'], ['V', 'Virement'], ['B', 'Carte bancaire']];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -661,13 +669,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     setPayDraft({
       num_piece: reglement?.num_piece || '', date_reglement: form.Date_Reglement || today(),
       code_banque: reglement?.code_banque || companyAccount(accounts, form.Code_Compagnie_Assure),
-      mod_dep: reglement?.mod_dep || 'C', typ_dep: 'T', tried: false,
+      mod_dep: reglement?.mod_dep || 'C', typ_dep: 'T', comptabiliser: Boolean(reglement?.comptabiliser), tried: false,
     });
   }
 
   function validatePay(event) {
     event.preventDefault();
-    const draft = { num_piece: payDraft.num_piece.trim(), date_reglement: payDraft.date_reglement, code_banque: payDraft.code_banque, mod_dep: payDraft.mod_dep || 'C', typ_dep: 'T' };
+    const draft = { num_piece: payDraft.num_piece.trim(), date_reglement: payDraft.date_reglement, code_banque: payDraft.code_banque, mod_dep: payDraft.mod_dep || 'C', typ_dep: 'T', comptabiliser: Boolean(payDraft.comptabiliser) };
     if (!draft.num_piece || !draft.date_reglement || !draft.code_banque) { setPayDraft((value) => ({ ...value, tried: true })); return; }
     setReglement(draft); setPayDraft(null);
     change({ Regle: true, Date_Reglement: draft.date_reglement, ...closeWhenSettled({ Regle: true, Date_Reglement: draft.date_reglement }) });
@@ -832,7 +840,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {flag('Clôturé', 'Cloture', 'Date_Cloture')}
             {reglement && form.Regle && (
               <p className="snr-span-6 snr-pay-note">
-                Règlement : pièce <b>{reglement.num_piece}</b> · {DEPENSE_MODES.find(([code]) => code === reglement.mod_dep)?.[1] || 'Chèque'} · compte <b>{reglement.code_banque}</b> · enregistré avec le dossier
+                Règlement : pièce <b>{reglement.num_piece}</b> · {DEPENSE_MODES.find(([code]) => code === reglement.mod_dep)?.[1] || 'Chèque'} · compte <b>{reglement.code_banque}</b> · {reglement.comptabiliser ? <>comptabilisé dans la feuille de caisse du <b>{frenchDate(journalDayOf(reglement.date_reglement))}</b></> : 'à comptabiliser'} · enregistré avec le dossier
                 <button type="button" onClick={() => tickRegle(true)}>Modifier</button>
               </p>
             )}
@@ -878,7 +886,13 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 <select value="T" disabled aria-describedby="snr-pay-type"><option value="T">Technique</option></select>
               </label>
             </div>
-            <small id="snr-pay-type" className="snr-pay-note">Le règlement est enregistré comme dépense technique ; il figure ensuite au Journal de dépense.</small>
+            {/* ticked: comptabilisé on the journal day of its date (cochée in that journal de dépense, counted in that feuille de
+                caisse); unticked: it stays to comptabiliser, as a pièce « à verser » not comptabilisée */}
+            <label className="snr-pay-check">
+              <input type="checkbox" checked={Boolean(payDraft.comptabiliser)} onChange={(event) => { const comptabiliser = event.target.checked; setPayDraft((value) => ({ ...value, comptabiliser })); }} />
+              Comptabiliser dans la feuille de caisse du {frenchDate(journalDayOf(payDraft.date_reglement)) || '…'}
+            </label>
+            <small id="snr-pay-type" className="snr-pay-note">Le règlement est enregistré comme dépense technique. Coché : il est comptabilisé à cette date (coché dans le Journal de dépense et compté dans la feuille de caisse de ce jour). Non coché : il reste à comptabiliser dans le Journal de dépense.</small>
             {payDraft.tried && <p className="snr-message is-error">Renseignez le N° pièce, la date de règlement et le compte banque.</p>}
             <footer>
               <button type="button" className="snr-tool" onClick={() => setPayDraft(null)}>Annuler</button>

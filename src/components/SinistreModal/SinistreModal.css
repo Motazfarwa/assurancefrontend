@@ -244,3 +244,7 @@
 /* A stored claim is shown locked until "Modifier": its values stay readable */
 .snr-body fieldset:disabled input, .snr-body fieldset:disabled select, .snr-body fieldset:disabled textarea,
 .snr-body select:disabled, .snr-body input[readonly] { color: #233c4b; -webkit-text-fill-color: #233c4b; opacity: 1; cursor: default; }
+
+/* Règlement du sinistre: "Comptabiliser dans la feuille de caisse du …" */
+.snr-pay-check { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; color: #19394d; font-size: 12.5px; font-weight: 700; }
+.snr-pay-check input { width: 16px; height: 16px; accent-color: #1d7d71; }

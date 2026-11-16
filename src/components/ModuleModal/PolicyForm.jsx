@@ -8,6 +8,10 @@ import { listClients, normalizeClientRecord, rankClients } from "../../services/
 import FlotteDialog from "../FlotteDialog/FlotteDialog";
 import PoliceFictiveWizard, { storeDraft } from "../FlotteDialog/PoliceFictiveWizard";
 import { policeErrors, quittanceErrors, REQUIRED_POLICY_FIELDS } from "./policyValidation";
+import CarteVerteDialog, { CarteVerteSummary } from "../CarteVerteDialog/CarteVerteDialog";
+
+// Prefixes of a police flotte (the legacy numbering: prefix + year + 5-digit counter), with the GAT branch they name.
+const FLOTTE_PREFIXES = [["555", "555 · P/C Expats de Tunisie"], ["666", "666 · PNC flotte auto"], ["777", "777 · BFPME flotte auto"], ["888", "888 · CTFCI flotte auto"], ["999", "999 · PNT flotte auto"]];
 
 // A new policy takes effect the day after today, for one year: expiration one year later, due date (day and
 // month only, "dd/mm" as the policy table stores it) on the same day.
@@ -88,6 +92,9 @@ const initialValues = {
     carte_verte: false,
     cv_du: "",
     cv_au: "",
+    cv_periode: "",
+    cv_solde: "",
+    cv_observations: "",
     observation: ""
 };
 
@@ -225,6 +232,10 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const storedNumInt = useRef(""); // the police flotte once stored
     const [fleetEditor, setFleetEditor] = useState(null); // their window: { index } (-1: a new one)
     const [triedSteps, setTriedSteps] = useState({}); // a step whose "Suivant" was clicked shows its input errors
+    const [cvOpen, setCvOpen] = useState(false); // the "Carte verte" popup
+    // "Police flotte" ticked on a new police: its number is the next one of the flotte prefix (flotteAuto, until retyped).
+    const [flottePrefix, setFlottePrefix] = useState("555");
+    const [flotteAuto, setFlotteAuto] = useState(false);
     const formRef = useRef(null);
 
     useEffect(() => {
@@ -376,6 +387,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     // are read from it (see branchCandidates).
     const handleNumberChange = (value) => {
         const clean = value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15);
+        setFlotteAuto(false); // a number typed or chosen is no longer the automatic flotte number
         setValues(prev => ({ ...prev, num_police: clean }));
     };
 
@@ -445,10 +457,34 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     const branch = companyCandidates.find(item => storedBranch && item.code_branche === storedBranch)
         || companyCandidates.find(item => item.forme === "annee")
         || (loadedExisting ? companyCandidates[0] : null)
+        || (flotteAuto ? companyCandidates.find(item => item.code_branche === flottePrefix) || null : null)
         || null;
     const tauxComm = branch?.taux_comm == null ? null : Number(branch.taux_comm); // commission rate (0.1 = 10 %)
     const nomBrancheShown = branch?.nom_branche || (loadedExisting ? nomBranche : "");
-    const branchMissing = Boolean(values.code_compagnie) && branchCandidates !== null && values.num_police.length >= 6 && !branch && !(loadedExisting && nomBranche);
+    const branchMissing = !flotteAuto && Boolean(values.code_compagnie) && branchCandidates !== null && values.num_police.length >= 6 && !branch && !(loadedExisting && nomBranche);
+
+    // "Police flotte" ticked on a new police: the N° police is the next one of the chosen prefix (prefix + year + counter),
+    // as the legacy software numbers them; unticked, an automatic number is taken away.
+    useEffect(() => {
+        if (!isCreate) return undefined;
+        if (!values.flotte) {
+            if (flotteAuto) { setFlotteAuto(false); setValues(prev => ({ ...prev, num_police: "" })); }
+            return undefined;
+        }
+        if (loadedExisting && !flotteAuto) return undefined; // an existing police of the client is shown: left as it is
+        const controller = new AbortController();
+        fetch(`${API_URL}/api/polices/numero-flotte?${new URLSearchParams({ prefixe: flottePrefix })}`, { credentials: "include", signal: controller.signal })
+            .then(response => response.json().then(body => (response.ok ? body : null)))
+            .then(body => {
+                if (!body?.num_police || controller.signal.aborted) return;
+                setNewPolice(true);
+                setValues(prev => ({ ...prev, num_police: body.num_police }));
+                setFlotteAuto(true);
+            })
+            .catch(() => {});
+        return () => controller.abort();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [values.flotte, flottePrefix, isCreate]);
 
     // No company chosen yet: the number names only one of the offered companies -> that company.
     useEffect(() => {
@@ -528,7 +564,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
 
     // The input errors of the step (shown once its "Suivant" was clicked); the code branche is the one read from the number.
     const stepErrors = !isCreate ? {} : step === 1
-        ? policeErrors({ ...values, code_branche: branch?.code_branche || "", echeance: echeanceText(values.echeance) }, DC_GUARANTEES.map(([key]) => key), branchLength)
+        ? policeErrors({ ...values, flotte_auto: flotteAuto, code_branche: branch?.code_branche || "", echeance: echeanceText(values.echeance) }, DC_GUARANTEES.map(([key]) => key), branchLength)
         : quittanceErrors(values);
     const errorCount = triedSteps[step] ? Object.keys(stepErrors).length : 0;
 
@@ -577,7 +613,10 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             ind_conducteur: amount(values.g_ind_cond),
             remarquage: values.g_remarquage ? 1 : 0
         };
-        const carte_verte = values.carte_verte ? { du: values.cv_du || null, au: values.cv_au || null } : null;
+        const carte_verte = values.carte_verte ? {
+            du: values.cv_du || null, au: values.cv_au || null,
+            periode_consommee: values.cv_periode || null, solde_echeance: values.cv_solde || null, observations: values.cv_observations || null,
+        } : null;
         // Ticked guarantees with their amounts (shown under Tous risques and Dommages cumulés).
         const dommages_cumules = values.tous_risque || values.dommages_cumules
             ? Object.fromEntries(DC_GUARANTEES.filter(([key]) => values[`dc_${key}`]).map(([key]) => [key, amount(values[`dc_${key}_montant`])]))
@@ -611,8 +650,8 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             if (!values.flotte || !result.num_int) return result;
             setFleetNumInt(String(result.num_int));
             storedNumInt.current = String(result.num_int);
-            const { refused, claims, stored } = await storeFleet(String(result.num_int), fleetDrafts);
-            return { ...result, fleetRefused: refused, fleetClaims: claims, fleetCount: stored };
+            const { refused, pieces, stored } = await storeFleet(String(result.num_int), fleetDrafts);
+            return { ...result, fleetRefused: refused, fleetPieces: pieces, fleetCount: stored };
         } catch (err) {
             setError(
                 err instanceof TypeError
@@ -632,11 +671,11 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     async function storeFleet(numInt, drafts) {
         const refused = [];
         const remaining = [];
-        const claims = [];
+        const pieces = []; // the vehicles whose règlement is entered after the save (step 5 of the police fictive)
         for (const draft of drafts) {
             try {
                 const code = await storeDraft(accessToken, numInt, draft);
-                if (draft.form.withClaim) claims.push({ num_imat: draft.num_imat, code_client: code, nom_client: draft.nom_client });
+                if (draft.form.withPiece) pieces.push({ num_imat: draft.num_imat, code_client: code, nom_client: draft.nom_client });
             } catch (fleetError) {
                 refused.push({ num_imat: draft.num_imat, message: fleetError.message });
                 remaining.push(fleetError.draft || draft);
@@ -644,7 +683,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         }
         setFleetDrafts(remaining);
         if (refused.length) setMessage(current => `${current} · Polices fictives refusées : ${refused.map(item => `${item.num_imat} (${item.message})`).join(", ")}`);
-        return { refused, claims, stored: drafts.length - refused.length };
+        return { refused, pieces, stored: drafts.length - refused.length };
     }
 
     async function retryFleet() {
@@ -869,7 +908,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     </label>
 
                     <div className="pf-field pf-field-wide pf-num-police">
-                        <span>N° Police *{clientPolices?.length > 0 && (isCreate
+                        <span>N° Police *{isCreate && <button type="button" className="pf-num-add" onClick={startNewPolice} title="Ajouter une nouvelle police (saisir son numéro)" aria-label="Nouvelle police">＋</button>}{clientPolices?.length > 0 && (isCreate
                             ? <small className="pf-num-count"> · {clientPolices.length} police{clientPolices.length > 1 ? "s" : ""} pour ce client</small>
                             : <small className="pf-num-count"> · {inForce.length} en vigueur sur {clientPolices.length}{inForce.length < clientPolices.length && <> · <button type="button" className="pf-link-button" disabled={Boolean(editing)} onClick={() => setAllPolices(!allPolices)}>{allPolices ? "en vigueur seulement" : "voir toutes"}</button></>}</small>)}</span>
                         {(isCreate ? clientPolices?.length > 1 : clientPolices?.length > 0 && (shownPolices.length !== 1 || shownPolices.length !== clientPolices.length)) && !newPolice ? (
@@ -893,6 +932,13 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                                 placeholder={`${new Date().getFullYear()} + code branche + chiffres`}
                             />
                         )}
+                        {isCreate && values.flotte && <label className="pf-flotte-prefix">
+                            <span>Préfixe flotte</span>
+                            <select value={flottePrefix} onChange={e => setFlottePrefix(e.target.value)}>
+                                {FLOTTE_PREFIXES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                            <small>{flotteAuto ? "N° automatique : préfixe + année + compteur" : "Numéro saisi"}</small>
+                        </label>}
                         {isCreate && clientPolices?.length > 0 && (newPolice
                             ? <button type="button" className="pf-link-button pf-num-switch" onClick={backToClientPolices}>← Polices du client</button>
                             : clientPolices.length === 1 && <button type="button" className="pf-link-button pf-num-switch" onClick={startNewPolice}>＋ Nouvelle police</button>)}
@@ -1062,7 +1108,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     {fleetDrafts.length > 0 && (
                     <div className="pf-receipts-wrap">
                         <table className="pf-receipts">
-                            <thead><tr><th>N°</th><th>Immatriculation</th><th>Marque</th><th>Client</th><th>Entrée</th><th className="is-number">Prime totale</th><th>Sinistre</th><th /></tr></thead>
+                            <thead><tr><th>N°</th><th>Immatriculation</th><th>Marque</th><th>Client</th><th>Entrée</th><th className="is-number">Prime totale</th><th>Règlement</th><th /></tr></thead>
                             <tbody>
                                 {fleetDrafts.map((item, index) => (
                                     <tr key={item.num_imat}>
@@ -1072,7 +1118,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                                         <td>{item.code_client || "Nouveau"} {item.nom_client}</td>
                                         <td>{item.effet ? item.effet.split("-").reverse().join("/") : "—"}</td>
                                         <td className="is-number">{item.prime_total != null ? Number(item.prime_total).toFixed(3) : "—"}</td>
-                                    <td>{item.form.withClaim ? "À déclarer" : "—"}</td>
+                                    <td>{item.form.withPiece ? "À saisir" : "—"}</td>
                                         <td className="pf-flotte-actions">
                                             <button type="button" className="pf-link-button" onClick={() => setFleetEditor({ index })}>Modifier</button>
                                             <button type="button" className="pf-link-button" onClick={() => setFleetDrafts(current => current.filter((_, position) => position !== index))}>Supprimer</button>
@@ -1250,15 +1296,19 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                     <div className="pf-field">
                         <span>&nbsp;</span>
                         <div className="pf-check-row pf-check-yesno-row">
-                            {check("Carte verte", "carte_verte")}
+                            {/* ticked: the popup asks the dates, the période consommée, the solde and the observations */}
+                            <label className="pf-check">
+                                <input type="checkbox" checked={values.carte_verte} disabled={locked}
+                                    onChange={e => { if (e.target.checked) setCvOpen(true); else setValues(prev => ({ ...prev, carte_verte: false, cv_du: "", cv_au: "", cv_periode: "", cv_solde: "", cv_observations: "" })); }} />
+                                Carte verte
+                            </label>
                         </div>
+                        {err("cv_du") || err("cv_au")}
                     </div>
-                    {values.carte_verte && (
-                        <>
-                            {field("Carte verte : du", "cv_du", "date")}
-                            {field("Carte verte : au", "cv_au", "date")}
-                        </>
-                    )}
+                    {values.carte_verte && <CarteVerteSummary values={values} onEdit={() => setCvOpen(true)} />}
+                    {cvOpen && <CarteVerteDialog value={values} echeance={values.expiration}
+                        onCancel={() => setCvOpen(false)}
+                        onSave={(carte) => { setValues(prev => ({ ...prev, ...carte, carte_verte: true })); setCvOpen(false); }} />}
                 </div>
             </section>
             )}

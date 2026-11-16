@@ -8,10 +8,11 @@ import { getClientByCode, getNextClientCode, saveClient } from '../../services/c
 import { checkPlate, importVehicles } from '../../services/flotteApi';
 import { quittanceErrors } from '../ModuleModal/policyValidation';
 import { VEHICLE_FIELDS } from './FlotteDialog';
+import CarteVerteDialog, { CarteVerteSummary } from '../CarteVerteDialog/CarteVerteDialog';
 import '../../pages/ClientManagement/ClientManagementPage.css';
 import './FlotteDialog.css';
 
-const STEPS = ['Identité du client', 'Coordonnées', 'Saisir police', 'Saisir quittance', 'Saisir sinistre'];
+const STEPS = ['Identité du client', 'Coordonnées', 'Saisir police', 'Saisir quittance', 'Saisir pièce de règlement'];
 // The premiums of the vehicle are those of its quittance (step 4): they are not entered twice.
 const POLICE_FIELDS = VEHICLE_FIELDS.filter(([key]) => !['prime_net', 'commission', 'prime_total'].includes(key));
 const NUMBER_FIELDS = new Set(POLICE_FIELDS.filter(([, , type]) => type === 'number').map(([key]) => key));
@@ -22,6 +23,8 @@ const QUITTANCE_FIELDS = [
 ];
 const QUITTANCE_AMOUNTS = new Set(QUITTANCE_FIELDS.filter(([, , type]) => type === 'number').map(([key]) => key));
 const today = () => new Date().toISOString().slice(0, 10);
+// The current month, as a quittance's période (11/2026).
+const currentPeriode = () => { const now = new Date(); return `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`; };
 const day = (value) => (value ? String(value).slice(0, 10) : '');
 const clean = (value) => String(value ?? '').trim();
 const plateKey = (value) => clean(value).replace(/\s/g, '').toUpperCase();
@@ -29,9 +32,13 @@ const clientLabel = (client) => [client.lastName, client.firstName].filter(Boole
 
 const blankClient = () => ({ ...EMPTY_CLIENT, clientCode: '', createdAt: today() });
 const blankForm = (contract) => ({
-  mode: 'nouveau', code: '', client: blankClient(), loaded: '', forcer: false, withClaim: false,
+  mode: 'nouveau', code: '', client: blankClient(), loaded: '', forcer: false, withPiece: false,
   vehicle: { ...Object.fromEntries(POLICE_FIELDS.map(([key]) => [key, ''])), effet: day(contract.effet) },
-  quittance: { ...Object.fromEntries(QUITTANCE_FIELDS.map(([key]) => [key, ''])), date_saisie: today(), carte_verte: false, cv_du: '', cv_au: '', observation: '' },
+  // date émission: today; période: the current month (both may be changed)
+  quittance: {
+    ...Object.fromEntries(QUITTANCE_FIELDS.map(([key]) => [key, ''])), date_saisie: today(), date_emission: today(), periode: currentPeriode(),
+    carte_verte: false, cv_du: '', cv_au: '', cv_periode: '', cv_solde: '', cv_observations: '', observation: '',
+  },
 });
 
 function vehicleErrors(values, contract) {
@@ -85,14 +92,14 @@ export async function storeDraft(accessToken, numInt, draft) {
       const text = clean(value);
       return [key, text === '' ? null : NUMBER_FIELDS.has(key) ? Number(text) : key === 'num_imat' ? text.toUpperCase() : text];
     }));
-    const { carte_verte: carteVerte, cv_du: du, cv_au: au, ...fields } = form.quittance;
+    const { carte_verte: carteVerte, cv_du: du, cv_au: au, cv_periode: periode, cv_solde: solde, cv_observations: observations, ...fields } = form.quittance;
     const quittance = Object.fromEntries(Object.entries(fields).map(([key, value]) => {
       const text = clean(value);
       return [key, QUITTANCE_AMOUNTS.has(key) && text !== '' ? Number(text) : text === '' && key !== 'observation' ? null : text];
     }));
     const { resultats } = await importVehicles(accessToken, numInt, [{
       ...vehicle, code_client: code, forcer: form.forcer, prime_net: quittance.prime_net, commission: quittance.commission, prime_total: quittance.prime_total,
-      quittance, carte_verte: carteVerte ? { du, au } : null,
+      quittance, carte_verte: carteVerte ? { du, au, periode_consommee: periode || null, solde_echeance: solde || null, observations: observations || null } : null,
     }]);
     if (!resultats[0]?.ok) throw new Error(resultats[0]?.message || 'Refusée par le serveur.');
     return code;
@@ -111,6 +118,7 @@ export default function PoliceFictiveWizard({ contract, draft, otherPlates = [],
   const [tried, setTried] = useState({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [cvOpen, setCvOpen] = useState(false); // the "Carte verte" popup
   const { mode, client, vehicle, quittance } = form;
   const usesForm = mode !== 'souscripteur';
   const editable = mode === 'nouveau' || (mode === 'existant' && Boolean(form.loaded));
@@ -119,7 +127,10 @@ export default function PoliceFictiveWizard({ contract, draft, otherPlates = [],
   const setClientField = (name, value) => setForm((current) => ({ ...current, client: { ...current.client, [name]: value } }));
   const setClientType = (value) => setForm((current) => ({ ...current, client: { ...current.client, clientType: value, firstName: value === 'Societe' ? '' : current.client.firstName } }));
   const setVehicle = (name, value) => setForm((current) => ({ ...current, forcer: name === 'num_imat' ? false : current.forcer, vehicle: { ...current.vehicle, [name]: value } }));
-  const setQuittance = (name, value) => setForm((current) => ({ ...current, quittance: { ...current.quittance, [name]: value } }));
+  // The prime totale is also the montant and the solde of the quittance (nothing paid yet); they can still be changed.
+  const setQuittance = (name, value) => setForm((current) => ({
+    ...current, quittance: { ...current.quittance, [name]: value, ...(name === 'prime_total' ? { montant_quittance: value, solde_quittance: value } : {}) },
+  }));
 
   const errorsOf = (number) => {
     if (number <= 2) return usesForm && editable ? clientStepErrors(client, number) : {};
@@ -239,20 +250,22 @@ export default function PoliceFictiveWizard({ contract, draft, otherPlates = [],
               <input type={type} step={type === 'number' ? 'any' : undefined} min={type === 'number' ? 0 : undefined} value={quittance[key]} onChange={(event) => setQuittance(key, event.target.value)} />
               {message(key)}
             </label>)}
-            <label className="flt-check is-wide"><input type="checkbox" checked={quittance.carte_verte} onChange={(event) => setQuittance('carte_verte', event.target.checked)} /> Carte verte</label>
-            {quittance.carte_verte && <>
-              <label><span>Carte verte : du *</span><input type="date" value={quittance.cv_du} onChange={(event) => setQuittance('cv_du', event.target.value)} />{message('cv_du')}</label>
-              <label><span>Carte verte : au *</span><input type="date" value={quittance.cv_au} onChange={(event) => setQuittance('cv_au', event.target.value)} />{message('cv_au')}</label>
-            </>}
+            {/* ticked: the popup asks the dates, the période consommée, the solde and the observations */}
+            <label className="flt-check is-wide"><input type="checkbox" checked={quittance.carte_verte}
+              onChange={(event) => { if (event.target.checked) setCvOpen(true); else setForm((current) => ({ ...current, quittance: { ...current.quittance, carte_verte: false, cv_du: '', cv_au: '', cv_periode: '', cv_solde: '', cv_observations: '' } })); }} /> Carte verte{message('cv_du') || message('cv_au')}</label>
+            {quittance.carte_verte && <CarteVerteSummary values={quittance} onEdit={() => setCvOpen(true)} />}
             <label className="is-wide"><span>Observation</span><input value={quittance.observation} onChange={(event) => setQuittance('observation', event.target.value)} />{message('observation')}</label>
           </div>
         </>}
         {step === 5 && <>
-          <label className="flt-check"><input type="checkbox" checked={form.withClaim} onChange={(event) => patch({ withClaim: event.target.checked })} /> Ce véhicule a un sinistre à déclarer</label>
-          <p className="flt-hint">Un sinistre a besoin de la police enregistrée : son formulaire s’ouvrira après l’enregistrement de la police flotte, avec le véhicule et son client déjà remplis.</p>
+          <label className="flt-check"><input type="checkbox" checked={form.withPiece} onChange={(event) => patch({ withPiece: event.target.checked })} /> Saisir la pièce de règlement de cette quittance</label>
+          <p className="flt-hint">La quittance doit d’abord être enregistrée : « Saisir les pièces de règlement » s’ouvrira après l’enregistrement de la police flotte, sur le client du véhicule, avec sa quittance à régler.</p>
         </>}
         {error && <p className="client-records-message is-error flt-error" role="alert">{error}</p>}
       </div>
+      {cvOpen && <CarteVerteDialog value={quittance} echeance={contract.expiration}
+        onCancel={() => setCvOpen(false)}
+        onSave={(carte) => { setForm((current) => ({ ...current, quittance: { ...current.quittance, ...carte, carte_verte: true } })); setCvOpen(false); }} />}
       <footer><span>Étape {step} sur 5</span><div className="client-footer-actions">
         {step === 1 ? <button className="client-secondary-button" type="button" onClick={onClose}>Annuler</button> : <button className="client-secondary-button" type="button" onClick={back}>← Précédent</button>}
         <button className="client-primary-button" type="button" disabled={busy} onClick={next}>{step === 5 ? (draft ? 'Enregistrer' : 'Ajouter à la flotte') : 'Suivant →'}</button>

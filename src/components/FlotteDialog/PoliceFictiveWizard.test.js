@@ -33,12 +33,14 @@ function fillCoordinates() {
   next();
 }
 function fillQuittance() {
-  type('Date émission *', '2026-11-08');
-  type('Période *', '11/2026');
+  // date émission (today) and période (this month) are already filled; montant and solde follow the prime totale
+  const now = new Date();
+  expect(screen.getByLabelText('Date émission *')).toHaveValue(now.toISOString().slice(0, 10));
+  expect(screen.getByLabelText('Période *')).toHaveValue(`${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`);
   type('Prime nette *', '100');
   type('Prime totale *', '120');
-  type('Montant quittance *', '120');
-  type('Solde quittance *', '120');
+  expect(screen.getByLabelText('Montant quittance *')).toHaveValue(120);
+  expect(screen.getByLabelText('Solde quittance *')).toHaveValue(120);
   next();
 }
 
@@ -63,13 +65,14 @@ test('goes through the five steps and gives a draft with a new client', async ()
   await screen.findByLabelText('Date émission *');
   expect(checkPlate).toHaveBeenCalledWith('token', '123 TUN 456', contract.num_police);
   fillQuittance();
-  fireEvent.click(await screen.findByLabelText('Ce véhicule a un sinistre à déclarer'));
+  expect(screen.getByText('Saisir pièce de règlement')).toBeTruthy();
+  fireEvent.click(await screen.findByLabelText('Saisir la pièce de règlement de cette quittance'));
   next();
 
   expect(onSubmit).toHaveBeenCalledTimes(1);
   const draft = onSubmit.mock.calls[0][0];
   expect(draft).toMatchObject({ num_imat: '123 TUN 456', code_client: '', nom_client: 'BEN ALI SAMI', prime_total: 120 });
-  expect(draft.form.withClaim).toBe(true);
+  expect(draft.form.withPiece).toBe(true);
 });
 
 test('the souscripteur skips the client steps', async () => {
@@ -92,7 +95,7 @@ test('a plate already in another fleet is refused', async () => {
 });
 
 const form = {
-  mode: 'nouveau', code: '', loaded: '', forcer: false, withClaim: false, client: { lastName: 'BEN ALI', clientCode: '' },
+  mode: 'nouveau', code: '', loaded: '', forcer: false, withPiece: false, client: { lastName: 'BEN ALI', clientCode: '' },
   vehicle: { num_imat: '123 tun 456', marque: '', puissance: '7', effet: '2026-11-08' },
   quittance: { date_saisie: '2026-11-08', date_emission: '2026-11-08', periode: '11/2026', prime_net: '100', commission: '', prime_total: '120', montant_quittance: '120', solde_quittance: '120', num_attestation: '', carte_verte: false, cv_du: '', cv_au: '', observation: '' },
 };
