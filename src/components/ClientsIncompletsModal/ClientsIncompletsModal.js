@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { useClient } from '../../contexts/ClientContext';
-import { navigate } from '../../navigation';
+import { navigate, rememberReturnModule } from '../../navigation';
 import { getClientByCode } from '../../services/clientApi';
 import { listIncompleteClientsPage } from '../../services/notificationApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
@@ -21,21 +21,22 @@ export const MANQUES = [['adresse', 'Sans adresse'], ['ville', 'Sans ville'], ['
 const filterValue = (categorie, manque) => (manque ? `coordonnees:${manque}` : categorie);
 
 // Module "Clients à compléter" (administrator only): every client with missing information, what is missing, by kind.
-export default function ClientsIncompletsModal({ moduleId, onClose }) {
+// initial: the filters to open with (coming back from a client's fiche, as they were left).
+export default function ClientsIncompletsModal({ moduleId, onClose, initial = {} }) {
   const { accessToken } = useAuth();
   const { setClient } = useClient();
-  const [categorie, setCategorie] = useState('');
-  const [manque, setManque] = useState('');
+  const [categorie, setCategorie] = useState(initial.categorie || '');
+  const [manque, setManque] = useState(initial.manque || '');
   const choose = (value) => { const [kind, missing = ''] = value.split(':'); setCategorie(kind); setManque(missing); };
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initial.search || '');
   // "Entre deux dates": the clients created (date de création) between the two dates; the counters follow.
-  const [between, setBetween] = useState(false);
-  const [debut, setDebut] = useState('2000-01-01');
-  const [fin, setFin] = useState(() => new Date().toISOString().slice(0, 10));
+  const [between, setBetween] = useState(Boolean(initial.between));
+  const [debut, setDebut] = useState(initial.debut || '2000-01-01');
+  const [fin, setFin] = useState(() => initial.fin || new Date().toISOString().slice(0, 10));
   const reversed = between && Boolean(debut && fin && debut > fin);
   const period = between && debut && fin && !reversed ? { date_debut: debut, date_fin: fin } : {};
   const periodKey = `${period.date_debut || ''}|${period.date_fin || ''}`;
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState((initial.search || '').trim());
   const [state, setState] = useState({ loading: true, error: '', data: null, items: [] });
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -77,6 +78,8 @@ export default function ClientsIncompletsModal({ moduleId, onClose }) {
     try {
       const record = await getClientByCode(accessToken, code);
       setClient({ ...record, _persisted: true });
+      // "Retour" (or Fermer) on the fiche comes back here, with the same filters.
+      rememberReturnModule(moduleId, { categorie, manque, search, between, debut, fin });
       onClose();
       navigate('/clients');
     } catch (openError) {

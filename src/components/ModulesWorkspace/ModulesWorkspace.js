@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { hasPermission, ROLES } from '../../auth/permissions';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
-import { navigate } from '../../navigation';
+import { navigate, takeReturnModule } from '../../navigation';
 import ModuleModal from '../ModuleModal/ModuleModal';
 import ExpertManagementModal from '../ExpertManagementModal/ExpertManagementModal';
 import CompanyManagementModal from '../CompanyManagementModal/CompanyManagementModal';
@@ -82,6 +82,7 @@ export default function ModulesWorkspace() {
   const [bankModule, setBankModule] = useState(null);
   const [depensesTechModule, setDepensesTechModule] = useState(null);
   const [incompleteModule, setIncompleteModule] = useState(null);
+  const [incompleteInitial, setIncompleteInitial] = useState(undefined); // its filters, coming back from a fiche
   const [journalJourModule, setJournalJourModule] = useState(null);
   const [reconciliationModule, setReconciliationModule] = useState(null);
   const [quittancesModule, setQuittancesModule] = useState(null);
@@ -112,6 +113,16 @@ export default function ModulesWorkspace() {
   });
   const selectedCategory = MODULE_CATEGORIES.find((category) => category.id === selectedModule?.category);
   const currentCategory = MODULE_CATEGORIES.find((category) => category.id === activeCategory);
+
+  // Back from a page a module window was left for (a client's fiche): that window opens again as it was.
+  useEffect(() => {
+    const back = takeReturnModule();
+    const module = back && INSURANCE_MODULES.find((item) => item.id === back.moduleId);
+    if (!module) return;
+    if (module.form === 'clients-incomplets') setIncompleteInitial(back.state || {});
+    openModule(module);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the modules are shown again
+  }, []);
 
   function openModule(module) {
     if (module.id === '100' && module.form === 'client') {
@@ -373,7 +384,7 @@ export default function ModulesWorkspace() {
       {termeModule && <EtatTermeModal moduleId={termeModule.id} onClose={() => setTermeModule(null)} />}
       {bankModule && <EtatComptesBanqueModal moduleId={bankModule.id} onClose={() => setBankModule(null)} />}
       {journalJourModule && <JournalJourModal moduleId={journalJourModule.id} onClose={() => { setJournalJourModule(null); setActiveModuleId(null); }} />}
-      {incompleteModule && user.isAdmin && <ClientsIncompletsModal moduleId={incompleteModule.id} onClose={() => { setIncompleteModule(null); setActiveModuleId(null); }} />}
+      {incompleteModule && user.isAdmin && <ClientsIncompletsModal moduleId={incompleteModule.id} initial={incompleteInitial} onClose={() => { setIncompleteModule(null); setIncompleteInitial(undefined); setActiveModuleId(null); }} />}
       {depensesTechModule && <EtatDepensesTechniquesModal moduleId={depensesTechModule.id} onClose={() => { setDepensesTechModule(null); setActiveModuleId(null); }} />}
       {reconciliationModule && <ReconciliationPoliceModal moduleId={reconciliationModule.id} onClose={() => setReconciliationModule(null)} />}
       {operationsModule && <OperationsJournalieresModal key={operationsModule.id} moduleId={operationsModule.id} familyKey={operationsModule.form === 'operations-financieres' ? 'financier' : 'production'} onClose={() => setOperationsModule(null)} />}

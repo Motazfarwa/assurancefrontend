@@ -2,10 +2,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ClientsIncompletsModal from './ClientsIncompletsModal';
 import { listIncompleteClientsPage } from '../../services/notificationApi';
 import { INSURANCE_MODULES } from '../../data/insuranceModules';
+import { navigate, rememberReturnModule } from '../../navigation';
 
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Admin', isAdmin: true } }) }));
 jest.mock('../../contexts/ClientContext', () => ({ useClient: () => ({ setClient: () => {} }) }));
-jest.mock('../../navigation', () => ({ navigate: () => {} }));
+jest.mock('../../navigation', () => ({ navigate: jest.fn(), rememberReturnModule: jest.fn() }));
 jest.mock('../../services/clientApi', () => ({ getClientByCode: () => Promise.resolve({}) }));
 jest.mock('../../services/notificationApi', () => ({ listIncompleteClientsPage: jest.fn() }));
 
@@ -70,4 +71,21 @@ test('"Chargement des clients…" is shown over the list while the clients are r
   expect(await screen.findByText('Chargement des clients…')).toBeInTheDocument();
   finish({ total: 0, found: 0, coordonnees: 0, sans_police: 0, manques: {}, items: [] });
   await waitFor(() => expect(screen.queryByText('Chargement des clients…')).not.toBeInTheDocument());
+});
+
+test('"Ouvrir la fiche" remembers the module and its filters, so "Retour" on the fiche comes back to it', async () => {
+  render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} />);
+  fireEvent.change(await screen.findByLabelText('Afficher'), { target: { value: 'sans_police' } });
+  await waitFor(() => expect(screen.queryByText('Chargement des clients…')).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.getAllByRole('button', { name: 'Ouvrir la fiche' })).toHaveLength(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Ouvrir la fiche' }));
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith('/clients'));
+  expect(rememberReturnModule).toHaveBeenCalledWith('105', expect.objectContaining({ categorie: 'sans_police', manque: '', search: '', between: false }));
+});
+
+test('opened again after the fiche: the filters are those that were left', async () => {
+  render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} initial={{ categorie: 'sans_police', search: 'ben', between: true, debut: '2000-01-01', fin: '2022-12-31' }} />);
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: 'ben', offset: 0, limit: 100, date_debut: '2000-01-01', date_fin: '2022-12-31' }));
+  expect(screen.getByLabelText('Afficher')).toHaveValue('sans_police');
+  expect(screen.getByLabelText('Créés entre deux dates')).toBeChecked();
 });
