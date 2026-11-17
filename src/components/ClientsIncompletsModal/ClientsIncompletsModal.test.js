@@ -89,3 +89,19 @@ test('opened again after the fiche: the filters are those that were left', async
   expect(screen.getByLabelText('Afficher')).toHaveValue('sans_police');
   expect(screen.getByLabelText('Créés entre deux dates')).toBeChecked();
 });
+
+test('the list is paginated: a page reads its 100 clients, a filter goes back to page 1', async () => {
+  listIncompleteClientsPage.mockImplementation((token, params) => Promise.resolve({ ...counters, found: 1845,
+    items: [client(String(5000 + params.offset), `CLIENT ${params.offset}`, { coordonnees: ['ville'] })] }));
+  render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} />);
+  expect(await screen.findByText('CLIENT 0')).toBeInTheDocument();
+  expect(screen.getByText('Page 1 / 19')).toBeInTheDocument();
+  expect(screen.queryByText(/clients de plus/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Suivant ›' }));
+  expect(await screen.findByText('CLIENT 100')).toBeInTheDocument();
+  expect(screen.getByText('Page 2 / 19')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '19' }));
+  expect(await screen.findByText('CLIENT 1800')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Sans police 893/ }));
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
+});
