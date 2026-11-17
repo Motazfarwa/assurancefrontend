@@ -56,14 +56,67 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
   </div>;
 }
 
-// Module "Saisie frais généraux": the agency's expenses (salaires, loyers, téléphone…), entered by
-// nature and type; the frais of a period open as an aperçu in a tab of their own.
+// Module "Afficher les frais généraux": the frais of a nature over a period, as an aperçu in a tab of its own (they are
+// entered in "Saisie frais généraux").
+export function AfficherFraisModal({ moduleId, onClose }) {
+  const { accessToken } = useAuth();
+  const [options, setOptions] = useState(null);
+  const [nature, setNature] = useState('D');
+  const [period, setPeriod] = useState({ debut: monthStart(), fin: today() });
+  const [report, setReport] = useState(null); // { popup, nature, debut, fin } of the open aperçu
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    getFraisOptions(accessToken).then((body) => { if (active) setOptions(body); }).catch((loadError) => { if (active) setError(loadError.message); });
+    return () => { active = false; };
+  }, [accessToken]);
+
+  const natureLabel = (code) => options?.natures.find((item) => item.code === code)?.libelle || 'Frais généraux';
+  const reversed = Boolean(period.debut && period.fin && period.fin < period.debut);
+
+  // The aperçu opens in a browser tab of its own; a new aperçu replaces the previous tab (NewWindow closes it).
+  function preview() {
+    setError('');
+    try { setReport({ popup: openReportWindow(natureLabel(nature)), nature, ...period }); }
+    catch (openError) { setError(openError.message); }
+  }
+
+  return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="catalog-modal frg-modal" role="dialog" aria-modal="true" aria-labelledby="frg-list-title">
+      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>COMPTABILITÉ · MODULE {moduleId}</span><h2 id="frg-list-title">Afficher les frais généraux</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
+      <div className="catalog-body">
+        <div className="catalog-section frg-preview">
+          <label className="catalog-field"><span>Nature frais</span>
+            <select value={nature} onChange={(event) => setNature(event.target.value)} disabled={!options} autoFocus>{options?.natures.map((item) => <option key={item.code} value={item.code}>{item.libelle}</option>)}</select>
+          </label>
+          <label className="catalog-field"><span>Du</span><input type="date" value={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, debut: event.target.value }))} /></label>
+          <label className="catalog-field"><span>Au</span><input type="date" value={period.fin} min={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, fin: event.target.value }))} /></label>
+          <button type="button" className="expert-submit" onClick={preview} disabled={!options || !period.debut || !period.fin || reversed}>Aperçu</button>
+        </div>
+        {reversed && <div className="expert-error catalog-message rst-message" role="alert">La date de fin précède la date de début.</div>}
+        {error && <div className="expert-error catalog-message rst-message" role="alert">{error}</div>}
+        <p className="jrn-hint">Les frais saisis de la nature choisie sur la période (date du frais), avec le type, le mode, la pièce, le compte et le total.</p>
+      </div>
+    </section>
+    {report && <NewWindow popup={report.popup} title={`${natureLabel(report.nature)} du ${formatDate(report.debut)} au ${formatDate(report.fin)}`} onClose={() => setReport(null)}>
+      <FraisSheet nature={report.nature} natureLabel={natureLabel(report.nature)} debut={report.debut} fin={report.fin} options={options} onClose={() => setReport(null)} />
+    </NewWindow>}
+  </div>;
+}
+
+// Module "Saisie frais généraux": the agency's expenses (salaires, loyers, téléphone…), entered by nature and type
+// (they are listed in the module "Afficher les frais généraux").
 export default function FraisGenerauxModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [options, setOptions] = useState(null);
   const [form, setForm] = useState(entry);
-  const [period, setPeriod] = useState({ debut: monthStart(), fin: today() });
-  const [report, setReport] = useState(null); // { popup, nature, debut, fin } of the open aperçu
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -84,9 +137,7 @@ export default function FraisGenerauxModal({ moduleId, onClose }) {
   }, [accessToken]);
 
   const nature = options?.natures.find((item) => item.code === form.nature);
-  const natureLabel = (code) => options?.natures.find((item) => item.code === code)?.libelle || 'Frais généraux';
   const typeLabel = (code) => nature?.types.find((type) => type.code_type === code)?.libelle || code;
-  const reversed = Boolean(period.debut && period.fin && period.fin < period.debut);
 
   function change(event) {
     const { name, value } = event.target;
@@ -104,13 +155,6 @@ export default function FraisGenerauxModal({ moduleId, onClose }) {
       typeRef.current?.focus();
     } catch (saveError) { setError(saveError.message); }
     finally { setBusy(false); }
-  }
-
-  // The aperçu opens in a browser tab of its own; a new aperçu replaces the previous tab (NewWindow closes it).
-  function preview() {
-    setError('');
-    try { setReport({ popup: openReportWindow(natureLabel(form.nature)), nature: form.nature, ...period }); }
-    catch (openError) { setError(openError.message); }
   }
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
@@ -147,18 +191,8 @@ export default function FraisGenerauxModal({ moduleId, onClose }) {
 
         {error && <div className="expert-error catalog-message rst-message" role="alert">{error}</div>}
         {notice && <div className="catalog-notice" role="status">{notice}</div>}
-
-        <div className="catalog-section frg-preview">
-          <strong>{natureLabel(form.nature)} saisis</strong>
-          <label className="catalog-field"><span>Du</span><input type="date" value={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, debut: event.target.value }))} /></label>
-          <label className="catalog-field"><span>Au</span><input type="date" value={period.fin} min={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, fin: event.target.value }))} /></label>
-          <button type="button" className="expert-submit" onClick={preview} disabled={!options || !period.debut || !period.fin || reversed}>Aperçu</button>
-        </div>
         <div className="rst-spacer" />
       </div>
     </section>
-    {report && <NewWindow popup={report.popup} title={`${natureLabel(report.nature)} du ${formatDate(report.debut)} au ${formatDate(report.fin)}`} onClose={() => setReport(null)}>
-      <FraisSheet nature={report.nature} natureLabel={natureLabel(report.nature)} debut={report.debut} fin={report.fin} options={options} onClose={() => setReport(null)} />
-    </NewWindow>}
   </div>;
 }

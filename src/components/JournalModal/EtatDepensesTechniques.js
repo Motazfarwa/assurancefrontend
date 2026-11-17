@@ -25,6 +25,8 @@ export function feuilleOf(row) {
 }
 
 function DepensesSheet({ params, companyName, onClose }) {
+  const pending = Boolean(params.non_comptabilisees);
+  const several = String(params.compagnies || '').includes(',');
   const { accessToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: '', data: null });
 
@@ -43,20 +45,21 @@ function DepensesSheet({ params, companyName, onClose }) {
       <article className="jrn-sheet">
         <header className="jrn-sheet-head">
           <div className="jrn-agency">{AGENCY_PYRAMID.map((line) => <span key={line}>{line}</span>)}</div>
-          <div className="jrn-sheet-title"><h1>ETAT DES DÉPENSES TECHNIQUES</h1><p>Compagnie : {companyName}</p><p>Mois de : {monthLabel(params.mois)}</p></div>
+          <div className="jrn-sheet-title"><h1>{pending ? 'DÉPENSES TECHNIQUES NON COMPTABILISÉES' : 'ETAT DES DÉPENSES TECHNIQUES'}</h1><p>{several ? 'Compagnies' : 'Compagnie'} : {companyName}</p><p>{pending ? 'Toutes dates (en instance)' : `Mois de : ${monthLabel(params.mois)}`}</p></div>
           <div className="jrn-agency jrn-printed"><span>Date : {formatDate(todayIso())}</span></div>
         </header>
         {state.loading ? <p className="jrn-sheet-state">Chargement…</p> : state.error ? <p className="jrn-sheet-state" role="alert">{state.error}</p> : <table className="jrn-sheet-table jrn-depenses-table">
-          <thead><tr><th>Date dép.</th><th>N° Police</th><th>Assuré(e)</th><th>Libellé</th><th>Montant</th><th>N° Chèque</th><th>Banque</th><th>Sinistre</th><th>Feuille de caisse</th></tr></thead>
+          <thead><tr>{several && <th>Compagnie</th>}<th>Date dép.</th><th>N° Police</th><th>Assuré(e)</th><th>Libellé</th><th>Montant</th><th>N° Chèque</th><th>Banque</th><th>Sinistre</th><th>Feuille de caisse</th></tr></thead>
           <tbody>
             {data.items.map((row) => <tr key={row.num_dep}>
-              <td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td><td>{row.assure || row.code_client}</td><td>{row.libelle}</td>
+              {several && <td>{row.nom_compagnie}</td>}<td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td>
+              <td title={row.sans_client ? 'Dépense enregistrée sans code client : nom lu dans son libellé' : undefined}>{row.assure || row.code_client}{row.sans_client && <small className="jrn-pending"> (sans code client)</small>}</td><td>{row.libelle}</td>
               <td className="num">{fmt(row.montant)}</td><td>{row.num_cheq}</td><td>{row.banque}</td><td>{row.sinistre}</td>
               <td className={row.comptabilise ? '' : 'jrn-pending'}>{feuilleOf(row)}</td>
             </tr>)}
-            {!data.items.length && <tr><td colSpan={9} className="jrn-sheet-state">Aucune dépense technique ce mois pour cette compagnie.</td></tr>}
+            {!data.items.length && <tr><td colSpan={several ? 10 : 9} className="jrn-sheet-state">{pending ? 'Aucune dépense technique en instance pour ces compagnies.' : 'Aucune dépense technique ce mois pour cette compagnie.'}</td></tr>}
           </tbody>
-          <tfoot><tr><td colSpan={4}>Total ({data.items.length} dépense{data.items.length > 1 ? 's' : ''})</td><td className="num">{fmt(data.total)}</td><td colSpan={4} /></tr></tfoot>
+          <tfoot><tr><td colSpan={several ? 5 : 4}>Total ({data.items.length} dépense{data.items.length > 1 ? 's' : ''})</td><td className="num">{fmt(data.total)}</td><td colSpan={4} /></tr></tfoot>
         </table>}
       </article>
     </div>
@@ -68,6 +71,10 @@ export default function EtatDepensesTechniquesModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [mois, setMois] = useState(lastMonth);
   const [compagnie, setCompagnie] = useState('');
+  // "Toutes les dépenses non encore comptabilisées": every date, for the companies ticked
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const [ticked, setTicked] = useState([]);
+  const tick = (code, on) => setTicked((current) => (on ? [...current, code] : current.filter((item) => item !== code)));
   const [companies, setCompanies] = useState([]);
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
@@ -88,9 +95,11 @@ export default function EtatDepensesTechniquesModal({ moduleId, onClose }) {
 
   function preview() {
     setError('');
-    const companyName = companies.find((item) => String(item.code_compagnie) === String(compagnie))?.nom_compagnie || compagnie;
+    const codes = pendingOnly ? ticked : [String(compagnie)];
+    const companyName = codes.map((code) => companies.find((item) => String(item.code_compagnie) === String(code))?.nom_compagnie || code).join(', ');
+    const params = pendingOnly ? { compagnies: codes.join(','), non_comptabilisees: true } : { compagnie, mois };
     try {
-      setReport({ popup: openReportWindow('Etat des dépenses techniques'), params: { compagnie, mois }, companyName });
+      setReport({ popup: openReportWindow('Etat des dépenses techniques'), params, companyName });
     } catch (openError) { setError(openError.message); }
   }
 
@@ -99,17 +108,24 @@ export default function EtatDepensesTechniquesModal({ moduleId, onClose }) {
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>COMPTABILITE · MODULE {moduleId}</span><h2 id="depenses-tech-title">Etat des dépenses techniques</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
         <div className="unpaid-filter-form acompte-filters">
-          <label className="acompte-field jrn-date"><span>Mois / Année</span><input type="month" value={mois} onChange={(event) => setMois(event.target.value)} /></label>
-          <label className="acompte-field jrn-company"><span>Compagnie</span>
-            <select value={compagnie} onChange={(event) => setCompagnie(event.target.value)}>
-              <option value="">Choisir…</option>
-              {companies.map((company) => <option key={company.code_compagnie} value={company.code_compagnie}>{company.nom_compagnie}</option>)}
-            </select>
-          </label>
-          <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={!mois || !compagnie}>Aperçu</button>
+          <label className="jrn-check jrn-pending-only"><input type="checkbox" checked={pendingOnly} onChange={(event) => setPendingOnly(event.target.checked)} /> Toutes les dépenses non encore comptabilisées</label>
+          {!pendingOnly && <>
+            <label className="acompte-field jrn-date"><span>Mois / Année</span><input type="month" value={mois} onChange={(event) => setMois(event.target.value)} /></label>
+            <label className="acompte-field jrn-company"><span>Compagnie</span>
+              <select value={compagnie} onChange={(event) => setCompagnie(event.target.value)}>
+                <option value="">Choisir…</option>
+                {companies.map((company) => <option key={company.code_compagnie} value={company.code_compagnie}>{company.nom_compagnie}</option>)}
+              </select>
+            </label>
+          </>}
+          {pendingOnly && <fieldset className="unpaid-filter-set unpaid-choice jrn-company-ticks"><legend>Compagnies</legend>
+            <label><input type="checkbox" checked={companies.length > 0 && ticked.length === companies.length} onChange={(event) => setTicked(event.target.checked ? companies.map((company) => String(company.code_compagnie)) : [])} /> Toutes</label>
+            {companies.map((company) => <label key={company.code_compagnie}><input type="checkbox" checked={ticked.includes(String(company.code_compagnie))} onChange={(event) => tick(String(company.code_compagnie), event.target.checked)} /> {company.nom_compagnie}</label>)}
+          </fieldset>}
+          <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={pendingOnly ? !ticked.length : !mois || !compagnie}>Aperçu</button>
         </div>
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
-        <p className="jrn-hint">Sinistres, ristournes et règlements d’expert payés dans le mois pour les polices de la compagnie. La dernière colonne indique la feuille de caisse où la dépense a été comptabilisée (Journal de dépense), ou « En instance ».</p>
+        <p className="jrn-hint">Sinistres, ristournes et règlements d’expert payés dans le mois pour les polices de la compagnie. La dernière colonne indique la feuille de caisse où la dépense a été comptabilisée (Journal de dépense), ou « En instance ». « Toutes les dépenses non encore comptabilisées » : toutes dates, pour les compagnies cochées.</p>
       </div>
     </section>
     {report && <NewWindow popup={report.popup} title="Etat des dépenses techniques" onClose={() => setReport(null)}>

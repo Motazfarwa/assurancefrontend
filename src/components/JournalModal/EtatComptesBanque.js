@@ -81,6 +81,31 @@ function NatureTable({ natures }) {
   </>;
 }
 
+// Mode of an écriture, as the legacy report prints it (TRegCli.type_reg_cli / TDepense.mod_dep).
+const MODES = { C: 'Chèque', V: 'Virement', T: 'Traite', E: 'Espèces', B: 'Carte bancaire', P: 'Prélèvement' };
+export const modeLabel = (code) => MODES[String(code || '').trim().toUpperCase()] || String(code || '').trim();
+
+// "Détail des écritures", as the legacy ImpCompteDetail_Tech: one line per écriture in date order (date, libellé — the
+// client of a règlement, the libellé of a dépense —, débit, crédit, mode, N° pièce), then the CUMUL of the period.
+function EcrituresSheet({ data, onClose }) {
+  const { banque, items } = data;
+  return <SheetFrame title={`DÉTAIL DES ÉCRITURES DU COMPTE ${banque.code_banque}`} subtitle={[`${banque.nom_banque || ''}${banque.num_compte ? ` · N° ${banque.num_compte}` : ''}`, `Du ${formatDate(data.debut)} au ${formatDate(data.fin)}`]} onClose={onClose}>
+    <table className="jrn-sheet-table jrn-bank-table jrn-bank-ecritures">
+      <thead><tr><th>Date</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Mode</th><th>N° pièce</th></tr></thead>
+      <tbody>
+        {items.map((item) => <tr key={item.id}>
+          <td>{formatDate(item.date_mvt)}</td>
+          <td>{item.id?.startsWith('R') ? item.nom_client || item.libelle : item.libelle || item.nom_client}</td>
+          <td className="num">{item.sens === 'D' ? money(item.montant) : ''}</td><td className="num">{item.sens === 'C' ? money(item.montant) : ''}</td>
+          <td>{modeLabel(item.mode)}</td><td>{item.reference}</td>
+        </tr>)}
+        {!items.length && <tr><td colSpan={6} className="jrn-sheet-state">Aucune écriture sur la période.</td></tr>}
+      </tbody>
+      <tfoot><tr><td colSpan={2}>CUMUL ({plural(items.length, 'écriture')})</td><td className="num">{money(data.total_debit)}</td><td className="num">{money(data.total_credit)}</td><td colSpan={2}>Solde final : {money(data.solde_final)}</td></tr></tfoot>
+    </table>
+  </SheetFrame>;
+}
+
 // Etat global: one line per day (crédit, débit, solde at the end of the day); détaillé: the movements day by day, each
 // day with its own totals. Both open on the four figures of the period and close on the totals per nature.
 function AccountSheet({ data, mode, onClose }) {
@@ -308,6 +333,7 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
           <fieldset className="jrn-bank-mode"><legend>Etat</legend>
             <label className="jrn-check"><input type="radio" name="bank-mode" checked={filters.mode === 'global'} onChange={() => change({ mode: 'global' })} />Etat global</label>
             <label className="jrn-check"><input type="radio" name="bank-mode" checked={filters.mode === 'detail'} onChange={() => change({ mode: 'detail' })} />Etat détaillé</label>
+            <label className="jrn-check"><input type="radio" name="bank-mode" checked={filters.mode === 'ecritures'} onChange={() => change({ mode: 'ecritures' })} />Détail des écritures</label>
           </fieldset>
           <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={!valid || busy}>{busy && !statement ? 'Patientez…' : 'Aperçu'}</button>
         </div>
@@ -372,7 +398,7 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
     </section>
     {report && data && <NewWindow popup={report.popup} title={report.kind === 'etat' ? 'Etat détaillé des comptes' : 'Confrontation bancaire'} onClose={() => setReport(null)}>
       {report.kind === 'etat'
-        ? <AccountSheet data={data} mode={filters.mode} onClose={() => setReport(null)} />
+        ? (filters.mode === 'ecritures' ? <EcrituresSheet data={data} onClose={() => setReport(null)} /> : <AccountSheet data={data} mode={filters.mode} onClose={() => setReport(null)} />)
         : result && <ConfrontationSheet data={data} result={result} fichier={statement.fichier} outside={period.outside} tolerance={tolerance} amountTolerance={amountTolerance} onClose={() => setReport(null)} />}
     </NewWindow>}
   </div>;

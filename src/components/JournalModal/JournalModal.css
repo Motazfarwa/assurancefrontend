@@ -303,3 +303,7 @@
 /* An acompte still to declare: listed, but outside the journal (as the legacy JEQ) */
 .jrn-table tr.is-outside td { color: #8a9aa2; font-style: italic; }
 .jrn-outside-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: #fff3e0; color: #a35a00; font-size: 8px; font-style: normal; font-weight: 700; }
+
+/* Etat des dépenses techniques: "non encore comptabilisées" and the companies ticked */
+.jrn-pending-only { flex-basis: 100%; }
+.jrn-company-ticks { flex-wrap: wrap; max-width: 640px; }
