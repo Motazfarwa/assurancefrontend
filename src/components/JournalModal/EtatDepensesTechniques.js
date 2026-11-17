@@ -53,7 +53,7 @@ function DepensesSheet({ params, companyName, onClose }) {
           <tbody>
             {data.items.map((row) => <tr key={row.num_dep}>
               {several && <td>{row.nom_compagnie}</td>}<td>{formatDate(row.date_dep)}</td><td>{row.num_police}</td>
-              <td title={row.sans_client ? 'Dépense enregistrée sans code client : nom lu dans son libellé' : undefined}>{row.assure || row.code_client}{row.sans_client && <small className="jrn-pending"> (sans code client)</small>}</td><td>{row.libelle}</td>
+              <td>{row.assure || row.code_client}</td><td>{row.libelle}</td>
               <td className="num">{fmt(row.montant)}</td><td>{row.num_cheq}</td><td>{row.banque}</td><td>{row.sinistre}</td>
               <td className={row.comptabilise ? '' : 'jrn-pending'}>{feuilleOf(row)}</td>
             </tr>)}
