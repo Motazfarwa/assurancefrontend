@@ -213,7 +213,7 @@ function SinistreNumberPicker({ accessToken, value, ignored, missing, onChange, 
 // Opened from a client file, the list starts on that client's claims, closed ones included, all dates.
 const newList = (clientCode = '') => ({
   q: '', codeClient: clientCode, nomClient: '', nonCloture: !clientCode, byEtape: false, byDate: false, dateMin: LIST_START, dateMax: monthsAgo(OVERDUE_MONTHS),
-  typeSinistre: '', items: null, total: 0, counts: null,
+  typeSinistre: '', etape: '', items: null, total: 0, counts: null,
 });
 // Claims list shown as one table per opposing company: the claims without one first, then the companies by name.
 // Columns of the claims list: [field, label, kind]; a click on a header sorts by it, a second click reverses the order.
@@ -335,15 +335,15 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
   // Claims list: search as you type (the expert's name too), filtered by status, type and date.
   const listKey = list ? JSON.stringify([
-    list.q, list.codeClient.trim(), list.nomClient.trim(), list.nonCloture, list.byDate ? list.dateMin : '', list.byDate ? list.dateMax : '', list.typeSinistre,
+    list.q, list.codeClient.trim(), list.nomClient.trim(), list.nonCloture, list.byDate ? list.dateMin : '', list.byDate ? list.dateMax : '', list.typeSinistre, list.etape,
   ]) : null;
   useEffect(() => {
     if (listKey === null) return undefined;
-    const [q, codeClient, nomClient, nonCloture, dateMin, dateMax, typeSinistre] = JSON.parse(listKey);
+    const [q, codeClient, nomClient, nonCloture, dateMin, dateMax, typeSinistre, etape] = JSON.parse(listKey);
     let active = true;
     const timer = setTimeout(() => {
       listSinistres(accessToken, {
-        q, code_client: codeClient, nom_client: nomClient, non_cloture: nonCloture || '', date_min: dateMin, date_max: dateMax, type_sinistre: typeSinistre, limit: 2000,
+        q, code_client: codeClient, nom_client: nomClient, non_cloture: nonCloture || '', date_min: dateMin, date_max: dateMax, type_sinistre: typeSinistre, code_etape: etape || '', limit: 2000,
       })
         .then((result) => { if (active) setList((value) => value && { ...value, items: result.items, total: result.total, counts: result.counts || null }); })
         .catch((requestError) => { if (active) fail(requestError.message); });
@@ -933,6 +933,15 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
                 <select value={list.typeSinistre} onChange={(event) => { const typeSinistre = event.target.value; setList((value) => ({ ...value, typeSinistre, items: null })); }} aria-label="Filtrer par type de sinistre">
                   <option value="">Tous</option>
                   {lookups.types_sinistre.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </label>
+              {/* the step reached by the file (its highest step in the suivi), by its libellé */}
+              <label className="snr-date-filter">
+                <span>Étape</span>
+                <select className="snr-etape-filter" value={list.etape} onChange={(event) => { const etape = event.target.value; setList((value) => ({ ...value, etape, items: null })); }} aria-label="Filtrer par étape">
+                  <option value="">Toutes</option>
+                  {lookups.etapes.map((option) => <option key={option.id} value={String(option.id)}>{option.id} · {option.label || `Étape ${option.id}`}</option>)}
+                  <option value="aucune">Sans étape</option>
                 </select>
               </label>
               <div className="snr-date-filter">
