@@ -1,11 +1,66 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+// The blank page a report tab opens on (public/apercu.html): of this site, so the tab can then show the report's name in its
+// address (…/etat-financier-des-operations-journalieres-technique) instead of about:blank.
+const BASE = process.env.PUBLIC_URL || '';
+
+export function windowSlug(title) {
+  return String(title || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '').toLowerCase() || 'apercu';
+}
+
+// Opens a browser tab synchronously, so call it from the click itself (pop-up blockers allow only that); null when blocked.
+export function openNamedWindow(title, features) {
+  return window.open(`${BASE}/apercu.html#${windowSlug(title)}`, '_blank', features);
+}
+
+// The tab's title and address: the report's name.
+export function nameWindow(popup, title) {
+  try {
+    popup.document.title = title;
+    popup.history.replaceState(null, '', `${BASE}/${windowSlug(title)}`);
+  } catch { /* the name is only cosmetic */ }
+}
+
+// Runs ready(document) once the blank page is loaded in the tab (what is written earlier is wiped by its loading),
+// then names the tab; returns a function cancelling the wait.
+export function whenWindowReady(popup, title, ready) {
+  let done = false;
+  const check = () => {
+    if (done || popup.closed) return true;
+    let loaded = false;
+    try { loaded = popup.location.href !== 'about:blank' && popup.document.readyState === 'complete'; } catch { loaded = false; }
+    if (!loaded) return false;
+    done = true;
+    ready(popup.document);
+    nameWindow(popup, title);
+    return true;
+  };
+  if (check()) return () => {};
+  const timer = setInterval(() => { if (check()) clearInterval(timer); }, 25);
+  return () => { done = true; clearInterval(timer); };
+}
+
+// A whole HTML page written in a new tab named after the report, then printed when `print`; null when blocked.
+export function writeNamedWindow(title, html, { print = false, features } = {}) {
+  const popup = openNamedWindow(title, features);
+  if (!popup) return null;
+  whenWindowReady(popup, title, (doc) => {
+    doc.open();
+    doc.write(html);
+    doc.close();
+    nameWindow(popup, title); // document.open gives the tab the address of this page: named again
+    popup.focus();
+    if (print) setTimeout(() => popup.print(), 0);
+  });
+  return popup;
+}
+
 // Opens a browser tab synchronously, so call it from the click itself (pop-up blockers allow only that).
 export function openReportWindow(title) {
-  const popup = window.open('', '_blank');
+  const popup = openNamedWindow(title);
   if (!popup) throw new Error('Autorisez les fenêtres pop-up de ce site pour afficher l’aperçu.');
-  popup.document.title = title;
   return popup;
 }
 
@@ -20,24 +75,26 @@ export default function NewWindow({ popup, title, onClose, children }) {
     // Owner token: in development React mounts effects twice, the tab must survive the first cleanup.
     const owner = {};
     popup.reportOwner = owner;
-    const doc = popup.document;
-    doc.title = title;
-    doc.head.querySelectorAll('[data-app-style]').forEach((node) => node.remove());
-    document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-      const copy = node.cloneNode(true);
-      if (node.href) copy.href = node.href; // absolute, the tab has no base URL of its own
-      copy.setAttribute('data-app-style', '');
-      doc.head.appendChild(copy);
+    let closed = null;
+    const cancel = whenWindowReady(popup, title, (doc) => {
+      doc.head.querySelectorAll('[data-app-style]').forEach((node) => node.remove());
+      document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+        const copy = node.cloneNode(true);
+        if (node.href) copy.href = node.href; // absolute, the tab has no base URL of its own
+        copy.setAttribute('data-app-style', '');
+        doc.head.appendChild(copy);
     });
     doc.body.innerHTML = '';
     const root = doc.createElement('div');
     doc.body.appendChild(root);
     setContainer(root);
-
-    const closed = () => closeRef.current();
+    // listened once the page is loaded: the blank page replacing the opening about:blank is not a closing
+    closed = () => closeRef.current();
     popup.addEventListener('pagehide', closed);
+    });
     return () => {
-      popup.removeEventListener('pagehide', closed);
+      cancel();
+      if (closed) popup.removeEventListener('pagehide', closed);
       setTimeout(() => { if (popup.reportOwner === owner && !popup.closed) popup.close(); }, 0);
     };
   }, [popup, title]);

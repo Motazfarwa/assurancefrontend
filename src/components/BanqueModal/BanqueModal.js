@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { createBanque, deleteBanque, extractBanque, listBanques, updateBanque } from '../../services/banqueApi';
 import { listCompanies } from '../../services/companyApi';
 import { showToast } from '../../services/toast';
+import { writeNamedWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
 import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
@@ -128,12 +129,8 @@ export default function BanqueModal({ moduleId = '740', onClose }) {
 
   function print() {
     const rows = listed.map((item) => `<tr><td>${escapeHtml(item.code_banque)}</td><td>${escapeHtml(item.nom_banque)}</td><td>${escapeHtml(item.num_compte_b)}</td><td>${escapeHtml(typeLabel(item.type_dep))}${item.type_dep === 'T' ? ` · ${escapeHtml(companyName(item.code_compagnie))}` : ''}</td><td class="n">${dt(item.credit_ini)}</td><td>${frDate(item.date_ini)}</td><td class="n">${dt(item.debit)}</td><td class="n">${dt(item.credit)}</td><td>${item.archive ? 'Archivé' : ''}</td></tr>`).join('');
-    const page = window.open('', '_blank');
-    if (!page) { setError('Autorisez les fenêtres pop-up pour imprimer la liste.'); return; }
-    page.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Liste des banques</title><style>body{font:12px Arial,sans-serif;color:#1c3342;margin:24px}h1{font-size:17px;margin:0 0 4px}p{margin:0 0 14px;color:#5f7480}table{width:100%;border-collapse:collapse}th,td{border:1px solid #c9d6db;padding:5px 7px;text-align:left}th{background:#eef4f5}.n{text-align:right}</style></head><body><h1>Liste des banques</h1><p>Assurance Jemmali · ${listed.length} compte(s) · imprimé le ${new Date().toLocaleDateString('fr-FR')}</p><table><thead><tr><th>Code</th><th>Libellé</th><th>N° compte</th><th>Type</th><th>Crédit initial</th><th>Date initiale</th><th>Débit en cours</th><th>Crédit en cours</th><th></th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
-    page.document.close();
-    page.focus();
-    page.print();
+    const page = writeNamedWindow('Liste des banques', `<!doctype html><html><head><meta charset="utf-8"><title>Liste des banques</title><style>body{font:12px Arial,sans-serif;color:#1c3342;margin:24px}h1{font-size:17px;margin:0 0 4px}p{margin:0 0 14px;color:#5f7480}table{width:100%;border-collapse:collapse}th,td{border:1px solid #c9d6db;padding:5px 7px;text-align:left}th{background:#eef4f5}.n{text-align:right}</style></head><body><h1>Liste des banques</h1><p>Assurance Jemmali · ${listed.length} compte(s) · imprimé le ${new Date().toLocaleDateString('fr-FR')}</p><table><thead><tr><th>Code</th><th>Libellé</th><th>N° compte</th><th>Type</th><th>Crédit initial</th><th>Date initiale</th><th>Débit en cours</th><th>Crédit en cours</th><th></th></tr></thead><tbody>${rows}</tbody></table></body></html>`, { print: true });
+    if (!page) setError('Autorisez les fenêtres pop-up pour imprimer la liste.');
   }
 
 

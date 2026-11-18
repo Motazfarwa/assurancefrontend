@@ -1,6 +1,7 @@
 // Printing and Excel export of the bordereau screens. A "section" is { title, columns: [{ key, label, kind? }], rows }.
 // kind: 'money' (3 decimals, right aligned) or 'date' (ISO -> dd/mm/yyyy).
 import { AGENCY_INFO } from '../data/agencyInfo';
+import { writeNamedWindow } from '../components/NewWindow/NewWindow';
 
 export const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
 export const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
@@ -15,8 +16,6 @@ function cellText(row, column) {
 }
 
 export function printReport({ title, lines = [], sections }) {
-  const popup = window.open('', '_blank', 'width=1100,height=800');
-  if (!popup) throw new Error('Autorisez les fenêtres pop-up pour imprimer.');
   const body = sections.map((section) => `
     <h2>${escapeHtml(section.title)}</h2>
     <table>
@@ -25,7 +24,7 @@ export function printReport({ title, lines = [], sections }) {
     ? section.rows.map((row) => `<tr>${section.columns.map((column) => `<td class="${column.kind === 'money' ? 'num' : ''}">${escapeHtml(cellText(row, column))}</td>`).join('')}</tr>`).join('')
     : `<tr><td colspan="${section.columns.length}" class="empty">Aucune ligne</td></tr>`}</tbody>
     </table>`).join('');
-  popup.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
+  const popup = writeNamedWindow(title, `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
     body{font:12px Arial,sans-serif;color:#111;margin:24px}
     .head{display:flex;justify-content:space-between;font:italic bold 12px 'Times New Roman',serif;color:#1a237e}
     h1{margin:18px auto;width:max-content;padding:8px 40px;border:1px solid #333;font-size:16px}
@@ -42,10 +41,8 @@ export function printReport({ title, lines = [], sections }) {
     <h1>${escapeHtml(title)}</h1>
     ${lines.map((line) => `<div class="meta">${escapeHtml(line)}</div>`).join('')}
     ${body}
-  </body></html>`);
-  popup.document.close();
-  popup.focus();
-  popup.print();
+  </body></html>`, { print: true, features: 'width=1100,height=800' });
+  if (!popup) throw new Error('Autorisez les fenêtres pop-up pour imprimer.');
 }
 
 export async function exportReportExcel(filename, sections) {

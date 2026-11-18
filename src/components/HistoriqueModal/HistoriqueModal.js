@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { listHistory, listHistoryUsers } from '../../services/historiqueApi';
+import { writeNamedWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../CompanyManagementModal/CompanyManagementModal.css';
 import HistoryDetailDialog from './HistoryDetailDialog';
@@ -43,13 +44,9 @@ export default function HistoriqueModal({ onClose }) {
   function search(event) { event.preventDefault(); setApplied({ ...filters }); }
 
   function print() {
-    const page = window.open('', '_blank');
-    if (!page) { setError('Autorisez les fenêtres pop-up pour imprimer.'); return; }
     const body = rows.map((row) => `<tr><td>${frDate(row.date)}</td><td>${escapeHtml(row.heure)}</td><td>${escapeHtml(row.utilisateur)}</td><td>${escapeHtml(row.mvt)}</td><td>${escapeHtml(row.design)}</td></tr>`).join('');
-    page.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Journal des événements</title><style>body{font:11px Arial,sans-serif;color:#1c3342;margin:22px}h1{font-size:16px;margin:0 0 4px}p{margin:0 0 12px;color:#5f7480}table{width:100%;border-collapse:collapse}th,td{border:1px solid #c9d6db;padding:4px 6px;text-align:left}th{background:#eef4f5}</style></head><body><h1>Journal des événements</h1><p>Du ${frDate(applied.du)} au ${frDate(applied.au)}${applied.utilisateur ? ` · ${escapeHtml(applied.utilisateur)}` : ''}${applied.mvt ? ` · ${escapeHtml(applied.mvt)}` : ''} · ${rows.length} action(s)</p><table><thead><tr><th>Date</th><th>Heure</th><th>Utilisateur</th><th>Mouvement</th><th>Désignation</th></tr></thead><tbody>${body}</tbody></table></body></html>`);
-    page.document.close();
-    page.focus();
-    page.print();
+    const page = writeNamedWindow('Journal des événements', `<!doctype html><html><head><meta charset="utf-8"><title>Journal des événements</title><style>body{font:11px Arial,sans-serif;color:#1c3342;margin:22px}h1{font-size:16px;margin:0 0 4px}p{margin:0 0 12px;color:#5f7480}table{width:100%;border-collapse:collapse}th,td{border:1px solid #c9d6db;padding:4px 6px;text-align:left}th{background:#eef4f5}</style></head><body><h1>Journal des événements</h1><p>Du ${frDate(applied.du)} au ${frDate(applied.au)}${applied.utilisateur ? ` · ${escapeHtml(applied.utilisateur)}` : ''}${applied.mvt ? ` · ${escapeHtml(applied.mvt)}` : ''} · ${rows.length} action(s)</p><table><thead><tr><th>Date</th><th>Heure</th><th>Utilisateur</th><th>Mouvement</th><th>Désignation</th></tr></thead><tbody>${body}</tbody></table></body></html>`, { print: true });
+    if (!page) setError('Autorisez les fenêtres pop-up pour imprimer.');
   }
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
