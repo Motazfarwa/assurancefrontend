@@ -307,3 +307,6 @@
 /* Etat des dépenses techniques: "non encore comptabilisées" and the companies ticked */
 .jrn-pending-only { flex-basis: 100%; }
 .jrn-company-ticks { flex-wrap: wrap; max-width: 640px; }
+
+/* the company ticks wrap inside the form (LLOYD was cut off on the right) */
+.acompte-filters .jrn-company-ticks { flex: 1 1 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }

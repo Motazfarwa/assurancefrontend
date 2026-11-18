@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getJournalPeriods, validateJournal } from '../../services/journalApi';
+import { getJournalPeriods } from '../../services/journalApi';
 
 const fmt = (value) => Number(value || 0).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
@@ -18,15 +18,12 @@ const plural = (count, one, many) => `${count} ${count > 1 ? many : one}`;
 // a journal holds what was declared on its own date. Journal d'encaissement: a quittance still to declare (unticked) is
 // in every journal from its payment on, until it is ticked (declared): then only in the journal of that date.
 // Each journal, as the legacy JEQ: what is declared on its date plus what is paid by then and still to declare, its total
-// (the Total général of the legacy JEQ), and "Valider" (after a confirmation) declares those on its date — they are then
-// in the feuille de caisse of that date.
-export default function JournalPeriods({ kind, accessToken, date, compagnie, nature, companyName, reloadKey, onOpen, onValidated }) {
+// (the Total général of the legacy JEQ). No "Valider" here: the journals are validated with the feuille de caisse
+// (module "Feuille de caisse", Aperçu · Valider).
+export default function JournalPeriods({ kind, accessToken, date, compagnie, nature, companyName, reloadKey, onOpen }) {
   const names = NAMES[kind];
   const [count, setCount] = useState(PAGE);
   const [state, setState] = useState({ loading: true, error: '', items: [], older: null });
-  const [asking, setAsking] = useState(null); // the journal whose validation is being confirmed
-  const [busy, setBusy] = useState(false);
-  const [version, setVersion] = useState(0);
 
   useEffect(() => { setCount(PAGE); }, [date, compagnie, nature, reloadKey]);
   useEffect(() => {
@@ -37,23 +34,7 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
       .then((body) => { if (active) setState({ loading: false, error: '', items: body.items || [], older: body.anterieur || null }); })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [], older: null }); });
     return () => { active = false; };
-  }, [accessToken, kind, date, compagnie, nature, count, reloadKey, version]);
-
-  async function confirm() {
-    const item = asking;
-    setBusy(true);
-    try {
-      const result = await validateJournal(accessToken, { type: kind, jour: item.jour, compagnie: compagnie ? Number(compagnie) : null, nature });
-      setAsking(null);
-      setVersion((value) => value + 1);
-      onValidated?.(`${names.title} du ${formatDate(item.jour)} validé : ${plural(result.declarees, names.what, names.whats)} · total ${fmt(result.montant)} TND, ${result.declarees > 1 ? `${names.verb}s` : names.verb} au ${formatDate(item.jour)} et dans la feuille de caisse de ce jour.`);
-    } catch (requestError) {
-      setState((current) => ({ ...current, error: requestError.message }));
-      setAsking(null);
-    } finally {
-      setBusy(false);
-    }
-  }
+  }, [accessToken, kind, date, compagnie, nature, count, reloadKey]);
 
   return <section className="unpaid-results jrn-periods" aria-label="Journaux par quinzaine">
     <div className="unpaid-results-heading">
@@ -76,7 +57,6 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
             : <span className="jrn-period-state">À valider{pending ? '' : ` · tout est ${names.done}`}</span>}</td>
           <td className="jrn-period-actions">
             <button type="button" className="expert-cancel" onClick={() => onOpen(item.jour)}>Détails</button>
-            <button type="button" className="expert-submit" onClick={() => setAsking(item)} disabled={!open || busy} title={open ? undefined : 'Journal déjà validé'}>Valider</button>
           </td>
         </tr>;
       })}</tbody>
@@ -84,20 +64,5 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
     {state.older && Number(state.older.a_declarer) > 0 && <p className="jrn-period-older">{plural(state.older.a_declarer, names.what, names.whats)} ({fmt(state.older.montant_a_declarer)} TND) réglée{state.older.a_declarer > 1 ? 's' : ''} avant le {formatDate(state.older.avant)} reste{state.older.a_declarer > 1 ? 'nt' : ''} à déclarer dans un journal plus ancien.</p>}
     <div className="jrn-period-more"><button type="button" className="expert-cancel" onClick={() => setCount((value) => value + PAGE)} disabled={state.loading}>{state.loading ? 'Chargement…' : 'Journaux plus anciens'}</button></div>
 
-    {asking && <div className="jrn-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setAsking(null); }}>
-      <section className="jrn-confirm" role="alertdialog" aria-modal="true" aria-labelledby="jrn-period-confirm-title" aria-describedby="jrn-period-confirm-text">
-        <h3 id="jrn-period-confirm-title">Valider le {names.title.toLowerCase()} du {formatDate(asking.jour)} ?</h3>
-        <p id="jrn-period-confirm-text">Les {names.whats} réglées {kind === 'encaissement' ? `jusqu’au ${formatDate(asking.jour)}` : `du ${formatDate(asking.debut)} au ${formatDate(asking.jour)}`} et encore à {kind === 'depense' ? 'comptabiliser' : 'déclarer'} seront {kind === 'depense' ? 'comptabilisées' : 'déclarées'} au <strong>{formatDate(asking.jour)}</strong>{companyName ? <> pour <strong>{companyName}</strong></> : ' pour toutes les compagnies'} et passeront dans la feuille de caisse de ce jour.</p>
-        <dl>
-          <div><dt>À {kind === 'depense' ? 'comptabiliser' : 'déclarer'}</dt><dd>{plural(asking.a_declarer, names.what, names.whats)} · {fmt(asking.montant_a_declarer)} TND</dd></div>
-          <div><dt>Déjà dans ce journal</dt><dd>{plural(asking.declarees, names.what, names.whats)} · {fmt(asking.montant_declare)} TND</dd></div>
-          <div><dt>Total du journal</dt><dd>{fmt(asking.montant)} TND</dd></div>
-        </dl>
-        <footer>
-          <button type="button" className="jrn-confirm-cancel" onClick={() => setAsking(null)} disabled={busy}>Annuler</button>
-          <button type="button" className="jrn-confirm-ok" onClick={confirm} disabled={busy} autoFocus>{busy ? 'Validation…' : 'Oui, valider'}</button>
-        </footer>
-      </section>
-    </div>}
   </section>;
 }

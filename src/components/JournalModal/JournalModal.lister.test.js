@@ -138,8 +138,7 @@ test('a tick comptabilises the quittance at once on the journal date, an untick 
   expect(await screen.findByText('Quittance 02026000002 retirée du journal du 15/11/2026 : à déclarer.')).toBeInTheDocument();
 });
 
-test('"Lister": one line per journal of the half months; "Valider" asks, then declares the journal on its date', async () => {
-  validateJournal.mockResolvedValue({ jour: '2026-11-15', declarees: 1, montant: 100, retirees: 0 });
+test('"Lister": one line per journal of the half months, without "Valider" (validated with the feuille de caisse)', async () => {
   render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
   fireEvent.click(await screen.findByRole('button', { name: 'Lister' }));
@@ -148,18 +147,12 @@ test('"Lister": one line per journal of the half months; "Valider" asks, then de
   const previous = screen.getByRole('button', { name: 'Journal d’encaissement du 31/10/2026' }).closest('tr');
   expect(within(current).getByText('300,000')).toBeInTheDocument();
   // everything already comptabilisé (by the old software) but never validated: still to validate
-  expect(within(previous).getByRole('button', { name: 'Valider' })).not.toBeDisabled();
   expect(within(previous).getByText('À valider · tout est déclaré')).toBeInTheDocument();
   // validated in the new system: done
   const validated = screen.getByRole('button', { name: 'Journal d’encaissement du 15/10/2026' }).closest('tr');
-  expect(within(validated).getByRole('button', { name: 'Valider' })).toBeDisabled();
   expect(within(validated).getByText('Validé le 15/10/2026 à 17:30 par Sami')).toBeInTheDocument();
-  fireEvent.click(within(current).getByRole('button', { name: 'Valider' }));
-  const dialog = screen.getByRole('alertdialog', { name: 'Valider le journal d’encaissement du 15/11/2026 ?' });
+  expect(screen.queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();
   expect(validateJournal).not.toHaveBeenCalled();
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, valider' }));
-  await waitFor(() => expect(validateJournal).toHaveBeenCalledWith('t', { type: 'encaissement', jour: '2026-11-15', compagnie: null, nature: '' }));
-  expect(await screen.findByText(/Journal d’encaissement du 15\/11\/2026 validé : 1 quittance/)).toBeInTheDocument();
   // older journals on demand
   fireEvent.click(screen.getByRole('button', { name: 'Journaux plus anciens' }));
   await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ nombre: 24 })));

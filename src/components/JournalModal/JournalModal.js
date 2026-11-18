@@ -103,7 +103,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   const [notice, setNotice] = useState('');
   const [sheet, setSheet] = useState(null); // the journal printout: { rows, preview }
   const [cashSheet, setCashSheet] = useState(false); // the feuille de caisse of the company on the date
-  // "Lister": a window with one line per journal of the half months (Détails, Valider).
+  // "Lister": a window with one line per journal of the half months (Détails; validated with the feuille de caisse).
   const [periodsOpen, setPeriodsOpen] = useState(false);
   const [periodsKey, setPeriodsKey] = useState(0);
   // The lines listed: { compagnie, date, nature }. They are read when the journal opens and when a filter changes.
@@ -141,7 +141,6 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
   // "Détails" of a journal: its date is listed here (the 15th or the last day of the month).
   const openJournal = (jour) => { setPeriodsOpen(false); if (jour === date) setListedFor({ compagnie, date, nature, at: Date.now() }); else setDate(jour); };
   // A journal validated in the window: the lines listed here are read again.
-  const afterJournalValidated = (message) => { setNotice(message); setListedFor((current) => (current ? { ...current, at: Date.now() } : current)); };
 
   useEffect(() => {
     const onKey = (event) => { if (event.key === 'Escape') { if (cashSheet) setCashSheet(false); else if (sheet) setSheet(null); else if (periodsOpen) setPeriodsOpen(false); else onClose(); } };
@@ -336,7 +335,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
       <section className="jrn-periods-window" role="dialog" aria-modal="true" aria-label={`${config.title} · journaux par quinzaine`}>
         <header><h3>{config.title} · journaux par quinzaine</h3><button type="button" className="expert-close" onClick={() => setPeriodsOpen(false)} aria-label="Fermer les journaux">×</button></header>
         <JournalPeriods kind={kind} accessToken={accessToken} date={date} compagnie={compagnie} nature={nature} companyName={company?.nom_compagnie}
-          reloadKey={periodsKey} onOpen={openJournal} onValidated={afterJournalValidated} />
+          reloadKey={periodsKey} onOpen={openJournal} />
       </section>
     </div>}
 

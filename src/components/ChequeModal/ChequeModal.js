@@ -441,7 +441,7 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
             <label>Date échéance<input type="date" value={form.datep} onChange={(event) => change({ datep: event.target.value })} /></label>
             <label>Date saisie<input value={shortDate(today())} readOnly /></label>
             <label>Montant<input type="number" step="any" min="0" value={form.montant} onChange={(event) => change({ montant: event.target.value })} /></label>
-            <label>Solde<input value={money(solde)} readOnly /></label>
+            <label>Solde<input value={money(solde)} readOnly title={form.a_verser && solde > 0.0005 ? 'Non réparti : enregistré en trop perçu du client' : undefined} />{form.a_verser && solde > 0.0005 && <small className="chq-due-note">Trop perçu enregistré</small>}</label>
           </fieldset>
 
           <div className="chq-row">

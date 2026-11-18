@@ -103,11 +103,11 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
         {notice && <div className="cqi-notice" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Masquer">×</button></div>}
         <section className="unpaid-results">
           <div className="unpaid-results-heading">
-            <div><span>{onlyReturned ? `QUITTANCES ${tc === 'C' ? 'COMPTANT' : 'TERME'} RETOURNÉES EN ${periode}` : `QUITTANCES ${tc === 'C' ? 'COMPTANT' : 'TERME'} DE LA PÉRIODE ${periode} · COCHEZ « RETOUR » POUR LES RETOURNER À LA COMPAGNIE`}</span>
+            <div><span>{onlyReturned ? `QUITTANCES ${tc === 'C' ? 'COMPTANT' : 'TERME'} RETOURNÉES · PÉRIODE ${periode}` : `QUITTANCES ${tc === 'C' ? 'COMPTANT' : 'TERME'} DE LA PÉRIODE ${periode} · COCHEZ « RETOUR » POUR LES RETOURNER À LA COMPAGNIE`}</span>
               <h3>{state.loading ? 'Chargement…' : `${state.items.length} quittance${state.items.length > 1 ? 's' : ''} · ${returned.length} retournée${returned.length > 1 ? 's' : ''}`}</h3></div>
             <div className="unpaid-total"><small>Total retourné</small><strong>{fmt(total)} TND</strong></div>
           </div>
-          {!state.loading && state.items.length === 0 ? <div className="unpaid-empty">{onlyReturned ? `Aucune quittance retournée en ${periode}` : `Aucune quittance de la période ${periode}`}{company ? ' pour cette compagnie' : ''}.</div>
+          {!state.loading && state.items.length === 0 ? <div className="unpaid-empty">{onlyReturned ? `Aucune quittance retournée pour la période ${periode}` : `Aucune quittance de la période ${periode}`}{company ? ' pour cette compagnie' : ''}.</div>
             : <div className="unpaid-table-scroll cqi-scroll jrn-scroll"><table className="unpaid-table jrn-table jrn-return-table">
               <thead><tr>{!company && <th>Compagnie</th>}<th>N° Police</th><th>Code Clt</th><th>Nom Client</th><th>Echéance</th>{onlyReturned && <th>Période</th>}<th>N° Quit.</th><th className="cqi-number">P.Net</th><th className="cqi-number">Com.</th><th className="cqi-number">P.Total</th><th className="cqi-number">Solde</th><th className="cqi-verser">Retour</th></tr></thead>
               <tbody>{state.items.map((row) => <tr key={`${row.num_police}-${row.num_quittance}`} className={row.date_retour ? 'is-returned' : undefined}>
