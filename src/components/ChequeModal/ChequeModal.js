@@ -41,6 +41,8 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
   const [pieces, setPieces] = useState([]);
   const [form, setForm] = useState(blankForm);
   const [alloc, setAlloc] = useState({});
+  // Quittances whose rest is written off as a moins perçu (pièce à verser only, as the legacy)
+  const [writeOff, setWriteOff] = useState({});
   const [editing, setEditing] = useState(false); // the typed piece number is a piece already stored
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -109,6 +111,7 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
         setQuittances(overview.quittances);
         setPieces(overview.pieces);
         setAlloc(pendingImport.current ? importedAlloc(overview.quittances, pendingImport.current) : {});
+        setWriteOff({});
         pendingImport.current = null;
         setEditing(false);
       } catch (requestError) {
@@ -186,7 +189,8 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
       code_client: client.code_client, nump: form.nump.trim(), typep: form.typep, datep: form.datep || null, montant: num(form.montant),
       code_banque: form.code_banque || null, a_verser: form.a_verser, en_instance: form.en_instance, compte_versement: form.a_verser ? form.compte_versement : null,
       comptabiliser: form.a_verser && form.comptabiliser,
-      allocations: Object.entries(alloc).filter(([, value]) => num(value) > 0).map(([num_quittance, value]) => ({ num_quittance, montant: num(value) })),
+      allocations: Object.entries(alloc).filter(([, value]) => num(value) > 0)
+        .map(([num_quittance, value]) => ({ num_quittance, montant: num(value), ...(form.a_verser && writeOff[num_quittance] ? { moins_percu: true } : {}) })),
     };
   }
 
@@ -216,6 +220,7 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
       // The statut of a batch of cheques is kept for the next one.
       setForm((current) => (batchRef.current && action === 'create' ? { ...blankForm(), a_verser: current.a_verser, en_instance: current.en_instance, compte_versement: current.compte_versement, comptabiliser: current.comptabiliser } : blankForm()));
       setAlloc({});
+      setWriteOff({});
       setEditing(false);
       await loadClient(client.code_client);
       // "À verser": the piece was recorded as a client règlement (TRegCli) and the quittances it pays are settled.
@@ -341,6 +346,7 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
   fillRef.current = (item) => {
     setForm((current) => ({ ...blankForm(), a_verser: current.a_verser, en_instance: current.en_instance, compte_versement: current.compte_versement }));
     setAlloc({});
+    setWriteOff({});
     setEditing(false);
     const position = `${batchRef.current.current + 1} / ${batchRef.current.items.length}`;
     if (item.status === 'erreur') { setNotice(`Chèque ${position} illisible (${item.error}) : saisissez-le à la main.`); return; }
@@ -507,12 +513,13 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
           </div>
           <div className="chq-table-wrap">
             <table className="chq-table">
-              <thead><tr><th>N° Police</th><th>Échéance</th><th>N° Quittance</th><th>Solde Quittance</th><th>Traite/Chèque</th><th>Reste à régler</th><th>Montant</th></tr></thead>
+              <thead><tr><th>N° Police</th><th>Échéance</th><th>N° Quittance</th><th>Solde Quittance</th><th>Traite/Chèque</th><th>Reste à régler</th><th>Montant</th><th title="Solder la quittance : le reste est enregistré en moins perçu">Moins perçu</th></tr></thead>
               <tbody>
                 {shown.length === 0 ? (
-                  <tr><td colSpan={7} className="chq-empty">{!client ? 'Saisissez un code client pour afficher ses quittances impayées.' : quittances.length ? `Aucune quittance impayée ${due === 'echues' ? 'échue' : 'non échue'} pour ce client.` : 'Aucune quittance impayée pour ce client.'}</td></tr>
+                  <tr><td colSpan={8} className="chq-empty">{!client ? 'Saisissez un code client pour afficher ses quittances impayées.' : quittances.length ? `Aucune quittance impayée ${due === 'echues' ? 'échue' : 'non échue'} pour ce client.` : 'Aucune quittance impayée pour ce client.'}</td></tr>
                 ) : shown.map((row) => {
                   const reste = Number(row.solde) - Number(row.instance) - num(alloc[row.num_quittance]);
+                  const canWriteOff = form.a_verser && num(alloc[row.num_quittance]) > 0 && reste > 0.0005;
                   return (
                     <tr key={row.num_quittance}>
                       <td>{row.num_police || row.num_int}</td>
@@ -522,11 +529,14 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
                       <td className="chq-number">{money(row.instance)}</td>
                       <td className={`chq-number${reste < -0.0005 ? ' is-over' : ''}`}>{money(reste)}</td>
                       <td><input className="chq-amount" type="number" step="any" min="0" value={alloc[row.num_quittance] ?? ''} onChange={(event) => setAlloc((current) => ({ ...current, [row.num_quittance]: event.target.value }))} /></td>
+                      <td className="chq-center"><input type="checkbox" aria-label={`Moins perçu ${row.num_quittance}`} disabled={!canWriteOff}
+                        title={canWriteOff ? `Solder : ${money(reste)} enregistré en moins perçu` : 'Pièce à verser, montant saisi et reste à régler'}
+                        checked={Boolean(canWriteOff && writeOff[row.num_quittance])} onChange={(event) => setWriteOff((current) => ({ ...current, [row.num_quittance]: event.target.checked }))} /></td>
                     </tr>
                   );
                 })}
                 {shown.length > 0 && (
-                  <tr className="chq-totals"><td colSpan={3}>TOTAUX</td><td className="chq-number">{money(totals.solde)}</td><td className="chq-number">{money(totals.instance)}</td><td className="chq-number">{money(totals.solde - totals.instance - totals.montant)}</td><td className="chq-number">{money(totals.montant)}</td></tr>
+                  <tr className="chq-totals"><td colSpan={3}>TOTAUX</td><td className="chq-number">{money(totals.solde)}</td><td className="chq-number">{money(totals.instance)}</td><td className="chq-number">{money(totals.solde - totals.instance - totals.montant)}</td><td className="chq-number">{money(totals.montant)}</td><td /></tr>
                 )}
               </tbody>
             </table>
