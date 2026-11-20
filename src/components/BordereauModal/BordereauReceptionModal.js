@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { isBordereauCompany, isTermeCompany, listCompanies } from '../../services/companyApi';
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
-import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau, setQuittancePeriode } from '../../services/bordereauApi';
+import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau, setQuittancePeriode, updateQuittanceLine } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
 import './BordereauModal.css';
 
@@ -22,6 +22,43 @@ const GRID = [
   ['num_police', 'N° Police (num_int)'], ['code_client', 'Code Clt'], ['nom_client', 'Nom Client'], ['echeance', 'Échéance', 'date'],
   ['num_quittance', 'N° Quit.'], ['prime_net', 'P.Net+C.Q.', 'money'], ['commission', 'Com.', 'money'], ['prime_total', 'Prime Total', 'money'],
 ];
+
+// Comptant: the N° quittance and the Prime Total are corrected in the grid; saved on Entrée or when leaving the cell,
+// Échap gives the value back.
+function EditableCell({ value, label, number, onSave }) {
+  const [text, setText] = useState(value ?? '');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setText(value ?? ''); }, [value]);
+  async function commit() {
+    const next = String(text).trim();
+    if (next === String(value ?? '').trim() || (number && Number(next) === Number(value))) { setText(value ?? ''); return; }
+    if (!next || (number && !(Number(next) >= 0))) { setText(value ?? ''); return; }
+    setSaving(true);
+    const ok = await onSave(number ? Number(next) : next);
+    setSaving(false);
+    if (!ok) setText(value ?? '');
+  }
+  return (
+    <input
+      className={`bd-cell-input${number ? ' is-number' : ''}`}
+      aria-label={label}
+      type={number ? 'number' : 'text'}
+      step={number ? 'any' : undefined}
+      min={number ? '0' : undefined}
+      value={text}
+      disabled={saving}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+        if (event.key === 'Escape') { event.stopPropagation(); setText(value ?? ''); }
+      }}
+    />
+  );
+}
+const EDITABLE = { num_quittance: false, prime_total: true }; // comptant: key -> numeric
 
 function fromApi(line) {
   return { ...line, echeance: line.echeance ? String(line.echeance).slice(0, 10) : null };
@@ -51,6 +88,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [validating, setValidating] = useState(''); // num_quittance being validated
+  const [search, setSearch] = useState(''); // code or name of the client
   const periode = monthToPeriode(form.month);
   const loadPeriode = kind.quittances ? '' : periode; // comptant: the list never depends on the month
   const validated = lines.filter((line) => line.valide).length;
@@ -62,6 +100,14 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     const client = clients[cleanNumber(line.num_police)];
     return client ? { ...line, code_client: line.code_client || client.code_client || '', nom_client: line.nom_client || client.nom_client || '' } : line;
   }), [lines, clients]);
+  // The lines of the client searched (code client starting with, or name containing, what is typed), with their index.
+  const visibleLines = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const indexed = shownLines.map((line, index) => ({ line, index }));
+    if (!term) return indexed;
+    return indexed.filter(({ line }) => String(line.code_client || '').trim().toLowerCase().startsWith(term)
+      || String(line.nom_client || '').toLowerCase().includes(term));
+  }, [shownLines, search]);
   const total = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0), 0), [lines]);
   // Solde: what is due to the company, prime totale less the agency's commissions.
   const solde = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0) - Number(line.commission || 0), 0), [lines]);
@@ -153,6 +199,24 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [accessToken, form.code_compagnie, form.tc, loadPeriode, annee, companyCodes, kind.quittances]);
+
+  // Comptant: a corrected N° quittance or Prime Total, saved in TQuittance (true when saved).
+  async function saveCell(line, key, value) {
+    setError('');
+    try {
+      const saved = await updateQuittanceLine(accessToken, {
+        num_quittance: line.num_quittance, num_int: line.num_police,
+        ...(key === 'num_quittance' ? { nouveau_numero: value } : { prime_total: value }),
+      });
+      setLines((current) => current.map((item) => (item.num_quittance === line.num_quittance && item.num_police === line.num_police
+        ? { ...item, num_quittance: saved.num_quittance, prime_total: saved.prime_total } : item)));
+      setNotice(key === 'num_quittance' ? `Quittance N° ${line.num_quittance} renumérotée ${saved.num_quittance}.` : `Prime totale de la quittance N° ${line.num_quittance} : ${money(saved.prime_total)}.`);
+      return true;
+    } catch (saveError) {
+      setError(saveError.message);
+      return false;
+    }
+  }
 
   // Comptant: ticking « Valider » gives the quittance the period chosen; unticking takes it back to no period.
   async function validateLine(line, checked) {
@@ -363,6 +427,8 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           <div className="bd-total" title="Prime totale moins les commissions"><span>Solde</span><strong>{money(solde)}</strong></div>
           <div className="bd-total"><span>Lignes</span><strong>{lines.length}</strong></div>
           {fromQuittances && <div className="bd-total"><span>Validées</span><strong>{validated}</strong></div>}
+          <label className="bd-search">Client<input type="search" value={search} placeholder="Code ou nom du client" onChange={(event) => setSearch(event.target.value)} /></label>
+          {search.trim() && <div className="bd-total"><span>Affichées</span><strong>{visibleLines.length}</strong></div>}
         </div>
 
         {error && <p className="bd-error" role="alert">{error}</p>}
@@ -391,10 +457,18 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
             <tbody>
               {lines.length === 0 && !draft ? (
                 <tr><td colSpan={GRID.length + 2} className="bd-empty">{kind.quittances ? 'Aucune quittance comptant sans période.' : form.code_compagnie ? `Aucun bordereau pour cette période : cliquez sur « ${kind.importLabel} » et choisissez le fichier Excel reçu du siège.` : 'Choisissez la compagnie et la période, puis importez le fichier du siège.'}</td></tr>
-              ) : shownLines.map((line, index) => (
+              ) : search.trim() && !visibleLines.length && !draft ? (
+                <tr><td colSpan={GRID.length + 2} className="bd-empty">Aucune ligne pour le client « {search.trim()} ».</td></tr>
+              ) : visibleLines.map(({ line, index }) => (
                 <tr key={`${line.id_ligne || 'new'}-${index}`} className={[selected === index && 'is-selected', line.valide && 'is-validated'].filter(Boolean).join(' ') || undefined} onClick={() => setSelected(index)} onDoubleClick={() => { setSelected(index); editLine(index); }}>
                   <td>{index + 1}</td>
-                  {GRID.map(([key, , kind]) => <td key={key} className={kind === 'money' ? 'is-number' : undefined}>{kind === 'money' ? money(line[key]) : kind === 'date' ? shortDate(line[key]) : line[key] ?? ''}</td>)}
+                  {GRID.map(([key, label, kind]) => (
+                    <td key={key} className={kind === 'money' ? 'is-number' : undefined}>
+                      {fromQuittances && key in EDITABLE
+                        ? <EditableCell value={line[key]} label={`${label} ${line.num_quittance}`} number={EDITABLE[key]} onSave={(value) => saveCell(line, key, value)} />
+                        : kind === 'money' ? money(line[key]) : kind === 'date' ? shortDate(line[key]) : line[key] ?? ''}
+                    </td>
+                  ))}
                   {fromQuittances && (
                     <td className="bd-valider" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
                       <label title={line.valide ? `Validée dans la période ${line.valide} — décocher pour la remettre sans période` : periode ? `Valider dans la période ${periode}` : 'Choisissez d’abord la période'}>

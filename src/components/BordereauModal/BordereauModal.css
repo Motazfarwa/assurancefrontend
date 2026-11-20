@@ -99,3 +99,10 @@
 .bd-grid tr.bd-draft input.is-number { text-align: right; }
 .bd-grid tr.bd-draft input:focus { outline: none; border-color: #187d78; box-shadow: 0 0 0 2px rgba(24, 125, 120, .15); }
 .bd-draft-actions { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-right: auto; }
+
+/* Réception comptant: N° quittance and Prime Total corrected in the grid; the client search */
+.bd-grid .bd-cell-input { width: 100%; min-width: 80px; box-sizing: border-box; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; font: inherit; color: inherit; }
+.bd-grid .bd-cell-input.is-number { text-align: right; }
+.bd-grid tr:hover .bd-cell-input { border-color: #c9d6db; background: #fff; }
+.bd-grid .bd-cell-input:focus { outline: none; border-color: #17806f; background: #fff; box-shadow: 0 0 0 2px rgba(23, 128, 111, 0.15); }
+.bd-form .bd-search input { min-width: 230px; }

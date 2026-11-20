@@ -35,6 +35,8 @@ export const getBordereauClients = (token, numeros) => request('/api/bordereaux/
 export const listQuittances = (token, { tc, periode, annee, code_compagnie, compagnies }) => request(`/api/bordereaux/quittances?${query({ tc, annee, code_compagnie, compagnies })}&periode=${encodeURIComponent(periode || '')}`, token);
 // Validates a comptant quittance in a period ('' takes the validation back); avant = the period it has now.
 export const setQuittancePeriode = (token, { num_quittance, num_int, periode, avant }) => request('/api/bordereaux/quittances/periode', token, { method: 'PUT', body: JSON.stringify({ num_quittance, num_int, periode, avant }) });
+// Réception comptant: corrects the number (nouveau_numero) or the Prime Total of a comptant quittance.
+export const updateQuittanceLine = (token, { num_quittance, num_int, nouveau_numero, prime_total }) => request('/api/bordereaux/quittances/ligne', token, { method: 'PUT', body: JSON.stringify({ num_quittance, num_int, nouveau_numero, prime_total }) });
 export const getConfrontation =(token, params) => request(`/api/bordereaux/confrontation?${query(params)}`, token);
 // Periods that have a bordereau for a company and T/C, most recent first: [{ periode, nb_lignes, fusionne }].
 export const listBordereauPeriodes = (token, { code_compagnie, tc }) => request(`/api/bordereaux/periodes?${query({ code_compagnie, tc })}`, token);
