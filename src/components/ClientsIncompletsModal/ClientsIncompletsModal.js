@@ -14,6 +14,7 @@ const PAGE = 100;
 export const CATEGORIES = [
   ['coordonnees', 'Coordonnées'],
   ['sans_police', 'Sans police'],
+  ['sans_quittance', 'Sans quittance'],
 ];
 // The coordonnée missing, to show only the clients without it.
 export const MANQUES = [['adresse', 'Sans adresse'], ['ville', 'Sans ville'], ['code postal', 'Sans code postal'], ['téléphone', 'Sans téléphone']];
@@ -99,17 +100,12 @@ export default function ClientsIncompletsModal({ moduleId, onClose, initial = {}
     <section className="unpaid-modal cim-modal" role="dialog" aria-modal="true" aria-labelledby="cim-title">
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>PRODUCTION · MODULE {moduleId} · ADMINISTRATEUR</span><h2 id="cim-title">Clients à compléter</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="unpaid-content">
-        <div className="cim-cards" role="group" aria-label="Type d’information manquante">
-          <button type="button" className={`cim-card${categorie === '' ? ' is-active' : ''}`} onClick={() => choose('')}><span>Tous les clients</span><strong>{data ? data.total : '…'}</strong></button>
-          {CATEGORIES.map(([key, label]) => <button type="button" key={key} className={`cim-card${categorie === key ? ' is-active' : ''}`} onClick={() => choose(key)} aria-pressed={categorie === key}>
-            <span>{label}</span><strong>{data ? data[key] : '…'}</strong>
-          </button>)}
-        </div>
         <div className="unpaid-filter-form acompte-filters cim-filters">
           <label className="acompte-field cim-filter"><span>Afficher</span>
             <select value={filterValue(categorie, manque)} onChange={(event) => choose(event.target.value)}>
               <option value="">Tous les clients à compléter{data ? ` (${data.total})` : ''}</option>
               <option value="sans_police">Sans police{data ? ` (${data.sans_police})` : ''}</option>
+              <option value="sans_quittance">Sans quittance{data?.sans_quittance !== undefined ? ` (${data.sans_quittance})` : ''}</option>
               <option value="coordonnees">Coordonnées manquantes{data ? ` (${data.coordonnees})` : ''}</option>
               {MANQUES.map(([key, label]) => <option key={key} value={`coordonnees:${key}`}>{'  '}{label}{data?.manques ? ` (${data.manques[key]})` : ''}</option>)}
             </select></label>
@@ -128,16 +124,17 @@ export default function ClientsIncompletsModal({ moduleId, onClose, initial = {}
         {state.loading && <div className="cim-loading" role="status"><span className="cim-spinner" aria-hidden="true" /><b>Chargement des clients…</b><small>Lecture des données en cours, veuillez patienter.</small></div>}
         <div className="cim-table-wrap" ref={tableRef}>
           <table className="cim-table">
-            <thead><tr><th>Client</th><th>Créé le</th><th>Coordonnées manquantes</th><th>Police</th><th aria-label="Action" /></tr></thead>
+            <thead><tr><th>Client</th><th>Créé le</th><th>Coordonnées manquantes</th><th>Police</th><th>Quittance</th><th aria-label="Action" /></tr></thead>
             <tbody>
               {items.map((item) => { const d = item.details || {}; return <tr key={item.code_client}>
                 <td className="cim-client"><b>{item.code_client}</b><span>{item.nom_client || 'Client sans nom'}</span></td>
                 <td>{!item.date_creation ? '—' : item.date_creation.startsWith('1900') ? <span className="cim-none" title="Date inconnue dans l’ancien logiciel (01/01/1900)">Inconnue</span> : item.date_creation.split('-').reverse().join('/')}</td>
                 <td>{d.coordonnees?.length ? <ul className="cim-entries">{d.coordonnees.map((text) => <li key={text}><span>{text}</span></li>)}</ul> : <span className="cim-none">Complètes</span>}</td>
                 <td>{d.sans_police ? <span className="cim-tag">Aucune police</span> : <span className="cim-none">—</span>}</td>
+                <td>{d.sans_quittance ? <span className="cim-tag">Aucune quittance</span> : <span className="cim-none">—</span>}</td>
                 <td><button type="button" className="expert-cancel cim-open" onClick={() => openClient(item.code_client)}>Ouvrir la fiche</button></td>
               </tr>; })}
-              {!state.loading && !items.length && <tr><td colSpan={5} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
+              {!state.loading && !items.length && <tr><td colSpan={6} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
             </tbody>
           </table>
         </div>

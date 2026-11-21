@@ -1,0 +1,31 @@
+/* Zoom of the window on top: always above the windows, bottom right. */
+.app-modal-zoom {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 10050;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #187d78;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(20, 60, 70, 0.22);
+}
+.app-modal-zoom button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #145f5b;
+  font: 700 16px/1 inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.app-modal-zoom button:hover:not(:disabled) { background: #e8f4f2; }
+.app-modal-zoom button:disabled { opacity: 0.35; cursor: default; }
+.app-modal-zoom .app-modal-zoom-value { min-width: 56px; font-size: 12px; }
+@media print { .app-modal-zoom { display: none; } }

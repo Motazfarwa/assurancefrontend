@@ -221,7 +221,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
             {Object.entries(ETATS).map(([key, label]) => <label key={key}><input type="radio" name="comptes-etat" checked={etat === key} onChange={() => setEtat(key)} /> {label}</label>)}
           </fieldset>
           {isAdmin && <fieldset className="unpaid-filter-set unpaid-choice"><legend>Présentation</legend>
-            <label><input type="radio" name="comptes-presentation" checked={presentation === 'synthese'} onChange={() => setPresentation('synthese')} /> Synthèse</label>
+            <label><input type="radio" name="comptes-presentation" checked={presentation === 'synthese'} onChange={() => setPresentation('synthese')} /> Global</label>
             <label><input type="radio" name="comptes-presentation" checked={presentation === 'detail'} onChange={() => setPresentation('detail')} /> Détail par client</label>
           </fieldset>}
           <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={missing || reversed || unpicked}>Aperçu</button>
@@ -230,7 +230,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
         {reversed && <div className="expert-error unpaid-error" role="alert">La date de fin précède la date de début.</div>}
         {unpicked && <p className="jrn-hint">Choisissez le client dans la liste proposée.</p>}
         <p className="jrn-hint">{isAdmin && presentation === 'synthese'
-          ? 'Synthèse : une ligne par client — prime, ristourne, montant réglé, reste à payer, commission (quittances d’échéance dans la période, sauf celles retournées à la compagnie) et sinistres payés dans la période.'
+          ? 'Global : une ligne par client — prime, ristourne, montant réglé, reste à payer, commission (quittances d’échéance dans la période, sauf celles retournées à la compagnie) et sinistres payés dans la période.'
           : 'Détail : pour chaque client, ses quittances d’échéance dans la période, compagnie par compagnie, avec la prime, le montant réglé et le reste à payer de chacune, et les totaux.'}</p>
       </div>
     </section>

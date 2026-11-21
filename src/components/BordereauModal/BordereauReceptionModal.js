@@ -4,6 +4,7 @@ import { isBordereauCompany, isTermeCompany, listCompanies } from '../../service
 import { BORDEREAU_FIELDS, buildLines, looksLikeMillimes, readBordereauFile, scaleMillimes } from '../../services/bordereauParser';
 import { currentMonth, deleteBordereau, getBordereau, getBordereauClients, listBordereaux, listQuittances, monthToPeriode, nextMonth, saveBordereau, setQuittancePeriode, updateQuittanceLine } from '../../services/bordereauApi';
 import { money, printReport, shortDate } from '../../services/bordereauReport';
+import BordereauConfrontationModal from './BordereauConfrontationModal';
 import './BordereauModal.css';
 
 // Terme: the head office's file for the coming due month. Comptant: always the quittances of TQuittance (tc 'C') without
@@ -58,7 +59,8 @@ function EditableCell({ value, label, number, onSave }) {
     />
   );
 }
-const EDITABLE = { num_quittance: false, prime_total: true }; // comptant: key -> numeric
+const EDITABLE = { num_quittance: false, prime_total: true }; // comptant (TQuittance): key -> numeric
+const EDITABLE_TERME = { prime_total: true }; // terme (the lines of the file): the Prime Total, the Solde follows
 
 function fromApi(line) {
   return { ...line, echeance: line.echeance ? String(line.echeance).slice(0, 10) : null };
@@ -89,6 +91,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const [notice, setNotice] = useState('');
   const [validating, setValidating] = useState(''); // num_quittance being validated
   const [search, setSearch] = useState(''); // code or name of the client
+  const [confronting, setConfronting] = useState(false); // the confrontation of the company / period, over this window
   const periode = monthToPeriode(form.month);
   const loadPeriode = kind.quittances ? '' : periode; // comptant: the list never depends on the month
   const validated = lines.filter((line) => line.valide).length;
@@ -200,6 +203,13 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     return () => { active = false; };
   }, [accessToken, form.code_compagnie, form.tc, loadPeriode, annee, companyCodes, kind.quittances]);
 
+  // Terme: a Prime Total corrected in the grid (the Solde follows); saved with the bordereau.
+  function editTermeCell(index, key, value) {
+    setLines((current) => current.map((line, at) => (at === index ? { ...line, [key]: value } : line)));
+    setDirty(true);
+    return true;
+  }
+
   // Comptant: a corrected N° quittance or Prime Total, saved in TQuittance (true when saved).
   async function saveCell(line, key, value) {
     setError('');
@@ -246,24 +256,31 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     return scale ? scaleMillimes(lines) : lines;
   };
 
+  // Several files at once (the head office may send a bordereau in several files): their lines follow each other.
   async function chooseFile(event) {
-    const file = event.target.files?.[0];
+    const files = [...(event.target.files || [])];
     event.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
     setError('');
     setNotice('');
     try {
-      const info = await readBordereauFile(file);
+      const infos = [];
+      for (const file of files) {
+        try { infos.push(await readBordereauFile(file)); } catch (fileError) { throw new Error(`« ${file.name} » : ${fileError.message}`); }
+      }
+      const info = infos[0];
+      const companiesOf = [...new Set(infos.map((item) => String(item.meta.code_compagnie || '')).filter(Boolean))];
+      if (companiesOf.length > 1) throw new Error('Les fichiers choisis sont de compagnies différentes : importez-les séparément.');
       // The file may carry the company, the type and the period: use them to fill the form.
       const { meta } = info;
       const company = companies.find((item) => String(item.code_compagnie) === String(meta.code_compagnie));
       const nextMonth = /^\d{2}\/\d{4}$/.test(meta.periode || '') ? `${meta.periode.slice(3)}-${meta.periode.slice(0, 2)}` : form.month;
       const nextForm = { ...form, code_compagnie: company ? String(company.code_compagnie) : form.code_compagnie, month: nextMonth };
-      const raw = buildLines(info);
+      const raw = infos.flatMap((item) => buildLines(item));
       const scale = looksLikeMillimes(raw);
-      const parsedLines = makeLines(info, scale, nextMonth.slice(5));
+      const parsedLines = infos.flatMap((item) => makeLines(item, scale, nextMonth.slice(5)));
       if (!parsedLines.length) {
-        setImported(info);
+        setImported({ ...info, others: infos.slice(1) });
         throw new Error('Aucune ligne avec un numéro de police n’a été trouvée. Choisissez la colonne du N° de police ci-dessous.');
       }
       if (nextForm.code_compagnie !== form.code_compagnie || nextForm.tc !== form.tc || nextForm.month !== form.month) {
@@ -271,13 +288,14 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
         setForm(nextForm);
       }
       setMillimes(scale);
-      setImported(info);
+      setImported({ ...info, others: infos.slice(1) });
       setLines(parsedLines);
       setFromQuittances(false);
-      setFichier(file.name);
+      const names = files.map((file) => file.name);
+      setFichier(names.join(', ').slice(0, 200));
       setDirty(true);
       setSelected(-1);
-      setNotice(`${parsedLines.length} ligne(s) lues dans « ${file.name} ». Vérifiez puis enregistrez.`);
+      setNotice(`${parsedLines.length} ligne(s) lues dans ${names.length > 1 ? `${names.length} fichiers (${names.join(', ')})` : `« ${names[0]} »`}. Vérifiez puis enregistrez.`);
     } catch (readError) {
       setError(readError.message);
     }
@@ -288,13 +306,20 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     if (value === '') delete mapping[key]; else mapping[key] = Number(value);
     const next = { ...imported, mapping };
     setImported(next);
-    setLines(makeLines(next, millimes, form.month.slice(5)));
+    setLines(importedLines(next, millimes));
     setDirty(true);
+  }
+
+  // The lines of every file imported; a column chosen for the first file goes for the others laid out the same way.
+  function importedLines(first, scale) {
+    const same = (other) => JSON.stringify(other.headers) === JSON.stringify(first.headers);
+    return [first, ...(first.others || []).map((other) => (same(other) ? { ...other, mapping: first.mapping } : other))]
+      .flatMap((item) => makeLines(item, scale, form.month.slice(5)));
   }
 
   function changeMillimes(checked) {
     setMillimes(checked);
-    setLines(makeLines(imported, checked, form.month.slice(5)));
+    setLines(importedLines(imported, checked));
     setDirty(true);
   }
 
@@ -394,13 +419,14 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
         </header>
 
         <div className="bd-toolbar">
-          <button type="button" className="bd-tool" onClick={startDraft} disabled={Boolean(draft)}>Ajouter</button>
+          <button type="button" className="bd-tool" onClick={startDraft} disabled={Boolean(draft)}>Ajouter une nouvelle ligne</button>
           <button type="button" className="bd-tool" disabled={selected < 0} onClick={() => editLine(selected)}>Modifier</button>
           <button type="button" className="bd-tool" disabled={selected < 0} onClick={removeLine}>Supprimer</button>
           <button type="button" className="bd-tool" disabled={!lines.length} onClick={preview}>Aperçu</button>
           <span className="bd-spacer" />
-          <input ref={fileInput} type="file" accept=".xls,.xlsx,.csv,.txt" hidden onChange={chooseFile} />
-          <button type="button" className="bd-import" onClick={() => fileInput.current?.click()} disabled={busy}>{kind.importLabel}</button>
+          <input ref={fileInput} type="file" accept=".xls,.xlsx,.csv,.txt" multiple hidden aria-label="Fichiers du siège" onChange={chooseFile} />
+          <button type="button" className="bd-import" onClick={() => fileInput.current?.click()} disabled={busy} title="Un ou plusieurs fichiers du siège">{kind.importLabel}</button>
+          {!kind.quittances && <button type="button" className="bd-import" onClick={() => setConfronting(true)} disabled={busy} title="Confronter le bordereau de la compagnie et de la période avec les quittances de l’agence">Confrontation</button>}
           <button type="button" className="bd-save" onClick={save} disabled={busy || !lines.length || (fromQuittances && !dirty)}>{busy ? 'Patientez…' : dirty ? 'Enregistrer le bordereau' : fromQuittances ? 'Quittances' : 'Enregistré'}</button>
         </div>
 
@@ -411,6 +437,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
               {companies.map((company) => <option key={company.code_compagnie} value={company.code_compagnie}>{company.nom_compagnie}</option>)}
             </select>
           </label>
+          <label className="bd-search">Client<input type="search" value={search} placeholder="Code ou nom du client" onChange={(event) => setSearch(event.target.value)} /></label>
           <label>Date réception<input type="date" value={form.date_reception} readOnly title="Date de réception : le jour de l’enregistrement (celle du bordereau quand il est déjà reçu)" /></label>
           <label>TC
             <select value={form.tc} disabled><option value={form.tc}>{kind.label}</option></select>
@@ -427,7 +454,6 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           <div className="bd-total" title="Prime totale moins les commissions"><span>Solde</span><strong>{money(solde)}</strong></div>
           <div className="bd-total"><span>Lignes</span><strong>{lines.length}</strong></div>
           {fromQuittances && <div className="bd-total"><span>Validées</span><strong>{validated}</strong></div>}
-          <label className="bd-search">Client<input type="search" value={search} placeholder="Code ou nom du client" onChange={(event) => setSearch(event.target.value)} /></label>
           {search.trim() && <div className="bd-total"><span>Affichées</span><strong>{visibleLines.length}</strong></div>}
         </div>
 
@@ -466,6 +492,8 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
                     <td key={key} className={kind === 'money' ? 'is-number' : undefined}>
                       {fromQuittances && key in EDITABLE
                         ? <EditableCell value={line[key]} label={`${label} ${line.num_quittance}`} number={EDITABLE[key]} onSave={(value) => saveCell(line, key, value)} />
+                        : !fromQuittances && key in EDITABLE_TERME
+                        ? <EditableCell value={line[key]} label={`${label} ${line.num_police}`} number={EDITABLE_TERME[key]} onSave={(value) => editTermeCell(index, key, value)} />
                         : kind === 'money' ? money(line[key]) : kind === 'date' ? shortDate(line[key]) : line[key] ?? ''}
                     </td>
                   ))}
@@ -535,6 +563,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           </form>
         </div>
       )}
+      {confronting && <BordereauConfrontationModal initial={{ code_compagnie: form.code_compagnie, tc: form.tc, month: form.month }} onClose={() => setConfronting(false)} />}
     </div>
   );
 }

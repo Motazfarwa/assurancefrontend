@@ -8,6 +8,8 @@ import LoginPage from './pages/Login/LoginPage';
 import AssistantWidget from './components/AssistantWidget/AssistantWidget';
 import AppToast from './components/AppToast/AppToast';
 import BackButton from './components/BackButton/BackButton';
+import ModalZoom from './components/ModalZoom/ModalZoom';
+import UppercaseInputs from './components/UppercaseInputs/UppercaseInputs';
 
 // The "Assistant IA" button is hidden for now; set to true to show it again.
 const SHOW_ASSISTANT = false;
@@ -51,6 +53,8 @@ function App() {
     <Page />
     {SHOW_ASSISTANT && pathname !== '/login' && <AssistantWidget />}
     {pathname !== '/login' && pathname !== '/forbidden' && <BackButton />}
+    {pathname !== '/login' && pathname !== '/forbidden' && <ModalZoom />}
+    <UppercaseInputs pathname={pathname} />
     <AppToast />
   </>;
 }

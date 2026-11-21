@@ -58,10 +58,11 @@ function Table({ columns, rows, empty, rowClass }) {
   );
 }
 
-export default function BordereauConfrontationModal({ onClose }) {
+// `initial`: the company and the month to confront, when opened from the Réception terme.
+export default function BordereauConfrontationModal({ onClose, initial }) {
   const { accessToken } = useAuth();
   const [companies, setCompanies] = useState([]);
-  const [form, setForm] = useState({ code_compagnie: '', tc: 'T', month: nextMonth() });
+  const [form, setForm] = useState({ code_compagnie: initial?.code_compagnie || '', tc: initial?.tc || 'T', month: initial?.month || nextMonth() });
   const [result, setResult] = useState(null);
   const [tab, setTab] = useState('confrontation');
   const [loading, setLoading] = useState(false);

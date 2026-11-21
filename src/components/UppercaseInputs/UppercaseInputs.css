@@ -1,0 +1,12 @@
+/* Saisie en majuscules: the text fields show their value in capitals (not their placeholder); emails, passwords and
+   the pages of the login and of the users keep the case. */
+body:not([data-keep-case]) input:not([type]):not([autocomplete~="username"]):not([autocomplete~="email"]):not([data-keep-case]),
+body:not([data-keep-case]) input[type="text"]:not([autocomplete~="username"]):not([autocomplete~="email"]):not([data-keep-case]),
+body:not([data-keep-case]) input[type="search"]:not([data-keep-case]),
+body:not([data-keep-case]) textarea:not([data-keep-case]) {
+  text-transform: uppercase;
+}
+body:not([data-keep-case]) input::placeholder,
+body:not([data-keep-case]) textarea::placeholder {
+  text-transform: none;
+}

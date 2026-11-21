@@ -10,7 +10,7 @@ jest.mock('../../navigation', () => ({ navigate: jest.fn(), rememberReturnModule
 jest.mock('../../services/clientApi', () => ({ getClientByCode: () => Promise.resolve({}) }));
 jest.mock('../../services/notificationApi', () => ({ listIncompleteClientsPage: jest.fn() }));
 
-const counters = { total: 2039, coordonnees: 1845, sans_police: 893 };
+const counters = { total: 2039, coordonnees: 1845, sans_police: 893, sans_quittance: 1210 };
 const client = (code, name, details) => ({ code_client: code, nom_client: name, manques: [], details: { coordonnees: [], sans_police: false, ...details } });
 
 beforeEach(() => {
@@ -26,16 +26,19 @@ test('the module is for the administrator only', () => {
   expect(INSURANCE_MODULES.find((module) => module.form === 'clients-incomplets')).toMatchObject({ id: '105', adminOnly: true });
 });
 
-test('counts the clients with missing coordonnées, without police, and their total; filters on a kind', async () => {
+test('counts the clients with missing coordonnées, without police, without quittance, and their total; filters on a kind', async () => {
   render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} />);
   expect(await screen.findByText('CAMBONI IGNAZIO')).toBeInTheDocument();
   expect(screen.getByText('téléphone')).toBeInTheDocument();
   expect(screen.getByText('Aucune police')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Tous les clients 2039/ })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Coordonnées 1845/ })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /Quittances/ })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /^Polices/ })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /Sans police 893/ }));
+  // no counter cards over the list: the counts are in the "Afficher" list
+  expect(screen.queryByRole('group', { name: 'Type d’information manquante' })).not.toBeInTheDocument();
+  expect(screen.getByRole('option', { name: /Tous les clients à compléter \(2039\)/ })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: /Coordonnées manquantes \(1845\)/ })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: /Sans quittance \(1210\)/ })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Afficher'), { target: { value: 'sans_quittance' } });
+  await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_quittance', manque: '', q: '', offset: 0, limit: 100 }));
+  fireEvent.change(screen.getByLabelText('Afficher'), { target: { value: 'sans_police' } });
   await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
   await waitFor(() => expect(screen.queryByText('CAMBONI IGNAZIO')).not.toBeInTheDocument());
 });
@@ -48,7 +51,7 @@ test('the filter shows the clients without police, or those without one coordonn
   expect(await screen.findByRole('option', { name: /Sans téléphone \(1773\)/ })).toBeInTheDocument();
   fireEvent.change(filter, { target: { value: 'coordonnees:ville' } });
   await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'coordonnees', manque: 'ville', q: '', offset: 0, limit: 100 }));
-  expect(screen.getByRole('button', { name: /Coordonnées 1845/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(filter).toHaveValue('coordonnees:ville');
   fireEvent.change(filter, { target: { value: 'sans_police' } });
   await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
 });
@@ -102,6 +105,6 @@ test('the list is paginated: a page reads its 100 clients, a filter goes back to
   expect(screen.getByText('Page 2 / 19')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '19' }));
   expect(await screen.findByText('CLIENT 1800')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /Sans police 893/ }));
+  fireEvent.change(screen.getByLabelText('Afficher'), { target: { value: 'sans_police' } });
   await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
 });

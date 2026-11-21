@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BordereauReceptionModal from './BordereauReceptionModal';
 import { getBordereauClients, listBordereaux, listQuittances, updateQuittanceLine } from '../../services/bordereauApi';
 import { listCompanies } from '../../services/companyApi';
@@ -7,6 +7,7 @@ jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't' 
 jest.mock('../../services/companyApi', () => ({
   listCompanies: jest.fn(), isBordereauCompany: () => true, isTermeCompany: () => true,
 }));
+jest.mock('../../services/bordereauParser', () => ({ ...jest.requireActual('../../services/bordereauParser'), readBordereauFile: jest.fn() }));
 jest.mock('../../services/bordereauApi', () => ({
   ...jest.requireActual('../../services/bordereauApi'),
   listQuittances: jest.fn(),
@@ -46,13 +47,34 @@ test('comptant: the N° quittance and the Prime Total are corrected in the grid'
   render(<BordereauReceptionModal tc="C" onClose={() => {}} />);
   const number = await screen.findByLabelText('N° Quit. 630363');
   fireEvent.change(number, { target: { value: '630399' } });
-  await act(async () => { fireEvent.blur(number); });
+  fireEvent.blur(number);
+  await waitFor(() => expect(updateQuittanceLine).toHaveBeenCalledTimes(1));
   expect(updateQuittanceLine).toHaveBeenCalledWith('t', { num_quittance: '630363', num_int: '045200700082', nouveau_numero: '630399' });
   expect(await screen.findByLabelText('N° Quit. 630399')).toHaveValue('630399');
 
   const prime = screen.getByLabelText('Prime Total 0401503');
   fireEvent.change(prime, { target: { value: '90' } });
-  await act(async () => { fireEvent.keyDown(prime, { key: 'Enter' }); fireEvent.blur(prime); });
+  fireEvent.keyDown(prime, { key: 'Enter' });
+  fireEvent.blur(prime);
   await waitFor(() => expect(updateQuittanceLine).toHaveBeenCalledWith('t', { num_quittance: '0401503', num_int: '043202602120', prime_total: 90 }));
   expect(updateQuittanceLine).toHaveBeenCalledTimes(2);
+});
+
+test('terme: the Prime Total of a line of the file is corrected in the grid and the Solde follows', async () => {
+  const { readBordereauFile } = jest.requireMock('../../services/bordereauParser');
+  readBordereauFile.mockResolvedValue({
+    meta: {}, headers: ['police', 'nom', 'prime'], headerRow: 0, mapping: { num_police: 0, nom_client: 1, prime_total: 2 },
+    rows: [['police', 'nom', 'prime'], ['B09650', 'NICOLA CASTELLITTO', 100], ['A74723', 'WE WISH AGENCY', 50]],
+  });
+  render(<BordereauReceptionModal tc="T" onClose={() => {}} />);
+  const files = [new File(['a'], 'terme-1.xlsx'), new File(['b'], 'terme-2.xlsx')];
+  fireEvent.change(screen.getByLabelText('Fichiers du siège'), { target: { files } });
+  expect(await screen.findByText(/4 ligne\(s\) lues dans 2 fichiers/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Confrontation' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Ajouter une nouvelle ligne' })).toBeInTheDocument();
+  const prime = screen.getAllByLabelText('Prime Total B09650')[0];
+  fireEvent.change(prime, { target: { value: '120' } });
+  fireEvent.blur(prime);
+  // 120 + 50 + 100 + 50, no commission
+  await waitFor(() => expect(screen.getAllByText('320,000').length).toBeGreaterThan(0));
 });
