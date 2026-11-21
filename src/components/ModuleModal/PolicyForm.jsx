@@ -461,7 +461,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         || null;
     const tauxComm = branch?.taux_comm == null ? null : Number(branch.taux_comm); // commission rate (0.1 = 10 %)
     const nomBrancheShown = branch?.nom_branche || (loadedExisting ? nomBranche : "");
-    const branchMissing = !flotteAuto && Boolean(values.code_compagnie) && branchCandidates !== null && values.num_police.length >= 6 && !branch && !(loadedExisting && nomBranche);
 
     // "Police flotte" ticked on a new police: the N° police is the next one of the chosen prefix (prefix + year + counter),
     // as the legacy software numbers them; unticked, an automatic number is taken away.
@@ -953,9 +952,6 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                             placeholder="Déduit du N° police"
                             readOnly
                         />
-                        {branchMissing && (
-                            <small className="pf-branch-error">Aucune branche de cette compagnie ne correspond à ce numéro.</small>
-                        )}
                     </label>
 
                     {!isCreate && (

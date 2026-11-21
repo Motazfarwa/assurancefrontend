@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { isStatementCompany, listCompanies } from '../../services/companyApi';
 import { getClientAccounts } from '../../services/journalApi';
+import { searchClients } from '../../services/clientApi';
 import NewWindow, { openReportWindow } from '../NewWindow/NewWindow';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
@@ -112,6 +113,34 @@ function ComptesSheet({ params, subtitle, onClose }) {
   </div>;
 }
 
+// The client of the état: searched by code or name in the clients; picking one keeps its code (onPick(code, name)).
+function ClientField({ value, name, onChange, onPick }) {
+  const { accessToken } = useAuth();
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const text = value.trim();
+    if (!open || text.length < 2 || name) { setResults([]); return undefined; }
+    let active = true;
+    const timer = setTimeout(() => {
+      searchClients(accessToken, text, 10).then((rows) => { if (active) setResults(rows); }).catch(() => { if (active) setResults([]); });
+    }, 250);
+    return () => { active = false; clearTimeout(timer); };
+  }, [accessToken, value, open, name]);
+  const nameOf = (row) => (row.nom_client || `${row.lastName || ''} ${row.firstName || ''}`).trim();
+  return <label className="acompte-field jrn-company jrn-client-field"><span>Client (code ou nom)</span>
+    <input value={value} placeholder="ex. 5060 ou BEN SALAH" autoFocus autoComplete="off" role="combobox" aria-controls="comptes-client-results" aria-expanded={open && results.length > 0}
+      onChange={(event) => { onChange(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} />
+    {name && <small className="jrn-client-name">{name}</small>}
+    {open && results.length > 0 && <ul id="comptes-client-results" className="jrn-client-results" role="listbox" aria-label="Clients trouvés">
+      {results.map((row) => <li key={row.clientCode} role="option" aria-selected={false}
+        onMouseDown={(event) => { event.preventDefault(); onPick(row.clientCode, nameOf(row)); setOpen(false); }}>
+        <b>{row.clientCode}</b> {nameOf(row)}
+      </li>)}
+    </ul>}
+  </label>;
+}
+
 // Module "Etat des comptes client": the period (or all), the selection (all, a company, a client or a police) and
 // the état of the quittances, then the aperçu in a tab of its own. The administrator chooses the synthèse (with the
 // règlements and commissions) or the detail; any other user gets the detail, as in the legacy software.
@@ -123,6 +152,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
   const [fin, setFin] = useState(today);
   const [scope, setScope] = useState('tous');
   const [value, setValue] = useState('');
+  const [clientName, setClientName] = useState(''); // the client picked in the list
   const [etat, setEtat] = useState('tous');
   const [presentation, setPresentation] = useState('synthese');
   const [companies, setCompanies] = useState([]);
@@ -145,6 +175,8 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
 
   const reversed = between && Boolean(debut && fin && fin < debut);
   const missing = (between && (!debut || !fin)) || (scope !== 'tous' && !value.trim());
+  // a name typed but no client picked: the état needs the client's code
+  const unpicked = scope === 'client' && Boolean(value.trim()) && !clientName && !/^\d+$/.test(value.trim());
 
   function preview() {
     setError('');
@@ -154,7 +186,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
     };
     const company = companies.find((item) => String(item.code_compagnie) === String(value));
     const subtitle = [
-      scope === 'compagnie' && `Compagnie : ${company?.nom_compagnie || value}`, scope === 'client' && `Client : ${value.trim()}`,
+      scope === 'compagnie' && `Compagnie : ${company?.nom_compagnie || value}`, scope === 'client' && `Client : ${value.trim()}${clientName ? ` ${clientName}` : ''}`,
       scope === 'police' && `Police : ${value.trim()}`, etat !== 'tous' && `Quittances : ${ETATS[etat].toLowerCase()}`,
     ].filter(Boolean).join(' · ');
     try {
@@ -173,7 +205,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
         </div>
         <div className="unpaid-filter-form acompte-filters jrn-dates">
           <fieldset className="unpaid-filter-set unpaid-choice"><legend>Sélection</legend>
-            {Object.entries(SCOPES).map(([key, label]) => <label key={key}><input type="radio" name="comptes-scope" checked={scope === key} onChange={() => { setScope(key); setValue(''); }} /> {label}</label>)}
+            {Object.entries(SCOPES).map(([key, label]) => <label key={key}><input type="radio" name="comptes-scope" checked={scope === key} onChange={() => { setScope(key); setValue(''); setClientName(''); }} /> {label}</label>)}
           </fieldset>
           {scope === 'compagnie' && <label className="acompte-field jrn-company"><span>Compagnie</span>
             <select value={value} onChange={(event) => setValue(event.target.value)}>
@@ -181,7 +213,7 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
               {companies.map((company) => <option key={company.code_compagnie} value={company.code_compagnie}>{company.nom_compagnie}</option>)}
             </select>
           </label>}
-          {scope === 'client' && <label className="acompte-field jrn-date"><span>Code client</span><input value={value} onChange={(event) => setValue(event.target.value)} placeholder="ex. 5060" autoFocus /></label>}
+          {scope === 'client' && <ClientField value={value} name={clientName} onChange={(text) => { setValue(text); setClientName(''); }} onPick={(code, nom) => { setValue(code); setClientName(nom); }} />}
           {scope === 'police' && <label className="acompte-field jrn-company"><span>N° police</span><input value={value} onChange={(event) => setValue(event.target.value)} placeholder="N° police ou N° interne" autoFocus /></label>}
         </div>
         <div className="unpaid-filter-form acompte-filters jrn-dates">
@@ -192,10 +224,11 @@ export default function EtatComptesClientsModal({ moduleId, onClose }) {
             <label><input type="radio" name="comptes-presentation" checked={presentation === 'synthese'} onChange={() => setPresentation('synthese')} /> Synthèse</label>
             <label><input type="radio" name="comptes-presentation" checked={presentation === 'detail'} onChange={() => setPresentation('detail')} /> Détail par client</label>
           </fieldset>}
-          <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={missing || reversed}>Aperçu</button>
+          <button type="button" className="expert-submit jrn-open" onClick={preview} disabled={missing || reversed || unpicked}>Aperçu</button>
         </div>
         {error && <div className="expert-error unpaid-error" role="alert">{error}</div>}
         {reversed && <div className="expert-error unpaid-error" role="alert">La date de fin précède la date de début.</div>}
+        {unpicked && <p className="jrn-hint">Choisissez le client dans la liste proposée.</p>}
         <p className="jrn-hint">{isAdmin && presentation === 'synthese'
           ? 'Synthèse : une ligne par client — prime, ristourne, montant réglé, reste à payer, commission (quittances d’échéance dans la période, sauf celles retournées à la compagnie) et sinistres payés dans la période.'
           : 'Détail : pour chaque client, ses quittances d’échéance dans la période, compagnie par compagnie, avec la prime, le montant réglé et le reste à payer de chacune, et les totaux.'}</p>
