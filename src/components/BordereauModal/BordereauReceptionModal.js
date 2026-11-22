@@ -19,6 +19,15 @@ const cleanNumber = (value) => String(value ?? '').trim().replace(/\.0+$/, '');
 // A line typed by hand: the amounts start at 0.
 const emptyLine = () => ({ num_police: '', code_client: '', nom_client: '', echeance: '', num_quittance: '', prime_net: '0', commission: '0', prime_total: '0' });
 const toAmount = (value) => (value === '' || value == null ? null : Number(value));
+// A Prime Total not typed (empty or 0) is the P.Net+C.Q. of the line, so the line still comes off the Solde.
+const withPrimeTotal = (line) => (Number(line.prime_total || 0) === 0 && Number(line.prime_net || 0) !== 0 ? { ...line, prime_total: line.prime_net } : line);
+// A field of the line being entered: the Prime Total follows the P.Net+C.Q. typed, until a Prime Total of its own is typed.
+function typeDraft(current, key, value) {
+  const next = { ...current, [key]: value, ...(key === 'num_police' ? { lookup: '' } : {}) };
+  const following = Number(current.prime_total || 0) === 0 || String(current.prime_total) === String(current.prime_net);
+  if (key === 'prime_net' && following) next.prime_total = value;
+  return next;
+}
 const GRID = [
   ['num_police', 'N° Police (num_int)'], ['code_client', 'Code Clt'], ['nom_client', 'Nom Client'], ['echeance', 'Échéance', 'date'],
   ['num_quittance', 'N° Quit.'], ['prime_net', 'P.Net+C.Q.', 'money'], ['commission', 'Com.', 'money'], ['prime_total', 'Prime Total', 'money'],
@@ -220,7 +229,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     if (!number) { setError('Saisissez le N° de police de la ligne.'); draftNumber.current?.focus(); return; }
     setError('');
     const { lookup, ...values } = draft;
-    setLines((current) => [...current, { ...values, num_police: number, echeance: values.echeance || null, prime_net: toAmount(values.prime_net), commission: toAmount(values.commission), prime_total: toAmount(values.prime_total) }]);
+    setLines((current) => [...current, withPrimeTotal({ ...values, num_police: number, echeance: values.echeance || null, prime_net: toAmount(values.prime_net), commission: toAmount(values.commission), prime_total: toAmount(values.prime_total) })]);
     setDirty(true);
     setNotice('Ligne ajoutée. Saisissez la suivante, ou enregistrez le bordereau.');
     startDraft();
@@ -441,14 +450,14 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     event.preventDefault();
     const values = editing.values;
     if (!String(values.num_police).trim()) return;
-    const clean = {
+    const clean = withPrimeTotal({
       ...values,
       num_police: String(values.num_police).replace(/\s/g, ''),
       echeance: values.echeance || null,
       prime_net: values.prime_net === '' ? null : Number(values.prime_net),
       commission: values.commission === '' ? null : Number(values.commission),
       prime_total: values.prime_total === '' ? null : Number(values.prime_total),
-    };
+    });
     setLines((current) => (editing.index < 0 ? [...current, clean] : current.map((line, index) => (index === editing.index ? clean : line))));
     setDirty(true);
     setEditing(null);
@@ -602,7 +611,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
                           step={type === 'money' ? 'any' : undefined}
                           className={type === 'money' ? 'is-number' : undefined}
                           value={draft[key] ?? ''}
-                          onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value, ...(key === 'num_police' ? { lookup: '' } : {}) }))}
+                          onChange={(event) => setDraft((current) => typeDraft(current, key, event.target.value))}
                         />}
                     </td>
                   ))}

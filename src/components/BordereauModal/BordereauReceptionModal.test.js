@@ -150,3 +150,23 @@ test('terme: a police whose zeros the file dropped (1777) is shown as ours (0017
   expect(screen.queryByText('BEN AMOR EP KANOUN INSAF')).not.toBeInTheDocument();
   expect(getBordereauClients).toHaveBeenCalledWith('t', ['1777']);
 });
+
+test('terme entered by hand: the P.Net+C.Q. typed is the Prime Total of the line (unless one is typed) and comes off the Solde', async () => {
+  getBordereauClients.mockResolvedValue({ 1777: { num_int: '001777', code_client: '2316', nom_client: 'BEN AMOR INSAF' } });
+  render(<BordereauReceptionModal tc="T" onClose={() => {}} />);
+  const totalBox = screen.getByLabelText('Total');
+  fireEvent.focus(totalBox);
+  fireEvent.change(totalBox, { target: { value: '100000' } });
+  fireEvent.blur(totalBox);
+  fireEvent.click(screen.getByRole('button', { name: 'Ajouter une nouvelle ligne' }));
+  fireEvent.change(screen.getByLabelText('N° Police (num_int)'), { target: { value: '1777' } });
+  fireEvent.change(screen.getByLabelText('P.Net+C.Q.'), { target: { value: '145200' } });
+  expect(screen.getByLabelText('Prime Total')).toHaveValue(145200);
+  fireEvent.click(screen.getByRole('button', { name: 'Ajouter la ligne (Entrée)' }));
+  expect(screen.getByLabelText('Solde')).toHaveValue((-45200).toLocaleString('fr-TN', { minimumFractionDigits: 3 }));
+  // a Prime Total of its own is kept
+  fireEvent.change(screen.getByLabelText('P.Net+C.Q.'), { target: { value: '5000' } });
+  fireEvent.change(screen.getByLabelText('Prime Total'), { target: { value: '5600' } });
+  fireEvent.change(screen.getByLabelText('P.Net+C.Q.'), { target: { value: '5001' } });
+  expect(screen.getByLabelText('Prime Total')).toHaveValue(5600);
+});
