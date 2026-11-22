@@ -25,6 +25,7 @@ import EtatPercusModal from '../JournalModal/EtatPercus';
 import EtatComptesClientsModal from '../JournalModal/EtatComptesClients';
 import EtatDepensesTechniquesModal from '../JournalModal/EtatDepensesTechniques';
 import ClientsIncompletsModal from '../ClientsIncompletsModal/ClientsIncompletsModal';
+import ControleTablesModal from '../ControleTablesModal/ControleTablesModal';
 import JournalJourModal from '../JournalJourModal/JournalJourModal';
 import RetourQuittancesModal from '../JournalModal/RetourQuittances';
 import EtatTermeModal from '../JournalModal/EtatTerme';
@@ -81,6 +82,7 @@ export default function ModulesWorkspace() {
   const [bankModule, setBankModule] = useState(null);
   const [depensesTechModule, setDepensesTechModule] = useState(null);
   const [incompleteModule, setIncompleteModule] = useState(null);
+  const [controleModule, setControleModule] = useState(null);
   const [incompleteInitial, setIncompleteInitial] = useState(undefined); // its filters, coming back from a fiche
   const [journalJourModule, setJournalJourModule] = useState(null);
   const [reconciliationModule, setReconciliationModule] = useState(null);
@@ -202,6 +204,12 @@ export default function ModulesWorkspace() {
     if (module.form === 'journal-jour') {
       setActiveModuleId(module.id);
       setJournalJourModule(module);
+      return;
+    }
+    if (module.form === 'controle-tables') {
+      if (!user.isAdmin) return;
+      setActiveModuleId(module.id);
+      setControleModule(module);
       return;
     }
     if (module.form === 'clients-incomplets') {
@@ -388,6 +396,7 @@ export default function ModulesWorkspace() {
       {termeModule && <EtatTermeModal moduleId={termeModule.id} onClose={() => setTermeModule(null)} />}
       {bankModule && <EtatComptesBanqueModal moduleId={bankModule.id} onClose={() => setBankModule(null)} />}
       {journalJourModule && <JournalJourModal moduleId={journalJourModule.id} onClose={() => { setJournalJourModule(null); setActiveModuleId(null); }} />}
+      {controleModule && user.isAdmin && <ControleTablesModal moduleId={controleModule.id} onClose={() => { setControleModule(null); setActiveModuleId(null); }} />}
       {incompleteModule && user.isAdmin && <ClientsIncompletsModal moduleId={incompleteModule.id} initial={incompleteInitial} onClose={() => { setIncompleteModule(null); setIncompleteInitial(undefined); setActiveModuleId(null); }} />}
       {depensesTechModule && <EtatDepensesTechniquesModal moduleId={depensesTechModule.id} onClose={() => { setDepensesTechModule(null); setActiveModuleId(null); }} />}
       {reconciliationModule && <ReconciliationPoliceModal moduleId={reconciliationModule.id} onClose={() => setReconciliationModule(null)} />}
