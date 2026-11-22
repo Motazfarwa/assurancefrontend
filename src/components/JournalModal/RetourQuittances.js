@@ -60,8 +60,11 @@ export default function RetourQuittancesModal({ moduleId, onClose }) {
 
   async function toggle(row, retour) {
     const paid = Number(row.prime_total || 0) - Number(row.solde_quittance || 0);
-    if (retour && paid > 0.0005
-      && !window.confirm(`La quittance N° ${row.num_quittance} a déjà reçu ${fmt(paid)} TND de règlement. La retourner quand même à la compagnie ?`)) return;
+    // every change is confirmed; a quittance already paid in part says so
+    const question = retour && paid > 0.0005
+      ? `La quittance N° ${row.num_quittance} a déjà reçu ${fmt(paid)} TND de règlement. La retourner quand même à la compagnie ?`
+      : 'Êtes-vous sûr de vouloir confirmer votre modification ?';
+    if (!window.confirm(question)) return;
     setSaving(row.num_quittance);
     setNotice('');
     try {

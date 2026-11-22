@@ -112,3 +112,7 @@
 .bd-files strong { color: #173247; font-size: 12.5px; }
 .bd-files span { color: #587079; font-size: 12px; }
 .bd-files .bd-tool.is-active { border-color: #17806f; color: #17806f; }
+
+/* Terme: the Total and the Solde typed at the top */
+.bd-total-edit input { width: 120px; padding: 2px 0; border: 0; border-bottom: 1px dashed #9cc7bd; background: transparent; color: #187d78; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bd-total-edit input:focus { outline: none; border-bottom-color: #17806f; }

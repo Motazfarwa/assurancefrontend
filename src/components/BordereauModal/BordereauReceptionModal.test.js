@@ -73,10 +73,37 @@ test('terme: the Prime Total of a line of the file is corrected in the grid and 
   expect(screen.getByRole('button', { name: 'Confrontation' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Ajouter une nouvelle ligne' })).toBeInTheDocument();
   const prime = screen.getAllByLabelText('Prime Total B09650')[0];
+  // the file imported: the Total is the file's (100 + 50, twice) and the Solde 0
+  expect(screen.getByLabelText('Total')).toHaveValue('300,000');
+  expect(screen.getByLabelText('Solde')).toHaveValue('0,000');
   fireEvent.change(prime, { target: { value: '120' } });
   fireEvent.blur(prime);
-  // 120 + 50 + 100 + 50, no commission
-  await waitFor(() => expect(screen.getAllByText('320,000').length).toBeGreaterThan(0));
+  // the lines now 320 for a Total of 300: Solde -20
+  await waitFor(() => expect(screen.getByLabelText('Solde')).toHaveValue((-20).toLocaleString('fr-TN', { minimumFractionDigits: 3 })));
+  expect(screen.getByLabelText('Total')).toHaveValue('300,000');
+});
+
+test('terme entered by hand: the Total is typed at the top and each line takes its Prime Total off the Solde', async () => {
+  getBordereauClients.mockResolvedValue({ 1777: { num_int: '001777', code_client: '2316', nom_client: 'BEN AMOR INSAF' } });
+  render(<BordereauReceptionModal tc="T" onClose={() => {}} />);
+  const totalBox = screen.getByLabelText('Total');
+  fireEvent.focus(totalBox);
+  fireEvent.change(totalBox, { target: { value: '10000' } });
+  fireEvent.blur(totalBox);
+  expect(screen.getByLabelText('Solde')).toHaveValue((10000).toLocaleString('fr-TN', { minimumFractionDigits: 3 }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ajouter une nouvelle ligne' }));
+  fireEvent.change(screen.getByLabelText('N° Police (num_int)'), { target: { value: '1777' } });
+  fireEvent.change(screen.getByLabelText('Prime Total'), { target: { value: '5600' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Ajouter la ligne (Entrée)' }));
+  // 10 000 - 5 600, as the legacy
+  expect(screen.getByLabelText('Solde')).toHaveValue((4400).toLocaleString('fr-TN', { minimumFractionDigits: 3 }));
+  expect(screen.getByLabelText('Total')).toHaveValue((10000).toLocaleString('fr-TN', { minimumFractionDigits: 3 }));
+  // the Solde typed: the Total follows
+  const soldeBox = screen.getByLabelText('Solde');
+  fireEvent.focus(soldeBox);
+  fireEvent.change(soldeBox, { target: { value: '400' } });
+  fireEvent.blur(soldeBox);
+  expect(screen.getByLabelText('Total')).toHaveValue((6000).toLocaleString('fr-TN', { minimumFractionDigits: 3 }));
 });
 
 test('terme, several files: each is read with its own columns and shown one at a time (Suivant), or all together', async () => {
@@ -104,5 +131,22 @@ test('terme, several files: each is read with its own columns and shown one at a
   expect(screen.getByText('STE J S AUTO PAINT')).toBeInTheDocument();
   expect(screen.getByText('SOCIETE CHARTEL')).toBeInTheDocument();
   // the bordereau total is the one of both files
-  expect(screen.getAllByText('3 036,229').length).toBeGreaterThan(0);
+  expect(screen.getByLabelText('Total')).toHaveValue((3036.229).toLocaleString('fr-TN', { minimumFractionDigits: 3 }));
+  expect(screen.getByLabelText('Solde')).toHaveValue('0,000');
+});
+
+test('terme: a police whose zeros the file dropped (1777) is shown as ours (001777), with the name of our client file', async () => {
+  const { readBordereauFile } = jest.requireMock('../../services/bordereauParser');
+  readBordereauFile.mockResolvedValue({
+    meta: {}, headers: ['police', 'nom', 'prime'], headerRow: 0, mapping: { num_police: 0, nom_client: 1, prime_total: 2 },
+    rows: [['police', 'nom', 'prime'], [1777, 'BEN AMOR EP KANOUN INSAF', 100]],
+  });
+  getBordereauClients.mockResolvedValue({ 1777: { num_int: '001777', code_client: '2316', nom_client: 'BEN AMOR INSAF' } });
+  render(<BordereauReceptionModal tc="T" onClose={() => {}} />);
+  fireEvent.change(screen.getByLabelText('Fichiers du siège'), { target: { files: [new File(['a'], 'terme.xlsx')] } });
+  expect(await screen.findByText('BEN AMOR INSAF')).toBeInTheDocument();
+  expect(screen.getByText('001777')).toBeInTheDocument();
+  expect(screen.getByText('2316')).toBeInTheDocument();
+  expect(screen.queryByText('BEN AMOR EP KANOUN INSAF')).not.toBeInTheDocument();
+  expect(getBordereauClients).toHaveBeenCalledWith('t', ['1777']);
 });

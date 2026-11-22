@@ -30,12 +30,6 @@ const COLUMNS = {
     { key: 'commission', label: 'Commission', kind: 'money' },
     { label: 'Statut', value: (row) => STATUS_LABELS[row.statut] || row.statut },
   ],
-  branches: [
-    { key: 'code_branche', label: 'Code branche' }, { key: 'nom_branche', label: 'Nom branche' },
-    { key: 'nb_bordereau', label: 'Lignes bordereau' }, { key: 'prime_net', label: 'Prime nette', kind: 'money' },
-    { key: 'commission', label: 'Commission', kind: 'money' }, { key: 'prime_total', label: 'Prime totale', kind: 'money' },
-    { key: 'nb_attendues', label: 'Attendues chez nous' }, { key: 'nb_non_parvenues', label: 'Non parvenues' },
-  ],
 };
 
 function Table({ columns, rows, empty, rowClass }) {
@@ -79,15 +73,6 @@ export default function BordereauConfrontationModal({ onClose, initial }) {
   }, [accessToken]);
 
   const anomalies = useMemo(() => (result ? result.lignes.filter((line) => line.statut !== 'ok') : []), [result]);
-  const branchTotals = useMemo(() => {
-    if (!result) return [];
-    const total = result.branches.reduce((sum, row) => ({
-      code_branche: 'TOTAL', nom_branche: '', nb_bordereau: sum.nb_bordereau + row.nb_bordereau, prime_net: sum.prime_net + row.prime_net,
-      commission: sum.commission + row.commission, prime_total: sum.prime_total + row.prime_total,
-      nb_attendues: sum.nb_attendues + row.nb_attendues, nb_non_parvenues: sum.nb_non_parvenues + row.nb_non_parvenues,
-    }), { nb_bordereau: 0, prime_net: 0, commission: 0, prime_total: 0, nb_attendues: 0, nb_non_parvenues: 0 });
-    return [...result.branches, total];
-  }, [result]);
 
   async function run(nextTab) {
     setError('');
@@ -115,15 +100,14 @@ export default function BordereauConfrontationModal({ onClose, initial }) {
       { title: 'Écarts et anomalies du bordereau', columns: COLUMNS.anomalies, rows: anomalies },
     ],
     bordereau: [{ title: 'État de bordereau', columns: COLUMNS.bordereau, rows: result?.lignes || [] }],
-    branches: [{ title: 'Totaux par code branche', columns: COLUMNS.branches, rows: branchTotals }],
   };
-  const titles = { confrontation: 'État de confrontation', bordereau: 'État de bordereau', branches: 'Liste des totaux par code branche' };
+  const titles = { confrontation: 'État de confrontation', bordereau: 'État de bordereau' };
 
   return (
     <div className="bd-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !loading) onClose(); }}>
       <section className="bd-dialog bd-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="bd-confrontation-title">
         <header className="bd-header">
-          <div><span>COMPTABILITE · MODULE 540</span><h2 id="bd-confrontation-title">Confrontation / Liste des totaux par code branche</h2></div>
+          <div><span>COMPTABILITE · RÉCEPTION TERME · MODULE 530</span><h2 id="bd-confrontation-title">Confrontation</h2></div>
           <button type="button" onClick={onClose} aria-label="Fermer">×</button>
         </header>
 
@@ -139,7 +123,6 @@ export default function BordereauConfrontationModal({ onClose, initial }) {
           </label>
           <label>Période<input type="month" value={form.month} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} /></label>
           <button type="button" className="bd-save" onClick={() => run('confrontation')} disabled={loading}>{loading ? 'Comparaison…' : 'Confrontation'}</button>
-          <button type="button" className="bd-tool" onClick={() => run('branches')} disabled={loading}>Liste des totaux par code branche</button>
         </div>
 
         {error && <p className="bd-error" role="alert">{error}</p>}
@@ -175,7 +158,6 @@ export default function BordereauConfrontationModal({ onClose, initial }) {
                 </>
               )}
               {tab === 'bordereau' && <Table columns={COLUMNS.bordereau} rows={result.lignes} empty="Bordereau vide." rowClass={(row) => (row.statut === 'ok' ? undefined : row.statut === 'inconnue' ? 'is-unknown' : 'is-gap')} />}
-              {tab === 'branches' && <Table columns={COLUMNS.branches} rows={branchTotals} empty="Aucune donnée." rowClass={(row) => (row.code_branche === 'TOTAL' ? 'is-total' : undefined)} />}
             </div>
           </>
         )}

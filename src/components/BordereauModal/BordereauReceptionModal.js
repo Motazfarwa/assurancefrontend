@@ -62,6 +62,29 @@ function EditableCell({ value, label, number, onSave }) {
 const EDITABLE = { num_quittance: false, prime_total: true }; // comptant (TQuittance): key -> numeric
 const EDITABLE_TERME = { prime_total: true }; // terme (the lines of the file): the Prime Total, the Solde follows
 
+const sumOf = (list) => list.reduce((sum, line) => sum + Number(line.prime_total || 0), 0);
+
+// Terme: the Total / Solde at the top, typed as an amount (applied on leaving the field or on Entrée).
+function AmountBox({ label, title, value, onChange }) {
+  const [text, setText] = useState(null); // null: not being typed, the value is shown
+  const apply = () => {
+    if (text === null) return;
+    const amount = Number(String(text).replace(/\s/g, '').replace(',', '.'));
+    setText(null);
+    if (Number.isFinite(amount) && Math.abs(amount - value) > 0.0005) onChange(amount);
+  };
+  return (
+    <label className="bd-total bd-total-edit" title={title}>
+      <span>{label}</span>
+      <input aria-label={label} inputMode="decimal" value={text ?? money(value)}
+        onFocus={() => setText(Number(value.toFixed(3)).toString())}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={apply}
+        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
+    </label>
+  );
+}
+
 // Several files imported: one at a time (‹ Précédent / Suivant ›, with its lines and its total), or all of them.
 function FileStrip({ sources, at, lines, onShow }) {
   const of = (index) => lines.filter((line) => line.source === index);
@@ -100,6 +123,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const mappedAt = sourceAt >= 0 ? sourceAt : 0; // the file whose columns are shown
   const imported = sources[mappedAt]?.info || null;
   const [dirty, setDirty] = useState(false);
+  const [announced, setAnnounced] = useState(null); // terme: the Total typed at the top (null: the total of the lines)
   const [millimes, setMillimes] = useState(false);
   const skipLoad = useRef(false);
   const [selected, setSelected] = useState(-1);
@@ -118,10 +142,16 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const companyCodes = companies.map((company) => company.code_compagnie).join(',');
   const annee = /^\d{4}$/.test(form.annee) ? form.annee : '';
   const companyName = companies.find((company) => String(company.code_compagnie) === String(form.code_compagnie))?.nom_compagnie || '';
-  // Lines with the client filled from the agency's policy when the file does not give it.
+  // Lines shown with the agency's police and client: the file's « 1777 » is our « 001777 », and the name is the one of our
+  // client file, not the company's spelling. The file's values stay only for a police unknown to the agency.
   const shownLines = useMemo(() => lines.map((line) => {
     const client = clients[cleanNumber(line.num_police)];
-    return client ? { ...line, code_client: line.code_client || client.code_client || '', nom_client: line.nom_client || client.nom_client || '' } : line;
+    return client ? {
+      ...line,
+      num_police: client.num_int || line.num_police,
+      code_client: client.code_client || line.code_client || '',
+      nom_client: client.nom_client || line.nom_client || '',
+    } : line;
   }), [lines, clients]);
   // The lines of the client searched (code client starting with, or name containing, what is typed), with their index.
   const visibleLines = useMemo(() => {
@@ -133,13 +163,18 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     return indexed.filter(({ line }) => String(line.code_client || '').trim().toLowerCase().startsWith(term)
       || String(line.nom_client || '').toLowerCase().includes(term));
   }, [shownLines, search, sources.length, sourceAt]);
-  const total = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0), 0), [lines]);
-  // Solde: what is due to the company, prime totale less the agency's commissions.
-  const solde = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0) - Number(line.commission || 0), 0), [lines]);
+  const linesTotal = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0), 0), [lines]);
+  // Terme, as the legacy: the Total is the company's (typed at the top, or the file's total when imported) and the Solde is
+  // that Total less the Prime Total of the lines, each line entered takes its prime off the Solde (an imported file: 0).
+  // Comptant: the total of the quittances, and the Solde what is due to the company (prime totale less the commissions).
+  const total = !kind.quittances && announced !== null ? announced : linesTotal;
+  const solde = useMemo(() => (kind.quittances
+    ? lines.reduce((sum, line) => sum + Number(line.prime_total || 0) - Number(line.commission || 0), 0)
+    : total - linesTotal), [kind.quittances, lines, total, linesTotal]);
 
   // Client code and name of the policies the lines name, asked once per policy number.
   useEffect(() => {
-    const missing = [...new Set(lines.filter((line) => !(line.code_client && line.nom_client)).map((line) => cleanNumber(line.num_police)))]
+    const missing = [...new Set(lines.map((line) => cleanNumber(line.num_police)))]
       .filter((number) => number && !requestedClients.current.has(number));
     if (!missing.length) return;
     missing.forEach((number) => requestedClients.current.add(number));
@@ -210,6 +245,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           : null;
         if (!active) return;
         setLines(result ? result.lignes.map(fromApi) : (quittances || []).map(fromApi));
+        setAnnounced(result?.bordereau.total_annonce != null ? Number(result.bordereau.total_annonce) : null);
         setFromQuittances(Boolean(quittances));
         setSavedId(result ? result.bordereau.id_bordereau : null);
         setFichier(result?.bordereau.fichier || '');
@@ -316,6 +352,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       setSources(read);
       setSourceAt(read.length > 1 ? 0 : -1); // several files: the first one shown, « Suivant » goes to the next
       setLines(parsedLines);
+      setAnnounced(sumOf(parsedLines)); // the file's total: Solde 0
       setFromQuittances(false);
       const names = files.map((file) => file.name);
       setFichier(names.join(', ').slice(0, 200));
@@ -333,7 +370,9 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     if (value === '') delete mapping[key]; else mapping[key] = Number(value);
     const next = sources.map((source, at) => (at === mappedAt ? { ...source, info: { ...source.info, mapping } } : source));
     setSources(next);
-    setLines(allLines(next, millimes, form.month));
+    const read = allLines(next, millimes, form.month);
+    setLines(read);
+    setAnnounced(sumOf(read));
     setDirty(true);
   }
 
@@ -344,7 +383,9 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
 
   function changeMillimes(checked) {
     setMillimes(checked);
-    setLines(allLines(sources, checked, form.month));
+    const read = allLines(sources, checked, form.month);
+    setLines(read);
+    setAnnounced(sumOf(read));
     setDirty(true);
   }
 
@@ -358,6 +399,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     try {
       const payload = {
         code_compagnie: Number(form.code_compagnie), tc: form.tc, periode, date_reception: form.date_reception || null, fichier: fichier || null,
+        total_annonce: kind.quittances ? null : Math.round(total * 1000) / 1000,
         lignes: shownLines.map((line) => ({
           num_police: String(line.num_police), code_client: line.code_client || null, nom_client: line.nom_client || null,
           echeance: line.echeance || null, num_quittance: line.num_quittance || null,
@@ -386,7 +428,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     setBusy(true);
     try {
       await deleteBordereau(accessToken, savedId);
-      setLines([]); setSavedId(null); setSources([]); setSourceAt(-1); setDirty(false); setSelected(-1); setFichier('');
+      setLines([]); setSavedId(null); setSources([]); setSourceAt(-1); setDirty(false); setSelected(-1); setFichier(''); setAnnounced(null);
       setNotice('Bordereau supprimé.');
     } catch (deleteError) {
       setError(deleteError.message);
@@ -478,8 +520,17 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           {kind.quittances && (
             <label>Année échéance<input className="bd-year" type="number" min="1990" max="2100" value={form.annee} onChange={(event) => changeForm({ annee: event.target.value })} /></label>
           )}
-          <div className="bd-total"><span>Total</span><strong>{money(total)}</strong></div>
-          <div className="bd-total" title="Prime totale moins les commissions"><span>Solde</span><strong>{money(solde)}</strong></div>
+          {kind.quittances ? (
+            <>
+              <div className="bd-total"><span>Total</span><strong>{money(total)}</strong></div>
+              <div className="bd-total" title="Prime totale moins les commissions"><span>Solde</span><strong>{money(solde)}</strong></div>
+            </>
+          ) : (
+            <>
+              <AmountBox label="Total" title="Total du bordereau de la compagnie" value={total} onChange={(value) => { setAnnounced(value); setDirty(true); }} />
+              <AmountBox label="Solde" title="Total moins la Prime Total des lignes saisies" value={solde} onChange={(value) => { setAnnounced(linesTotal + value); setDirty(true); }} />
+            </>
+          )}
           <div className="bd-total"><span>Lignes</span><strong>{lines.length}</strong></div>
           {fromQuittances && <div className="bd-total"><span>Validées</span><strong>{validated}</strong></div>}
           {search.trim() && <div className="bd-total"><span>Affichées</span><strong>{visibleLines.length}</strong></div>}

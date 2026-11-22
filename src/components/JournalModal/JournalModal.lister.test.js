@@ -27,6 +27,7 @@ const line = (number, extra) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.spyOn(window, 'confirm').mockReturnValue(true); // « Êtes-vous sûr de vouloir confirmer votre modification ? » : OK
   listJournalCompanies.mockResolvedValue([{ code_compagnie: 4, nom_compagnie: 'CARTE' }]);
   tickReceipts.mockImplementation((token, date, items) => Promise.resolve({
     date, comptabilisees: items.filter((item) => item.coche).map((item) => item.num_quittance), retirees: items.filter((item) => !item.coche).map((item) => item.num_quittance),
@@ -136,6 +137,18 @@ test('a tick comptabilises the quittance at once on the journal date, an untick 
   fireEvent.click(screen.getByLabelText('Choisir 02026000002'));
   await waitFor(() => expect(tickReceipts).toHaveBeenLastCalledWith('t', '2026-11-15', [{ num_quittance: '02026000002', coche: false }]));
   expect(await screen.findByText('Quittance 02026000002 retirée du journal du 15/11/2026 : à déclarer.')).toBeInTheDocument();
+});
+
+test('a tick is confirmed first: « Annuler » leaves the quittance as it was', async () => {
+  window.confirm.mockReturnValue(false);
+  render(<JournalModal kind="encaissement" moduleId="580" onClose={() => {}} />);
+  await openDetails();
+  fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
+  const pending = await screen.findByLabelText('Choisir 02026017527');
+  fireEvent.click(pending);
+  expect(window.confirm).toHaveBeenCalledWith('Êtes-vous sûr de vouloir confirmer votre modification ?');
+  expect(tickReceipts).not.toHaveBeenCalled();
+  expect(pending).not.toBeChecked();
 });
 
 test('"Lister": one line per journal of the half months, without "Valider" (validated with the feuille de caisse)', async () => {

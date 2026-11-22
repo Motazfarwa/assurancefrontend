@@ -10,6 +10,8 @@ import { CashSheet, isJournalDay, journalDay } from './FeuilleCaisse';
 import './JournalModal.css';
 import { AGENCY_PYRAMID } from '../../data/agencyInfo';
 
+export const CONFIRM_CHANGE = 'Êtes-vous sûr de vouloir confirmer votre modification ?';
+
 const money = new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const fmt = (value) => money.format(Number(value || 0));
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
@@ -60,15 +62,15 @@ const KINDS = {
   },
   depense: {
     title: 'Journal de dépense',
-    heading: 'DÉPENSES DE TYPE T DE LA QUINZAINE · COMPTABILISÉES DANS CE JOURNAL (GRISÉES) ET À COMPTABILISER · COCHEZ « CHOIX » PUIS « COMPTABILISER »',
+    heading: 'DÉPENSES DE TYPE T · COMPTABILISÉES DANS CE JOURNAL (GRISÉES) ET NON COMPTABILISÉES JUSQU’À CETTE DATE · COCHEZ « CHOIX » PUIS « COMPTABILISER »',
     load: getExpensesJournal,
     post: (token, compagnie, date, rows) => postExpenses(token, { compagnie, date, depenses: rows.map((row) => row.num_dep) }),
     key: (row) => String(row.num_dep),
-    preselect: () => true,
+    preselect: (row) => Boolean(row.comptabilise), // as the legacy: what is still to comptabiliser comes unticked
     text: (row) => `${row.numero || ''} ${row.num_police || ''} ${row.num_imat || ''} ${row.assure || ''} ${row.num_cheq || ''}`,
     amount: 'montant',
-    // The journal of the half month (as in "Lister"): the dépenses comptabilisées in it, and those paid in it still to
-    // comptabiliser (type T, Comptabiliser N).
+    // The journal of the date (as in "Lister"): the dépenses comptabilisées on it, and every one paid up to it and still to
+    // comptabiliser (type T, Comptabiliser N), whatever its date, until it is comptabilisé.
     showDone: true,
     journal: true,
     // "Lister" without a company: the dépenses of every company.
@@ -186,8 +188,10 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
       setListedFor((current) => (current ? { ...current, at: Date.now() } : current));
     }
   }
+  // Every change of the « Choix » ticks is confirmed first.
   const toggle = (row) => {
     if (ticking) return;
+    if (!window.confirm(CONFIRM_CHANGE)) return;
     const ticked = !chosen.has(config.key(row));
     if (config.tick) { setChosen((current) => { const next = new Set(current); if (ticked) next.add(config.key(row)); else next.delete(config.key(row)); return next; }); tick([row], ticked); return; }
     setChosen((current) => {
@@ -206,6 +210,7 @@ export default function JournalModal({ kind = 'encaissement', moduleId, onClose 
       tick(rows, ticked);
       return;
     }
+    if (!pending.length || !window.confirm(CONFIRM_CHANGE)) return;
     setChosen((current) => {
       const next = new Set(current);
       pending.forEach((row) => (ticked ? next.add(config.key(row)) : next.delete(config.key(row))));
