@@ -8,8 +8,9 @@ import './ControleTablesModal.css';
 // only an incomplete copy of the other), rows without key. Nothing is changed here: it is only read.
 const VERDICTS = {
   identiques: ['Identiques', 'Les lignes sont la même information : une seule est à garder.'],
-  incomplete: ['Une copie incomplète', 'Une ligne a toutes les informations ; l’autre n’en reprend qu’une partie (à supprimer).'],
-  differentes: ['Informations différentes', 'Les lignes ont la même clé mais des informations différentes : à vérifier.'],
+  incomplete: ['Une copie incomplète', 'Une ligne a toutes les informations ; l’autre n’en reprend qu’une partie (colonnes « manque ») : c’est la copie à vérifier puis supprimer.'],
+  differentes: ['Informations différentes', 'Les lignes décrivent la même chose mais avec des informations différentes : à vérifier.'],
+  meme_contenu: ['Seul le N° diffère', 'Même contenu sous des N° différents : saisi plusieurs fois, ou plusieurs lignes réellement identiques (à vérifier).'],
 };
 const STATES = { identique: 'Identique', incomplete: 'Incomplète', complete: 'Complète' };
 
@@ -18,7 +19,7 @@ const plural = (count, word) => `${count} ${word}${count > 1 ? 's' : ''}`;
 
 function anomalies(result) {
   if (!result) return null;
-  return (result.doublons_exacts?.lignes_en_trop || 0) + (result.doublons_cle?.groupes || 0) + (result.cles_vides || 0);
+  return (result.doublons_exacts?.lignes_en_trop || 0) + (result.doublons_cle?.groupes || 0) + (result.cles_vides || 0) + (result.probables?.groupes || 0);
 }
 
 function Summary({ result }) {
@@ -72,6 +73,7 @@ export default function ControleTablesModal({ moduleId, onClose }) {
 
   async function scanEverything() {
     setScanAll({ done: 0, total: tables.length });
+    setSelected(''); // the report of every table is shown
     for (let at = 0; at < tables.length; at += 1) {
       const name = tables[at].table;
       try {
@@ -119,6 +121,7 @@ export default function ControleTablesModal({ moduleId, onClose }) {
 
         <main className="ctm-detail">
           {!table && <p className="ctm-hint">Choisissez une table à gauche pour voir ses anomalies, ou « Analyser toutes les tables » pour savoir lesquelles en ont. Rien n’est modifié : la base est seulement lue.</p>}
+          {!table && scanned.length > 0 && <Report summaries={summaries} onOpen={choose} />}
           {table && <>
             <div className="ctm-keys">
               <span>Clé de <b>{table.table}</b> (les colonnes qui doivent être uniques) :</span>
@@ -141,19 +144,27 @@ export default function ControleTablesModal({ moduleId, onClose }) {
 
 function TableResult({ data }) {
   const keyColumns = data.cle;
-  const nothing = !data.doublons_exacts.groupes && !data.doublons_cle?.groupes && !data.cles_vides;
+  const nothing = !data.doublons_exacts.groupes && !data.doublons_cle?.groupes && !data.cles_vides && !data.probables?.groupes;
   return <div className="ctm-result">
     <div className="ctm-cards">
       <div><b>{data.lignes}</b><span>lignes</span></div>
       <div className={data.doublons_exacts.groupes ? 'is-bad' : ''}><b>{data.doublons_exacts.lignes_en_trop}</b><span>lignes en double (identiques)</span></div>
       <div className={data.doublons_cle?.groupes ? 'is-bad' : ''}><b>{data.doublons_cle ? data.doublons_cle.groupes : '—'}</b><span>{data.doublons_cle ? `clés en double (${data.doublons_cle.lignes} lignes)` : 'clés en double (aucune clé choisie)'}</span></div>
       <div className={data.cles_vides ? 'is-bad' : ''}><b>{data.cles_vides ?? '—'}</b><span>lignes sans clé</span></div>
+      <div className={data.probables?.groupes ? 'is-bad' : ''}><b>{data.probables?.groupes ?? 0}</b><span>doublons probables (N° différents){data.probables?.verdicts?.incomplete ? ` · ${data.probables.verdicts.incomplete} copie(s) incomplète(s)` : ''}</span></div>
     </div>
     {nothing && <p className="ctm-ok" role="status">Aucune anomalie dans {data.table}{keyColumns.length ? '' : ' (sans clé choisie, seuls les doublons exacts sont cherchés)'}.</p>}
 
     {data.groupes?.length > 0 && <section className="ctm-section">
       <h3>Même clé sur plusieurs lignes ({data.doublons_cle.groupes}{data.doublons_cle.groupes > data.groupes.length ? `, les ${data.groupes.length} premières` : ''})</h3>
       {data.groupes.map((group) => <Group key={JSON.stringify(group.cle)} group={group} keyColumns={keyColumns} />)}
+    </section>}
+
+    {data.probables_details?.length > 0 && <section className="ctm-section">
+      <h3>Doublons probables : la même opération sous des N° différents ({data.probables.groupes}{data.probables.groupes > data.probables_details.length ? `, les ${data.probables_details.length} premiers` : ''})</h3>
+      <p className="ctm-group-hint">Copies incomplètes : {data.probables.verdicts.incomplete} · informations différentes : {data.probables.verdicts.differentes} · seul le N° diffère : {data.probables.verdicts.meme_contenu}</p>
+      {data.probables_details.map((group) => <Group key={group.lignes.map((row) => row.ctid).join()} group={group} keyColumns={keyColumns}
+        title={`${group.type} : ${Object.values(group.signature).join(' · ')}`} />)}
     </section>}
 
     {data.exacts?.length > 0 && <section className="ctm-section">
@@ -180,22 +191,44 @@ function TableResult({ data }) {
 }
 
 // A group of rows with the same key: the key, the columns that differ, and each row (complete, incomplete, identical).
-function Group({ group, keyColumns }) {
+function Group({ group, keyColumns, title }) {
   const [label, hint] = VERDICTS[group.verdict] || [group.verdict, ''];
   const columns = [...keyColumns, ...group.colonnes_differentes.filter((column) => !keyColumns.includes(column))];
+  const lacking = group.lignes.some((row) => row.manque?.length);
   return <article className={`ctm-group is-${group.verdict}`}>
     <header>
-      <b>{keyColumns.map((key) => `${key} = ${group.cle[key]}`).join(' · ')}</b>
+      <b>{title || keyColumns.map((key) => `${key} = ${group.cle[key]}`).join(' · ')}</b>
       <span>{group.nombre} lignes</span>
       <span className="ctm-verdict" title={hint}>{label}</span>
     </header>
     <p className="ctm-group-hint">{hint}{group.colonnes_differentes.length ? ` Colonnes différentes : ${group.colonnes_differentes.join(', ')}.` : ''}</p>
     <div className="ctm-scroll"><table className="ctm-table">
-      <thead><tr><th>Ligne (ctid)</th><th>État</th><th>Remplies</th>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+      <thead><tr><th>Ligne (ctid)</th><th>État</th><th>Remplies</th>{lacking && <th>Manque</th>}{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
       <tbody>{group.lignes.map((row) => <tr key={row.ctid} className={`is-${row.etat}`}>
         <td className="ctm-ctid">{row.ctid}</td><td><span className={`ctm-state is-${row.etat}`}>{STATES[row.etat] || row.etat}</span></td><td>{row.remplies}</td>
+        {lacking && <td className={row.manque?.length ? 'is-missing' : ''}>{row.manque?.join(', ') || '—'}</td>}
         {columns.map((column) => <td key={column} className={row.valeurs[column] == null && !keyColumns.includes(column) ? 'is-missing' : ''}>{shown(row.valeurs[column]) || '∅'}</td>)}
       </tr>)}</tbody>
     </table></div>
   </article>;
+}
+
+// After « Analyser toutes les tables »: every table analysed with its counts, the tables with anomalies first.
+function Report({ summaries, onOpen }) {
+  const rows = Object.entries(summaries).filter(([, item]) => !item.error)
+    .sort(([nameA, a], [nameB, b]) => (anomalies(b) > 0) - (anomalies(a) > 0) || nameA.localeCompare(nameB));
+  const failed = Object.entries(summaries).filter(([, item]) => item.error);
+  return <section className="ctm-section">
+    <h3>Rapport de l’analyse ({rows.length} tables)</h3>
+    <div className="ctm-scroll"><table className="ctm-table ctm-report">
+      <thead><tr><th>Table</th><th>Lignes</th><th>Lignes en double</th><th>Clés en double</th><th>Sans clé</th><th>Doublons probables</th><th>dont copies incomplètes</th><th>Anomalies</th></tr></thead>
+      <tbody>{rows.map(([name, item]) => <tr key={name} className={anomalies(item) ? 'is-flagged' : ''}>
+        <td><button type="button" className="ctm-link" onClick={() => onOpen(name)}>{name}</button></td>
+        <td>{item.lignes}</td><td>{item.doublons_exacts.lignes_en_trop || ''}</td><td>{item.doublons_cle?.groupes || ''}</td><td>{item.cles_vides || ''}</td>
+        <td>{item.probables?.groupes || ''}</td><td>{item.probables?.verdicts?.incomplete || ''}</td>
+        <td>{anomalies(item) ? <span className="ctm-badge is-bad">{anomalies(item)}</span> : <span className="ctm-badge is-ok">OK</span>}</td>
+      </tr>)}</tbody>
+    </table></div>
+    {failed.length > 0 && <p className="expert-error" role="alert">Non analysées : {failed.map(([name, item]) => `${name} (${item.error})`).join(' · ')}</p>}
+  </section>;
 }
