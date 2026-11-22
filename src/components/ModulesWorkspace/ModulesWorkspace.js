@@ -16,7 +16,6 @@ import AgencyUnpaidModal from '../AgencyUnpaidModal/AgencyUnpaidModal';
 import AcompteModal from '../AcompteModal/AcompteModal';
 import EtatImpayeModal from '../EtatImpayeModal/EtatImpayeModal';
 import BordereauReceptionModal from '../BordereauModal/BordereauReceptionModal';
-import BordereauConfrontationModal from '../BordereauModal/BordereauConfrontationModal';
 import BordereauFusionModal from '../BordereauModal/BordereauFusionModal';
 import ChequeModal from '../ChequeModal/ChequeModal';
 import ChequeInstanceModal from '../ChequeInstanceModal/ChequeInstanceModal';
@@ -151,7 +150,7 @@ export default function ModulesWorkspace() {
       setShowDocumentModal(true);
       return;
     }
-    if (['bordereau-reception', 'bordereau-comptant', 'bordereau-confrontation', 'bordereau-fusion'].includes(module.form)) {
+    if (['bordereau-reception', 'bordereau-comptant', 'bordereau-fusion'].includes(module.form)) {
       setActiveModuleId(module.id);
       setBordereauModal(module.form);
       return;
@@ -379,7 +378,6 @@ export default function ModulesWorkspace() {
       {etatImpayeModule && <EtatImpayeModal moduleId={etatImpayeModule.id} onClose={() => setEtatImpayeModule(null)} />}
       {bordereauModal === 'bordereau-reception' && <BordereauReceptionModal tc="T" onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-comptant' && <BordereauReceptionModal tc="C" onClose={() => setBordereauModal(null)} />}
-      {bordereauModal === 'bordereau-confrontation' && <BordereauConfrontationModal onClose={() => setBordereauModal(null)} />}
       {bordereauModal === 'bordereau-fusion' && <BordereauFusionModal onClose={() => setBordereauModal(null)} />}
       {showChequeModal && <ChequeModal onClose={() => setShowChequeModal(false)} />}
       {feuilleCaisseModule && <FeuilleCaisseModal moduleId={feuilleCaisseModule.id} onClose={() => setFeuilleCaisseModule(null)} />}

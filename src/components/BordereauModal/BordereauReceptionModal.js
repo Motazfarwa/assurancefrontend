@@ -427,6 +427,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           <input ref={fileInput} type="file" accept=".xls,.xlsx,.csv,.txt" multiple hidden aria-label="Fichiers du siège" onChange={chooseFile} />
           <button type="button" className="bd-import" onClick={() => fileInput.current?.click()} disabled={busy} title="Un ou plusieurs fichiers du siège">{kind.importLabel}</button>
           {!kind.quittances && <button type="button" className="bd-import" onClick={() => setConfronting(true)} disabled={busy} title="Confronter le bordereau de la compagnie et de la période avec les quittances de l’agence">Confrontation</button>}
+          {savedId && <button type="button" className="bd-danger" onClick={removeBordereau} disabled={busy}>Supprimer le bordereau</button>}
           <button type="button" className="bd-save" onClick={save} disabled={busy || !lines.length || (fromQuittances && !dirty)}>{busy ? 'Patientez…' : dirty ? 'Enregistrer le bordereau' : fromQuittances ? 'Quittances' : 'Enregistré'}</button>
         </div>
 
@@ -536,7 +537,6 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
           {draft && <span className="bd-draft-actions"><button type="button" className="bd-save" onClick={addDraft}>Ajouter la ligne (Entrée)</button><button type="button" className="bd-tool" onClick={() => setDraft(null)}>Terminer la saisie</button></span>}
           <span>{savedId ? `Bordereau n° ${savedId}${fichier ? ` · ${fichier}` : ''}` : fichier ? `Fichier : ${fichier} (non enregistré)` : ''}</span>
           <div>
-            {savedId && <button type="button" className="bd-danger" onClick={removeBordereau} disabled={busy}>Supprimer le bordereau</button>}
             <button type="button" className="bd-tool" onClick={onClose}>Fermer</button>
           </div>
         </footer>
