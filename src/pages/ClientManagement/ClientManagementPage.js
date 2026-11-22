@@ -10,7 +10,7 @@ import ChequeModal from '../../components/ChequeModal/ChequeModal';
 import { INSURANCE_MODULES, MODULE_CATEGORIES } from '../../data/insuranceModules';
 import ClientListModal from '../ClientListModal/ClientListModal';
 import ClientListerModal from '../ClientListModal/ClientListerModal';
-import { navigate } from '../../navigation';
+import { navigate, takeClientAction } from '../../navigation';
 import { showToast } from '../../services/toast';
 import { CoordinatesFields, FieldErrors, IdentityFields } from './ClientFormFields';
 import { clientStepErrors } from './clientValidation';
@@ -100,6 +100,14 @@ export default function ClientManagementPage({ modal = false }) {
     }, 1000);
     return () => window.clearTimeout(timeout);
   }, [successToast]);
+
+  // Opened from Clients à compléter ("Sans quittance"): straight to the quittance to enter, or to "Saisir police".
+  useEffect(() => {
+    if (!client._persisted || !client.clientCode) return;
+    const action = takeClientAction(client.clientCode);
+    if (action === 'receipt') setActiveAction(CLIENT_ACTIONS.find((item) => item.key === 'receipt'));
+    else if (action === 'police') setStep(3);
+  }, [client._persisted, client.clientCode]);
 
   const newFlow = !client._persisted || flowStarted;
   // Modifier goes through the same four steps; it may also stop at Coordonnées and save only the client.

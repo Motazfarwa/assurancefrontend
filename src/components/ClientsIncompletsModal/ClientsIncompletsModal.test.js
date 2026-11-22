@@ -2,11 +2,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ClientsIncompletsModal from './ClientsIncompletsModal';
 import { listIncompleteClientsPage } from '../../services/notificationApi';
 import { INSURANCE_MODULES } from '../../data/insuranceModules';
-import { navigate, rememberReturnModule } from '../../navigation';
+import { navigate, rememberClientAction, rememberReturnModule } from '../../navigation';
 
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ accessToken: 't', user: { name: 'Admin', isAdmin: true } }) }));
 jest.mock('../../contexts/ClientContext', () => ({ useClient: () => ({ setClient: () => {} }) }));
-jest.mock('../../navigation', () => ({ navigate: jest.fn(), rememberReturnModule: jest.fn() }));
+jest.mock('../../navigation', () => ({ navigate: jest.fn(), rememberReturnModule: jest.fn(), rememberClientAction: jest.fn() }));
 jest.mock('../../services/clientApi', () => ({ getClientByCode: () => Promise.resolve({}) }));
 jest.mock('../../services/notificationApi', () => ({ listIncompleteClientsPage: jest.fn() }));
 
@@ -107,4 +107,18 @@ test('the list is paginated: a page reads its 100 clients, a filter goes back to
   expect(await screen.findByText('CLIENT 1800')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Afficher'), { target: { value: 'sans_police' } });
   await waitFor(() => expect(listIncompleteClientsPage).toHaveBeenLastCalledWith('t', { categorie: 'sans_police', manque: '', q: '', offset: 0, limit: 100 }));
+});
+
+test('"Sans quittance": the client opens on the quittance to enter, or on "Saisir police" without a police', async () => {
+  listIncompleteClientsPage.mockResolvedValue({ ...counters, found: 2, items: [
+    client('5055', 'HAS POLICE', { sans_quittance: true }),
+    client('5063', 'BEN AISSA ASMA', { sans_police: true, sans_quittance: true }),
+  ] });
+  render(<ClientsIncompletsModal moduleId="105" onClose={() => {}} initial={{ categorie: 'sans_quittance' }} />);
+  const buttons = await screen.findAllByRole('button', { name: 'Saisir la quittance' });
+  fireEvent.click(buttons[0]);
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith('/clients'));
+  expect(rememberClientAction).toHaveBeenCalledWith('5055', 'receipt');
+  fireEvent.click(buttons[1]);
+  await waitFor(() => expect(rememberClientAction).toHaveBeenCalledWith('5063', 'police'));
 });

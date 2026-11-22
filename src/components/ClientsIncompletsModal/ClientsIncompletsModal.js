@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { useClient } from '../../contexts/ClientContext';
-import { navigate, rememberReturnModule } from '../../navigation';
+import { navigate, rememberClientAction, rememberReturnModule } from '../../navigation';
 import { getClientByCode } from '../../services/clientApi';
 import { listIncompleteClientsPage } from '../../services/notificationApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
@@ -78,10 +78,15 @@ export default function ClientsIncompletsModal({ moduleId, onClose, initial = {}
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  async function openClient(code) {
+  // "Sans quittance": the fiche opens on the quittance to enter ("Gestion quittance"), or on "Saisir police" when the
+  // client has no police yet (a quittance needs one).
+  async function openClient(item) {
+    const code = item.code_client;
     try {
       const record = await getClientByCode(accessToken, code);
       setClient({ ...record, _persisted: true });
+      const lacks = item.details || {};
+      if (categorie === 'sans_quittance') rememberClientAction(code, lacks.sans_police ? 'police' : 'receipt');
       // "Retour" (or Fermer) on the fiche comes back here, with the same filters.
       rememberReturnModule(moduleId, { categorie, manque, search, between, debut, fin, page });
       onClose();
@@ -132,7 +137,7 @@ export default function ClientsIncompletsModal({ moduleId, onClose, initial = {}
                 <td>{d.coordonnees?.length ? <ul className="cim-entries">{d.coordonnees.map((text) => <li key={text}><span>{text}</span></li>)}</ul> : <span className="cim-none">Complètes</span>}</td>
                 <td>{d.sans_police ? <span className="cim-tag">Aucune police</span> : <span className="cim-none">—</span>}</td>
                 <td>{d.sans_quittance ? <span className="cim-tag">Aucune quittance</span> : <span className="cim-none">—</span>}</td>
-                <td><button type="button" className="expert-cancel cim-open" onClick={() => openClient(item.code_client)}>Ouvrir la fiche</button></td>
+                <td><button type="button" className="expert-cancel cim-open" onClick={() => openClient(item)}>{categorie === 'sans_quittance' ? 'Saisir la quittance' : 'Ouvrir la fiche'}</button></td>
               </tr>; })}
               {!state.loading && !items.length && <tr><td colSpan={6} className="cim-empty">Aucun client à compléter pour ces critères.</td></tr>}
             </tbody>
