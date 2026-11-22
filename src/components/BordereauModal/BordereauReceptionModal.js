@@ -62,6 +62,22 @@ function EditableCell({ value, label, number, onSave }) {
 const EDITABLE = { num_quittance: false, prime_total: true }; // comptant (TQuittance): key -> numeric
 const EDITABLE_TERME = { prime_total: true }; // terme (the lines of the file): the Prime Total, the Solde follows
 
+// Several files imported: one at a time (‹ Précédent / Suivant ›, with its lines and its total), or all of them.
+function FileStrip({ sources, at, lines, onShow }) {
+  const of = (index) => lines.filter((line) => line.source === index);
+  const shown = at >= 0 ? of(at) : lines;
+  const sum = (list, key) => list.reduce((total, line) => total + Number(line[key] || 0), 0);
+  return (
+    <div className="bd-files" role="group" aria-label="Fichiers importés">
+      <button type="button" className="bd-tool" onClick={() => onShow(at - 1)} disabled={at <= 0}>‹ Précédent</button>
+      <strong>{at >= 0 ? `Fichier ${at + 1} / ${sources.length} : ${sources[at].name}` : `Tous les fichiers (${sources.length})`}</strong>
+      <span>{shown.length} ligne(s) · Total {money(sum(shown, 'prime_total'))} · Com. {money(sum(shown, 'commission'))}</span>
+      <button type="button" className="bd-tool" onClick={() => onShow(at + 1)} disabled={at < 0 || at >= sources.length - 1}>Suivant ›</button>
+      <button type="button" className={`bd-tool${at < 0 ? ' is-active' : ''}`} onClick={() => onShow(at < 0 ? 0 : -1)}>{at < 0 ? 'Un fichier à la fois' : 'Tous les fichiers'}</button>
+    </div>
+  );
+}
+
 function fromApi(line) {
   return { ...line, echeance: line.echeance ? String(line.echeance).slice(0, 10) : null };
 }
@@ -78,7 +94,11 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   const [savedId, setSavedId] = useState(null);
   const [fromQuittances, setFromQuittances] = useState(false); // the lines are the quittances of TQuittance
   const [fichier, setFichier] = useState('');
-  const [imported, setImported] = useState(null);
+  // The files imported ({ name, info }), each read with its own columns; sourceAt: the one shown (-1: all of them).
+  const [sources, setSources] = useState([]);
+  const [sourceAt, setSourceAt] = useState(-1);
+  const mappedAt = sourceAt >= 0 ? sourceAt : 0; // the file whose columns are shown
+  const imported = sources[mappedAt]?.info || null;
   const [dirty, setDirty] = useState(false);
   const [millimes, setMillimes] = useState(false);
   const skipLoad = useRef(false);
@@ -106,11 +126,13 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   // The lines of the client searched (code client starting with, or name containing, what is typed), with their index.
   const visibleLines = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const indexed = shownLines.map((line, index) => ({ line, index }));
+    const inFile = sources.length > 1 && sourceAt >= 0;
+    const indexed = shownLines.map((line, index) => ({ line, index }))
+      .filter(({ line }) => !inFile || line.source === undefined || line.source === sourceAt);
     if (!term) return indexed;
     return indexed.filter(({ line }) => String(line.code_client || '').trim().toLowerCase().startsWith(term)
       || String(line.nom_client || '').toLowerCase().includes(term));
-  }, [shownLines, search]);
+  }, [shownLines, search, sources.length, sourceAt]);
   const total = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0), 0), [lines]);
   // Solde: what is due to the company, prime totale less the agency's commissions.
   const solde = useMemo(() => lines.reduce((sum, line) => sum + Number(line.prime_total || 0) - Number(line.commission || 0), 0), [lines]);
@@ -191,7 +213,8 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
         setFromQuittances(Boolean(quittances));
         setSavedId(result ? result.bordereau.id_bordereau : null);
         setFichier(result?.bordereau.fichier || '');
-        setImported(null);
+        setSources([]);
+        setSourceAt(-1);
         setDirty(false);
         setSelected(-1);
         if (result?.bordereau.date_reception) setForm((current) => ({ ...current, date_reception: String(result.bordereau.date_reception).slice(0, 10) }));
@@ -278,9 +301,11 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       const nextForm = { ...form, code_compagnie: company ? String(company.code_compagnie) : form.code_compagnie, month: nextMonth };
       const raw = infos.flatMap((item) => buildLines(item));
       const scale = looksLikeMillimes(raw);
-      const parsedLines = infos.flatMap((item) => makeLines(item, scale, nextMonth.slice(5)));
+      const read = infos.map((item, at) => ({ name: files[at].name, info: item }));
+      const parsedLines = allLines(read, scale, nextMonth);
       if (!parsedLines.length) {
-        setImported({ ...info, others: infos.slice(1) });
+        setSources(read);
+        setSourceAt(read.length > 1 ? 0 : -1);
         throw new Error('Aucune ligne avec un numéro de police n’a été trouvée. Choisissez la colonne du N° de police ci-dessous.');
       }
       if (nextForm.code_compagnie !== form.code_compagnie || nextForm.tc !== form.tc || nextForm.month !== form.month) {
@@ -288,7 +313,8 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
         setForm(nextForm);
       }
       setMillimes(scale);
-      setImported({ ...info, others: infos.slice(1) });
+      setSources(read);
+      setSourceAt(read.length > 1 ? 0 : -1); // several files: the first one shown, « Suivant » goes to the next
       setLines(parsedLines);
       setFromQuittances(false);
       const names = files.map((file) => file.name);
@@ -301,25 +327,24 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     }
   }
 
+  // A column corrected for the file shown: only that file is read again with it (each file has its own layout).
   function changeMapping(key, value) {
     const mapping = { ...imported.mapping };
     if (value === '') delete mapping[key]; else mapping[key] = Number(value);
-    const next = { ...imported, mapping };
-    setImported(next);
-    setLines(importedLines(next, millimes));
+    const next = sources.map((source, at) => (at === mappedAt ? { ...source, info: { ...source.info, mapping } } : source));
+    setSources(next);
+    setLines(allLines(next, millimes, form.month));
     setDirty(true);
   }
 
-  // The lines of every file imported; a column chosen for the first file goes for the others laid out the same way.
-  function importedLines(first, scale) {
-    const same = (other) => JSON.stringify(other.headers) === JSON.stringify(first.headers);
-    return [first, ...(first.others || []).map((other) => (same(other) ? { ...other, mapping: first.mapping } : other))]
-      .flatMap((item) => makeLines(item, scale, form.month.slice(5)));
+  // The lines of every file imported, one file after the other; each line knows its file (source).
+  function allLines(list, scale, month) {
+    return list.flatMap(({ info }, at) => makeLines(info, scale, month.slice(5)).map((line) => ({ ...line, source: at })));
   }
 
   function changeMillimes(checked) {
     setMillimes(checked);
-    setLines(importedLines(imported, checked));
+    setLines(allLines(sources, checked, form.month));
     setDirty(true);
   }
 
@@ -343,6 +368,8 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       const result = await saveBordereau(accessToken, payload);
       const stored = await getBordereau(accessToken, result.id_bordereau);
       setLines(stored.lignes.map(fromApi));
+      setSources([]); // saved: one bordereau, its lines as stored
+      setSourceAt(-1);
       setSavedId(result.id_bordereau);
       setFromQuittances(false);
       setDirty(false);
@@ -359,7 +386,7 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
     setBusy(true);
     try {
       await deleteBordereau(accessToken, savedId);
-      setLines([]); setSavedId(null); setImported(null); setDirty(false); setSelected(-1); setFichier('');
+      setLines([]); setSavedId(null); setSources([]); setSourceAt(-1); setDirty(false); setSelected(-1); setFichier('');
       setNotice('Bordereau supprimé.');
     } catch (deleteError) {
       setError(deleteError.message);
@@ -461,9 +488,11 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
         {error && <p className="bd-error" role="alert">{error}</p>}
         {notice && !error && <p className="bd-notice" role="status">{notice}</p>}
 
+        {sources.length > 1 && <FileStrip sources={sources} at={sourceAt} lines={lines} onShow={setSourceAt} />}
+
         {imported && (
           <details className="bd-mapping">
-            <summary>Colonnes détectées dans le fichier{imported.titled ? '' : ' (aucune ligne de titres : ordre habituel supposé)'} — corrigez si besoin</summary>
+            <summary>Colonnes détectées dans {sources.length > 1 ? `« ${sources[mappedAt].name} »` : 'le fichier'}{imported.titled ? '' : ' (aucune ligne de titres : ordre habituel supposé)'} — corrigez si besoin</summary>
             <label className="bd-millimes"><input type="checkbox" checked={millimes} onChange={(event) => changeMillimes(event.target.checked)} /> Montants en millimes (726050 = 726,050) — diviser par 1000</label>
             <div className="bd-mapping-grid">
               {BORDEREAU_FIELDS.map((field) => (

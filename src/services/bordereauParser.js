@@ -5,11 +5,14 @@ export const BORDEREAU_FIELDS = [
   { key: 'num_police', label: 'N° Police', required: true, synonyms: ['npolice', 'numpolice', 'numint', 'numeropolice', 'policen', 'police', 'ncontrat', 'numcontrat', 'contrat', 'npol'] },
   { key: 'code_client', label: 'Code client', synonyms: ['codeclient', 'codeclt', 'cclient', 'codecli', 'codecl', 'ncl', 'client'] },
   { key: 'nom_client', label: 'Nom client', synonyms: ['nomclient', 'nomassure', 'nometprenom', 'nomprenom', 'raisonsociale', 'souscripteur', 'assure', 'nom'] },
-  { key: 'echeance', label: 'Échéance', synonyms: ['echeance', 'dateecheance', 'dateterme', 'terme', 'dech'] },
-  { key: 'num_quittance', label: 'N° Quittance', synonyms: ['nquittance', 'numquittance', 'numeroquittance', 'quittancen', 'nquitt', 'nquit', 'numquit', 'quittance', 'quit'] },
+  // LLOYD: the terme falls on the "Date d'effet acte comptable" (its "Date d'échéance" is the end of the period covered)
+  { key: 'echeance', label: 'Échéance', synonyms: ['echeance', 'dateecheance', 'dateterme', 'terme', 'dech', 'datedeffetactecomptable', 'dateeffetactecomptable', 'dateeffet', 'datedeffet'] },
+  // LLOYD: the quittance is the "N° d'acte comptable"
+  { key: 'num_quittance', label: 'N° Quittance', synonyms: ['nquittance', 'numquittance', 'numeroquittance', 'quittancen', 'nquitt', 'nquit', 'numquit', 'quittance', 'quit', 'ndactecomptable', 'nactecomptable', 'numeroacte'] },
   { key: 'prime_net', label: 'P. Net + C.Q.', synonyms: ['primenette', 'primenet', 'pnetcq', 'pnet', 'netcq', 'net'] },
   { key: 'commission', label: 'Commission', synonyms: ['commission', 'commissions', 'comcie', 'comm', 'com'] },
-  { key: 'prime_total', label: 'Prime totale', synonyms: ['primetotale', 'primetotal', 'primettc', 'totalttc', 'montantttc', 'ptotal', 'ttc', 'total', 'montant'] },
+  // LLOYD: the "Prime brut"; never what was cashed ("Montant encaissé", empty on a terme to come)
+  { key: 'prime_total', label: 'Prime totale', synonyms: ['primetotale', 'primetotal', 'primebrut', 'primebrute', 'primettc', 'totalttc', 'montantttc', 'ptotal', 'ttc', 'total', 'montant'], never: /encaiss|commission|retenue|ristourne/ },
 ];
 
 // Legacy grid order, used when the file has no title row.
@@ -17,13 +20,50 @@ const POSITIONAL = { num_police: 1, code_client: 2, nom_client: 3, echeance: 4, 
 
 const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
+// Titles and names saved in UTF-8 but read as Windows-1252 ("Ã©chÃ©ance" for "échéance", in the LLOYD exports):
+// given back their accents; any other text is left as it is.
+const CP1252 = { 0x20ac: 0x80, 0x201a: 0x82, 0x192: 0x83, 0x201e: 0x84, 0x2026: 0x85, 0x2020: 0x86, 0x2021: 0x87, 0x2c6: 0x88, 0x2030: 0x89, 0x160: 0x8a,
+  0x2039: 0x8b, 0x152: 0x8c, 0x17d: 0x8e, 0x2018: 0x91, 0x2019: 0x92, 0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97, 0x2dc: 0x98,
+  0x2122: 0x99, 0x161: 0x9a, 0x203a: 0x9b, 0x153: 0x9c, 0x17e: 0x9e, 0x178: 0x9f };
+export function repairText(text) {
+  if (typeof text !== 'string' || !/[\u00c3\u00c2\u00e2][\u0080-\u00ff\u0152-\u2122]/.test(text)) return text;
+  const bytes = [];
+  for (const char of text) {
+    const code = char.codePointAt(0);
+    const byte = code < 0x100 ? code : CP1252[code];
+    if (byte === undefined) return text;
+    bytes.push(byte);
+  }
+  return decodeUtf8(bytes) ?? text;
+}
+
+// UTF-8 bytes -> text; null when they are not valid UTF-8 (the text was not garbled after all).
+function decodeUtf8(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length;) {
+    const first = bytes[i];
+    const size = first < 0x80 ? 1 : first >= 0xc2 && first < 0xe0 ? 2 : first >= 0xe0 && first < 0xf0 ? 3 : first >= 0xf0 && first < 0xf5 ? 4 : 0;
+    if (!size || i + size > bytes.length) return null;
+    let code = size === 1 ? first : first & (0xff >> (size + 1));
+    for (let k = 1; k < size; k += 1) {
+      const next = bytes[i + k];
+      if ((next & 0xc0) !== 0x80) return null;
+      code = (code << 6) | (next & 0x3f);
+    }
+    out += String.fromCodePoint(code);
+    i += size;
+  }
+  return out;
+}
+
 function cellToPlain(value) {
   if (value == null) return '';
+  if (typeof value === 'string') return repairText(value);
   if (value instanceof Date) return value;
   if (typeof value === 'object') {
     if (Array.isArray(value.richText)) return value.richText.map((part) => part.text).join('');
     if ('result' in value) return cellToPlain(value.result);
-    if ('text' in value) return String(value.text);
+    if ('text' in value) return repairText(String(value.text));
     if ('error' in value) return '';
   }
   return value;
@@ -53,7 +93,7 @@ function parseCsv(text) {
 
 async function readRows(file) {
   const name = file.name.toLowerCase();
-  if (name.endsWith('.csv') || name.endsWith('.txt')) return parseCsv(await file.text());
+  if (name.endsWith('.csv') || name.endsWith('.txt')) return parseCsv(await file.text()).map((row) => row.map(repairText));
   if (name.endsWith('.xls')) {
     // Legacy Excel 97-2003 files (what the legacy software exports): read with SheetJS. Dates stay Excel serial numbers.
     const XLSX = await import('xlsx');
@@ -81,13 +121,16 @@ function guessMapping(headers) {
   const normalized = headers.map(normalize);
   const used = new Set();
   const mapping = {};
+  // the synonyms in their order: the most precise title first (when a file has several columns that could fit)
   const pick = (field, test) => {
-    if (mapping[field.key] !== undefined) return;
-    const index = normalized.findIndex((header, position) => header && !used.has(position) && test(header));
-    if (index >= 0) { mapping[field.key] = index; used.add(index); }
+    for (const synonym of field.synonyms) {
+      if (mapping[field.key] !== undefined) return;
+      const index = normalized.findIndex((header, position) => header && !used.has(position) && !field.never?.test(header) && test(header, synonym));
+      if (index >= 0) { mapping[field.key] = index; used.add(index); }
+    }
   };
-  BORDEREAU_FIELDS.forEach((field) => pick(field, (header) => field.synonyms.includes(header)));
-  BORDEREAU_FIELDS.forEach((field) => pick(field, (header) => field.synonyms.some((synonym) => synonym.length >= 5 && header.includes(synonym))));
+  BORDEREAU_FIELDS.forEach((field) => pick(field, (header, synonym) => header === synonym));
+  BORDEREAU_FIELDS.forEach((field) => pick(field, (header, synonym) => synonym.length >= 5 && header.includes(synonym)));
   return mapping;
 }
 

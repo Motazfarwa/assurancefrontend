@@ -106,3 +106,9 @@
 .bd-grid tr:hover .bd-cell-input { border-color: #c9d6db; background: #fff; }
 .bd-grid .bd-cell-input:focus { outline: none; border-color: #17806f; background: #fff; box-shadow: 0 0 0 2px rgba(23, 128, 111, 0.15); }
 .bd-form .bd-search input { min-width: 230px; }
+
+/* Several files imported: one at a time, or all of them */
+.bd-files { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 22px 8px; padding: 8px 12px; border: 1px solid #cfe0dc; border-radius: 8px; background: #f6faf9; }
+.bd-files strong { color: #173247; font-size: 12.5px; }
+.bd-files span { color: #587079; font-size: 12px; }
+.bd-files .bd-tool.is-active { border-color: #17806f; color: #17806f; }

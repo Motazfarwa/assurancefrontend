@@ -78,3 +78,31 @@ test('terme: the Prime Total of a line of the file is corrected in the grid and 
   // 120 + 50 + 100 + 50, no commission
   await waitFor(() => expect(screen.getAllByText('320,000').length).toBeGreaterThan(0));
 });
+
+test('terme, several files: each is read with its own columns and shown one at a time (Suivant), or all together', async () => {
+  const { readBordereauFile } = jest.requireMock('../../services/bordereauParser');
+  readBordereauFile
+    .mockResolvedValueOnce({
+      meta: {}, headers: ['Num. police', 'Souscripteur', 'Prime brut'], headerRow: 0, mapping: { num_police: 0, nom_client: 1, prime_total: 2 },
+      rows: [['Num. police', 'Souscripteur', 'Prime brut'], ['94402000088', 'STE J S AUTO PAINT', 2377.839], ['94402000087', 'BOUHNAK SOFIEN', 375.39]],
+    })
+    .mockResolvedValueOnce({
+      meta: {}, headers: ['Date', 'Prime brut', 'Description souscripteur', 'Num. police'], headerRow: 0, mapping: { prime_total: 1, nom_client: 2, num_police: 3 },
+      rows: [['Date', 'Prime brut', 'Description souscripteur', 'Num. police'], ['16/12/2026', 283, 'SOCIETE CHARTEL', '944450056']],
+    });
+  render(<BordereauReceptionModal tc="T" onClose={() => {}} />);
+  fireEvent.change(screen.getByLabelText('Fichiers du siège'), { target: { files: [new File(['a'], 'T12-2026 LLOYD.xlsx'), new File(['b'], 'T 12-2026 LLOYD IRDS.xlsx')] } });
+  expect(await screen.findByText('Fichier 1 / 2 : T12-2026 LLOYD.xlsx')).toBeInTheDocument();
+  expect(screen.getByText('STE J S AUTO PAINT')).toBeInTheDocument();
+  expect(screen.queryByText('SOCIETE CHARTEL')).not.toBeInTheDocument();
+  expect(screen.getByText(/2 ligne\(s\) · Total 2 753,229/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Suivant ›' }));
+  expect(screen.getByText('Fichier 2 / 2 : T 12-2026 LLOYD IRDS.xlsx')).toBeInTheDocument();
+  expect(screen.getByText('SOCIETE CHARTEL')).toBeInTheDocument();
+  expect(screen.queryByText('STE J S AUTO PAINT')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Tous les fichiers' }));
+  expect(screen.getByText('STE J S AUTO PAINT')).toBeInTheDocument();
+  expect(screen.getByText('SOCIETE CHARTEL')).toBeInTheDocument();
+  // the bordereau total is the one of both files
+  expect(screen.getAllByText('3 036,229').length).toBeGreaterThan(0);
+});
