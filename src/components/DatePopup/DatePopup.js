@@ -9,6 +9,12 @@ import './DatePopup.css';
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const DAYS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
 const WIDTH = 252;
+// The years offered in the list: from 1930 to 30 years from now (and the year shown, whatever it is).
+const YEARS = (shownYear) => {
+  const last = Math.max(new Date().getFullYear() + 30, shownYear);
+  const first = Math.min(1930, shownYear);
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index);
+};
 const HEIGHT = 290;
 
 const pad = (value) => String(value).padStart(2, '0');
@@ -40,6 +46,7 @@ export default function DatePopup() {
   const [field, setField] = useState(null); // the input the calendar is open for
   const [view, setView] = useState(() => new Date()); // any day of the month shown
   const [place, setPlace] = useState({ top: 0, left: 0 });
+  const [mode, setMode] = useState('days'); // days, or the list of the months / of the years dropped
   const popup = useRef(null);
 
   const locate = useCallback((input) => {
@@ -60,6 +67,7 @@ export default function DatePopup() {
         event.preventDefault(); // not the browser's own calendar
         const current = parseIso(input.value);
         setView(current || new Date());
+        setMode('days');
         locate(input);
         setField(input);
         return;
@@ -118,10 +126,35 @@ export default function DatePopup() {
       <div className="dp-head">
         <button type="button" onClick={() => move(-12)} aria-label="Année précédente">«</button>
         <button type="button" onClick={() => move(-1)} aria-label="Mois précédent">‹</button>
-        <strong>{MONTHS[month]} {year}</strong>
+        <span className="dp-title">
+          <button type="button" className={`dp-pick${mode === 'months' ? ' is-open' : ''}`} onClick={() => setMode(mode === 'months' ? 'days' : 'months')} aria-label="Choisir le mois" aria-expanded={mode === 'months'}>{MONTHS[month]} ▾</button>
+          <button type="button" className={`dp-pick${mode === 'years' ? ' is-open' : ''}`} onClick={() => setMode(mode === 'years' ? 'days' : 'years')} aria-label="Choisir l'année" aria-expanded={mode === 'years'}>{year} ▾</button>
+        </span>
         <button type="button" onClick={() => move(1)} aria-label="Mois suivant">›</button>
         <button type="button" onClick={() => move(12)} aria-label="Année suivante">»</button>
       </div>
+      {/* As the legacy calendar: a click on the month (or the year) drops the list of the months (of the years) */}
+      {mode === 'months' && (
+        <div className="dp-menu" role="listbox" aria-label="Mois">
+          {MONTHS.map((name, index) => (
+            <button key={name} type="button" role="option" aria-selected={index === month} className={index === month ? 'is-chosen' : ''}
+              onClick={() => { setView(new Date(year, index, 1)); setMode('days'); }}>
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+      {mode === 'years' && (
+        <div className="dp-menu" role="listbox" aria-label="Années" ref={(node) => node?.querySelector('.is-chosen')?.scrollIntoView?.({ block: 'center' })}>
+          {YEARS(year).map((item) => (
+            <button key={item} type="button" role="option" aria-selected={item === year}
+              className={[item === year && 'is-chosen', item === today.getFullYear() && 'is-today'].filter(Boolean).join(' ')}
+              onClick={() => { setView(new Date(item, month, 1)); setMode('days'); }}>
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="dp-grid">
         {DAYS.map((day) => <span key={day} className="dp-weekday">{day}</span>)}
         {monthGrid(year, month).map((day) => (

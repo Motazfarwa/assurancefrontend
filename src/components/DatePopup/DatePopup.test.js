@@ -24,7 +24,8 @@ test('a click on a date field opens the calendar; a day chosen is written in the
   render(<Form />);
   fireEvent.click(screen.getByLabelText('Date début'));
   expect(screen.getByRole('group', { name: 'Calendrier' })).toBeInTheDocument();
-  expect(screen.getByText('novembre 2026')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Choisir le mois' })).toHaveTextContent('novembre');
+  expect(screen.getByRole('button', { name: "Choisir l'année" })).toHaveTextContent('2026');
   expect(screen.getByRole('button', { name: '17/11/2026' })).toHaveClass('is-chosen');
   fireEvent.click(screen.getByRole('button', { name: '25/11/2026' }));
   expect(screen.getByLabelText('valeur')).toHaveTextContent('2026-11-25');
@@ -35,10 +36,27 @@ test('‹ › move the month, Aujourd\'hui gives today, Échap closes', () => {
   render(<Form />);
   fireEvent.click(screen.getByLabelText('Date début'));
   fireEvent.click(screen.getByRole('button', { name: 'Mois suivant' }));
-  expect(screen.getByText('décembre 2026')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Choisir le mois' })).toHaveTextContent('décembre');
   fireEvent.click(screen.getByRole('button', { name: /^Aujourd'hui/ }));
   expect(screen.getByLabelText('valeur')).toHaveTextContent(isoOf(new Date()));
   fireEvent.click(screen.getByLabelText('Date début'));
   fireEvent.keyDown(window, { key: 'Escape' });
   expect(screen.queryByRole('group', { name: 'Calendrier' })).not.toBeInTheDocument();
+});
+
+test('a click on the month drops the 12 months, on the year the years: 01/2020 is found in a few clicks', () => {
+  render(<Form />);
+  fireEvent.click(screen.getByLabelText('Date début'));
+  fireEvent.click(screen.getByRole('button', { name: "Choisir l'année" }));
+  const years = screen.getByRole('listbox', { name: 'Années' });
+  expect(years).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('option', { name: '2020' }));
+  expect(screen.queryByRole('listbox', { name: 'Années' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: "Choisir l'année" })).toHaveTextContent('2020');
+  fireEvent.click(screen.getByRole('button', { name: 'Choisir le mois' }));
+  expect(screen.getAllByRole('option')).toHaveLength(12);
+  fireEvent.click(screen.getByRole('option', { name: 'janvier' }));
+  expect(screen.getByRole('button', { name: 'Choisir le mois' })).toHaveTextContent('janvier');
+  fireEvent.click(screen.getByRole('button', { name: '01/01/2020' }));
+  expect(screen.getByLabelText('valeur')).toHaveTextContent('2020-01-01');
 });

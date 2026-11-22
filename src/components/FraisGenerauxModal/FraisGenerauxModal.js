@@ -32,6 +32,8 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
   }, [accessToken, nature, debut, fin]);
 
   const { data } = state;
+  // The printed état: in the order of the dates (the oldest first), then of the N°.
+  const byDate = (items) => [...items].sort((a, b) => String(a.date_dep || '').slice(0, 10).localeCompare(String(b.date_dep || '').slice(0, 10)) || Number(a.num_dep) - Number(b.num_dep));
   return <div className="jrn-page">
     <div className="jrn-sheet-frame">
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
@@ -44,7 +46,7 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
         {state.loading ? <p className="jrn-sheet-state">Chargement…</p> : state.error ? <p className="jrn-sheet-state" role="alert">{state.error}</p> : <table className="jrn-sheet-table frg-sheet-table">
           <thead><tr><th>N°</th><th>Date</th><th>Type frais</th><th>Mode</th><th>N° pièce</th><th>Compte</th><th>Observation</th><th>Montant</th></tr></thead>
           <tbody>
-            {data.items.map((item) => <tr key={item.num_dep}>
+            {byDate(data.items).map((item) => <tr key={item.num_dep}>
               <td>{item.num_dep}</td><td>{formatDate(item.date_dep)}</td><td>{item.libelle || item.code_type}</td><td>{modeLabel(item.mode)}</td><td>{item.num_piece}</td><td>{item.code_banque}</td><td>{item.observation}</td><td className="num">{fmt(item.montant)}</td>
             </tr>)}
             {!data.items.length && <tr><td colSpan={8} className="jrn-sheet-state">Aucun frais sur la période.</td></tr>}

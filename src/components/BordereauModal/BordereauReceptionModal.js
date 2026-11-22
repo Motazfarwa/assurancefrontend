@@ -38,9 +38,11 @@ const GRID = [
 function EditableCell({ value, label, number, onSave }) {
   const [text, setText] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
+  const [typing, setTyping] = useState(false); // an amount shows its 3 decimals (3 009,080) unless being typed
   useEffect(() => { setText(value ?? ''); }, [value]);
   async function commit() {
-    const next = String(text).trim();
+    setTyping(false);
+    const next = number ? String(text).replace(/\s/g, '').replace(',', '.') : String(text).trim();
     if (next === String(value ?? '').trim() || (number && Number(next) === Number(value))) { setText(value ?? ''); return; }
     if (!next || (number && !(Number(next) >= 0))) { setText(value ?? ''); return; }
     setSaving(true);
@@ -52,10 +54,10 @@ function EditableCell({ value, label, number, onSave }) {
     <input
       className={`bd-cell-input${number ? ' is-number' : ''}`}
       aria-label={label}
-      type={number ? 'number' : 'text'}
-      step={number ? 'any' : undefined}
-      min={number ? '0' : undefined}
-      value={text}
+      type="text"
+      inputMode={number ? 'decimal' : undefined}
+      value={number && !typing && text !== '' && Number.isFinite(Number(text)) ? money(text) : text}
+      onFocus={() => setTyping(true)}
       disabled={saving}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
