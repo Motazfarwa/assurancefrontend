@@ -1,0 +1,46 @@
+/* The calendar of every date field (see DatePopup.js). The browser's own calendar icon is replaced by ours. */
+input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+input[type="date"]:not(:disabled):not([readonly]) {
+  cursor: pointer;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23587079' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.dp-popup {
+  position: fixed;
+  z-index: 100000;
+  width: 252px;
+  padding: 8px;
+  border: 1px solid #b9cfd3;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 40, 55, 0.22);
+  font-family: inherit;
+  color: #173247;
+  user-select: none;
+}
+.dp-head { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; }
+.dp-head strong { flex: 1; text-align: center; font-size: 14px; text-transform: capitalize; }
+.dp-head button {
+  width: 26px; height: 26px; border: 1px solid #d5e2e4; border-radius: 5px; background: #f5f9f9;
+  color: #173247; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.dp-head button:hover { background: #e3f0ee; }
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding-bottom: 6px; border-bottom: 1px solid #e1eaec; }
+.dp-weekday { padding: 3px 0 5px; border-bottom: 1px solid #173247; color: #8a9aa1; font-size: 11px; text-align: center; }
+.dp-day {
+  height: 30px; border: 2px solid transparent; border-radius: 50%; background: none;
+  color: #173247; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.dp-day:hover:not(:disabled) { background: #e3f0ee; }
+.dp-day.is-other { color: #a3b1b6; font-weight: 400; }
+.dp-day.is-today { color: #17806f; text-decoration: underline; }
+.dp-day.is-chosen { border-color: #d64545; }
+.dp-day:disabled { color: #d0d8da; cursor: default; }
+.dp-today {
+  display: block; width: 100%; margin-top: 6px; padding: 5px 0; border: 0; border-radius: 5px; background: none;
+  color: #173247; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.dp-today:hover:not(:disabled) { background: #e3f0ee; }
