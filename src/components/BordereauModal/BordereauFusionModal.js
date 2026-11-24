@@ -143,7 +143,7 @@ export default function BordereauFusionModal({ onClose }) {
         {form.code_compagnie && periodes?.length === 0 && !error && (
           <p className="bd-error" role="status">Aucun bordereau enregistré pour {companyName || 'cette compagnie'} (terme). Importez-le d'abord (Réception terme).</p>
         )}
-        {!result && !error && !(form.code_compagnie && periodes?.length === 0) && <p className="bd-notice">Choisissez la compagnie et la période : le bordereau reçu est comparé avec vos polices et quittances, puis vous pouvez le fusionner. La fusion marque le bordereau comme traité ; vos polices et quittances ne sont pas modifiées.</p>}
+        {!result && !error && !(form.code_compagnie && periodes?.length === 0) && <p className="bd-notice">Choisissez la compagnie et la période : le bordereau reçu est comparé avec vos polices et quittances, puis vous pouvez le fusionner. La fusion marque le bordereau comme traité et ajoute ses quittances dans les quittances (montant = solde) : elles apparaissent alors dans l’état des impayés.</p>}
 
         {result && (
           <div className="bd-report">
@@ -153,6 +153,17 @@ export default function BordereauFusionModal({ onClose }) {
                 {fused ? `Fusionné le ${shortDate(result.bordereau.date_fusion)}${result.bordereau.fusion_par ? ` par ${result.bordereau.fusion_par}` : ''}` : 'N\'est pas encore fusionné'}
               </span>
             </p>
+            {/* what the fusion put into the quittances (and so into the état des impayés) */}
+            {fused && result.resume.nb_quittances_fusion != null && (
+              <p className={result.resume.nb_quittances_fusion ? 'bd-notice' : 'bd-error'} role="status">
+                {result.resume.nb_quittances_fusion
+                  ? `${result.resume.nb_quittances_fusion} quittance(s) de ce bordereau ajoutée(s) dans les quittances par la fusion.`
+                  : 'Aucune quittance ajoutée par cette fusion (fusionné avant la mise à jour, ou quittances déjà présentes) : annulez la fusion puis fusionnez à nouveau.'}
+              </p>
+            )}
+            {result.resume.nb_sans_quittance > 0 && (
+              <p className="bd-error" role="status">{result.resume.nb_sans_quittance} ligne(s) sans N° de quittance : elles ne peuvent pas être ajoutées dans les quittances (vérifiez la colonne N° Quittance du fichier).</p>
+            )}
             <div className="bd-summary">
               <div><strong>{result.resume.nb_lignes}</strong><span>lignes</span></div>
               <div className="is-ok"><strong>{result.resume.nb_ok}</strong><span>concordantes</span></div>
