@@ -58,7 +58,7 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
   </div>;
 }
 
-// Module "Afficher les frais généraux": the frais of a nature over a period, as an aperçu in a tab of its own (they are
+// Module "État des frais généraux": the frais of a nature over a period, as an aperçu in a tab of its own (they are
 // entered in "Saisie frais généraux").
 export function AfficherFraisModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
@@ -92,11 +92,11 @@ export function AfficherFraisModal({ moduleId, onClose }) {
 
   return <div className="expert-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="catalog-modal frg-modal" role="dialog" aria-modal="true" aria-labelledby="frg-list-title">
-      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>COMPTABILITÉ · MODULE {moduleId}</span><h2 id="frg-list-title">Afficher les frais généraux</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
+      <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>COMPTABILITÉ · MODULE {moduleId}</span><h2 id="frg-list-title">État des frais généraux</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="catalog-body">
         <div className="catalog-section frg-preview">
           <label className="catalog-field"><span>Nature frais</span>
-            <select value={nature} onChange={(event) => setNature(event.target.value)} disabled={!options} autoFocus>{options?.natures.map((item) => <option key={item.code} value={item.code}>{item.libelle}</option>)}</select>
+            <select value={nature} onChange={(event) => setNature(event.target.value)} disabled={!options} autoFocus>{options?.natures.filter((item) => item.code !== 'S').map((item) => <option key={item.code} value={item.code}>{item.libelle}</option>)}</select>
           </label>
           <label className="catalog-field"><span>Du</span><input type="date" value={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, debut: event.target.value }))} /></label>
           <label className="catalog-field"><span>Au</span><input type="date" value={period.fin} min={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, fin: event.target.value }))} /></label>
@@ -114,7 +114,7 @@ export function AfficherFraisModal({ moduleId, onClose }) {
 }
 
 // Module "Saisie frais généraux": the agency's expenses (salaires, loyers, téléphone…), entered by nature and type
-// (they are listed in the module "Afficher les frais généraux").
+// (they are listed in the module "État des frais généraux").
 export default function FraisGenerauxModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [options, setOptions] = useState(null);

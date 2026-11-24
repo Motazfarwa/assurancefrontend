@@ -15,10 +15,10 @@ test('"Saisie frais généraux" only enters the frais: no aperçu', async () => 
   expect(screen.queryByRole('button', { name: 'Aperçu' })).not.toBeInTheDocument();
 });
 
-test('"Afficher les frais généraux" is a module of its own: nature, period, aperçu', async () => {
-  expect(INSURANCE_MODULES.find((module) => module.id === '401')).toMatchObject({ title: 'Afficher les frais generaux', form: 'frais-generaux-liste' });
+test('"État des frais généraux" is a module of its own: nature, period, aperçu', async () => {
+  expect(INSURANCE_MODULES.find((module) => module.id === '401')).toMatchObject({ title: 'État des frais généraux', form: 'frais-generaux-liste' });
   render(<AfficherFraisModal moduleId="401" onClose={() => {}} />);
-  expect(screen.getByRole('heading', { name: 'Afficher les frais généraux' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'État des frais généraux' })).toBeInTheDocument();
   expect(await screen.findByRole('option', { name: 'Frais Généraux (W.J)' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Aperçu' })).toBeEnabled();
 });

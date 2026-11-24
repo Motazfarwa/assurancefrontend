@@ -794,7 +794,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           <fieldset className="snr-group" disabled={locked}>
             <legend>Assuré et police</legend>
             {input('N° police', 'Num_Int', { maxLength: 15, onBlur: () => fillFromPolicy(), onType: () => fillFromPolicy({ quiet: true }), list: 'snr-client-policies', placeholder: 'Recherche auto', required: true })}
-            {input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => { if (!form.Code_Client) fillFromPolicy({ plate: true }); }, onType: () => { if (!formRef.current.Code_Client) fillFromPolicy({ plate: true, quiet: true }); }, placeholder: '209 TU 2222' })}
+            {/* the plate typed (at any time, client already filled or not): the police of that vehicle, its client, company, branch and risk */}
+            {input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => fillFromPolicy({ plate: true, quiet: true }), onType: () => fillFromPolicy({ plate: true, quiet: true }), placeholder: '209 TU 2222' })}
             {fleetVehicles.length > 0 && <label className="snr-span-6 snr-fleet">
               <span>Véhicule de la flotte<i> *</i></span>
               <select value={fleetVehicles.find((vehicle) => plateKey(vehicle.num_imat) === plateKey(form.Num_Imat))?.ordre || ''} onChange={(event) => chooseFleetVehicle(event.target.value)}>

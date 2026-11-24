@@ -216,9 +216,13 @@ function fromDetail({ police: p = {}, quittance: q = {} }) {
     };
 }
 
+// A registration plate compared as the backend does: spaces left out, upper case (9464 tu 207 = 9464TU207).
+const plateKey = (value) => String(value || "").replace(/\s/g, "").toUpperCase();
+
 // embedded: used as steps 3 and 4 of the "new client" flow. "Suivant" on the receipt calls onReceiptReady without storing
 // anything; the last step stores everything through saveRef. beforeSave runs first (it creates the client). saveRef.current()
 // resolves to the stored result, with `fleet` when a fleet window opened, or to null with the error shown on the receipt.
+
 export default function PolicyForm({ clientCode = "", prefill = null, onStepChange, onClose, initialClient = "", embedded = false, beforeSave, onReceiptReady, saveRef, fleetRetryRef, finalLabel = "Soumettre", clientName = "" }) {
     const { accessToken, user } = useAuth();
     // Opened from a client file: a new policy (then its receipt) is entered for that client.
@@ -760,7 +764,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                 throw new Error(typeof data.detail === 'string' ? data.detail : 'Recherche impossible');
             }
             const loaded = fromDetail(data);
-            loadedRef.current = { num: loaded.num_police, client: loaded.code_client, numInt: String(data.police?.num_int || "").trim() };
+            loadedRef.current = { num: loaded.num_police, client: loaded.code_client, numInt: String(data.police?.num_int || "").trim(), plate: plateKey(loaded.num_imat) };
             const g = data.garanties || {};
             const guarantees = {
                 g_vol: asText(g.vol), g_incendie: asText(g.incendie), g_bdg: asText(g.bdg),
@@ -791,7 +795,7 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
             if (err.name !== 'AbortError') {
                 setQuittances([]);
                 // A new police: its number is not found yet, which is expected.
-                if (!(isCreate && params.num_police)) setError(err.message);
+                if (!(isCreate && (params.num_police || params.num_imat))) setError(err.message);
             }
         } finally {
             if (!signal.aborted) setLoading(false);
@@ -831,6 +835,18 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
     }, [values.num_police]);
 
     // Client code -> its polices (above): the latest police in force is shown, with its receipts.
+
+    // Immatriculation typed (spaces and case ignored) -> the police of that vehicle (the one in force first), its client
+    // and its receipts, once typing pauses. Not while a new police number of its own is being typed.
+    useEffect(() => {
+        const plate = plateKey(values.num_imat);
+        if (plate.length < 6 || plate === loadedRef.current.plate) return undefined;
+        if (values.num_police && values.num_police !== loadedRef.current.num) return undefined;
+        const controller = new AbortController();
+        const timer = setTimeout(() => lookup({ num_imat: plate }, controller.signal), 600);
+        return () => { controller.abort(); clearTimeout(timer); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [values.num_imat]);
 
 
     // "Nom client": a typed name proposes the matching clients; picking one fills the code, which loads its policy.
