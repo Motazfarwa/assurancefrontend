@@ -81,7 +81,7 @@ function withFleet(policy) {
 const POLICY_DETAILS = [
   ['num_police', 'N° police'], ['num_int', 'N° dossier'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
   ['nom_compagnie', 'Compagnie'], ['code_branche', 'Branche'], ['risque', 'Risque'], ['etat', 'État'],
-  ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['duree', 'Durée (mois)'],
+  ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['duree', 'Durée'],
   ['num_imat', 'Immatriculation'], ['marque', 'Marque'], ['Garantie', 'Garantie'], ['Franchise', 'Franchise'],
   ['capital', 'Capital'], ['prime_net', 'Prime nette'], ['commission', 'Commission'], ['prime_total', 'Prime totale'],
   ['obser', 'Observation'],
@@ -105,9 +105,20 @@ export function RecordsDialog({ kicker, title, subtitle, columns: fixedColumns, 
 }
 
 // The details of one policy, with its actions (Modifier is here, not in the list).
+// The durée in the policy's Unité (TPolice.Unite): A = an(s), M = mois, J = jour(s); 1 A is one year, not one month.
+export function durationText(policy) {
+  const duree = policy.duree;
+  if (duree == null || duree === '') return '—';
+  const n = Number(duree);
+  const unite = String(policy.Unite ?? policy.unite ?? '').trim().toUpperCase();
+  const unit = unite === 'A' ? (n > 1 ? 'ans' : 'an') : unite === 'M' ? 'mois' : unite === 'J' ? (n > 1 ? 'jours' : 'jour') : '';
+  return unit ? `${duree} ${unit}` : String(duree);
+}
+
 function PolicyDetailDialog({ policy, onClose, actions }) {
   const value = (key) => {
     if (key === 'etat') return [String(policy.etat || '').trim(), policyStatus(policy)].filter(Boolean).join(' · ') || '—';
+    if (key === 'duree') return durationText(policy);
     return formatValue(policy[key]);
   };
   return <div className="client-records-backdrop is-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>

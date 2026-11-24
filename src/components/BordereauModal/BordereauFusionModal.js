@@ -74,8 +74,13 @@ export default function BordereauFusionModal({ onClose }) {
     setLoading(true);
     setError('');
     try {
-      await fuseBordereau(accessToken, bordereau, !clean);
-      setNotice('Bordereau fusionné.');
+      const done = await fuseBordereau(accessToken, bordereau, !clean);
+      // what went into TQuittance (montant = solde = prime totale)
+      const parts = [];
+      if (done?.quittances_creees != null) parts.push(`${done.quittances_creees} quittance(s) ajoutée(s) dans les quittances`);
+      if (done?.quittances_existantes) parts.push(`${done.quittances_existantes} déjà présente(s)`);
+      if (done?.lignes_sans_quittance) parts.push(`${done.lignes_sans_quittance} ligne(s) sans N° de quittance`);
+      setNotice(`Bordereau fusionné.${parts.length ? ` ${parts.join(', ')}.` : ''}`);
       setResult(await getConfrontation(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc, periode }));
     } catch (requestError) {
       setError(requestError.message);
