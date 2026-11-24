@@ -318,3 +318,16 @@
 .jrn-client-results li { padding: 7px 9px; border-radius: 6px; color: #233c4b; font-size: 12.5px; font-weight: 400; cursor: pointer; }
 .jrn-client-results li:hover { background: #eef7f5; }
 .jrn-client-results b { margin-right: 6px; color: #1f7a6d; }
+
+/* Reports on screen: the column titles stay at the top while scrolling down the lines (Code, Nom client, Prime…).
+   The sheet must not be a scroll box itself for that (the page or the backdrop scrolls); on a narrow screen it keeps
+   its own horizontal scroll. */
+@media screen and (min-width: 900px) {
+  .jrn-sheet { overflow: visible; }
+}
+@media screen {
+  .jrn-sheet-table thead th {
+    position: sticky; top: 0; z-index: 2; background: #f1f4f5;
+    box-shadow: inset 0 1px 0 #333, inset 0 -1px 0 #333; /* the collapsed borders do not follow a sticky cell */
+  }
+}
