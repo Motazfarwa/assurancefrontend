@@ -160,10 +160,10 @@ test('"Lister": one line per journal of the half months, without "Valider" (vali
   const previous = screen.getByRole('button', { name: 'Journal d’encaissement du 31/10/2026' }).closest('tr');
   expect(within(current).getByText('300,000')).toBeInTheDocument();
   // everything already comptabilisé (by the old software) but never validated: still to validate
-  expect(within(previous).getByText('À valider · tout est déclaré')).toBeInTheDocument();
+  expect(within(previous).getByText('Non validé')).toBeInTheDocument();
   // validated in the new system: done
   const validated = screen.getByRole('button', { name: 'Journal d’encaissement du 15/10/2026' }).closest('tr');
-  expect(within(validated).getByText('Validé le 15/10/2026 à 17:30 par Sami')).toBeInTheDocument();
+  expect(within(validated).getByTitle('Validé le 15/10/2026 à 17:30 par Sami')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();
   expect(validateJournal).not.toHaveBeenCalled();
   // older journals on demand

@@ -9,6 +9,7 @@ import { showToast } from '../../services/toast';
 import SinistreSuivi from './SinistreSuivi';
 import DocumentImportDialog from '../DocumentImportDialog/DocumentImportDialog';
 import ModuleLinks from '../ModuleLinks/ModuleLinks';
+import ExpertManagementModal from '../ExpertManagementModal/ExpertManagementModal';
 import './SinistreModal.css';
 
 // The journal day of a date: the 15th until the 15th, then the last day of the month (the feuille de caisse it goes in).
@@ -272,6 +273,7 @@ const statusOf = (row) => (row.Cloture ? ['Clôturé', 'is-closed'] : row.Regle 
 export default function SinistreModal({ onClose, mode = 'manage', moduleId = '620', clientCode = '', policyNumber = '', vehicle, onSaved, onNavigate, available }) {
   const { accessToken } = useAuth();
   const fileInput = useRef(null);
+  const [addingExpert, setAddingExpert] = useState(false);
   const [lookups, setLookups] = useState({ responsabilites: [], types_sinistre: [], branches: [], compagnies: [], compagnies_adverses: [], experts: [], garanties: [], types_degats: [], etapes: [], urgences: [] });
   const [form, setForm] = useState(blank);
   const [current, setCurrent] = useState(''); // number of the stored claim being edited ('' = new claim)
@@ -281,6 +283,10 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
   // A stored claim opens locked: "Modifier" opens its fields, "Enregistrer" stores them, "Annuler" puts it back.
   const [editing, setEditing] = useState(false);
   const locked = Boolean(current) && !editing;
+  // A vehicle branch (famille AUTO: auto, transport, vol, bris de glaces) has an immatriculation; habitation, incendie,
+  // RC… do not. No branch chosen yet: the immatriculation stays (it finds the police).
+  const branchFamily = lookups.branches.find((branch) => String(branch.id) === String(form.Code_Type_Branche))?.famille || '';
+  const vehicleBranch = !branchFamily || branchFamily === 'AUTO';
   useEffect(() => { setEditing(false); }, [current]);
   const [tried, setTried] = useState(false); // a save was attempted: required fields are highlighted
   const [busy, setBusy] = useState(false);
@@ -698,6 +704,11 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
       />
     </label>
   );
+  const branchLabel = lookups.branches.find((branch) => String(branch.id) === String(form.Code_Type_Branche))?.label || '';
+  const inBranch = (expert) => form.Code_Type_Branche !== '' && (expert.branches || []).map(String).includes(String(form.Code_Type_Branche));
+  const branchExperts = lookups.experts.filter(inBranch);
+  const otherExperts = lookups.experts.filter((expert) => !inBranch(expert));
+
   const choose = (label, name, options, { none = '', noneLabel = '—', span = 3 } = {}) => {
     const known = options.some((option) => String(option.id) === String(form[name])) || String(form[name]) === String(none);
     return (
@@ -795,8 +806,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             <legend>Assuré et police</legend>
             {input('N° police', 'Num_Int', { maxLength: 15, onBlur: () => fillFromPolicy(), onType: () => fillFromPolicy({ quiet: true }), list: 'snr-client-policies', placeholder: 'Recherche auto', required: true })}
             {/* the plate typed (at any time, client already filled or not): the police of that vehicle, its client, company, branch and risk */}
-            {input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => fillFromPolicy({ plate: true, quiet: true }), onType: () => fillFromPolicy({ plate: true, quiet: true }), placeholder: '209 TU 2222' })}
-            {fleetVehicles.length > 0 && <label className="snr-span-6 snr-fleet">
+            {vehicleBranch && input('Immatriculation', 'Num_Imat', { maxLength: 12, onBlur: () => fillFromPolicy({ plate: true, quiet: true }), onType: () => fillFromPolicy({ plate: true, quiet: true }), placeholder: '209 TU 2222' })}
+            {vehicleBranch && fleetVehicles.length > 0 && <label className="snr-span-6 snr-fleet">
               <span>Véhicule de la flotte<i> *</i></span>
               <select value={fleetVehicles.find((vehicle) => plateKey(vehicle.num_imat) === plateKey(form.Num_Imat))?.ordre || ''} onChange={(event) => chooseFleetVehicle(event.target.value)}>
                 <option value="">— Choisir le véhicule sinistré —</option>
@@ -815,7 +826,7 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             <legend>Partie adverse</legend>
             {input('Tiers', 'Tiers1', { span: 6, maxLength: 50 })}
             {choose('Compagnie adverse', 'Code_Compagnie_Advers1', lookups.compagnies_adverses, { none: '0', noneLabel: '(Aucune)' })}
-            {input('Immatriculation', 'Num_Imat1', { maxLength: 12 })}
+            {vehicleBranch && input('Immatriculation', 'Num_Imat1', { maxLength: 12 })}
             {input('N° police', 'Num_Int1', { maxLength: 15 })}
             {input('N° sinistre adverse', 'Num_Sinistre_Compagnie_Advers1', { maxLength: 20 })}
           </fieldset>
@@ -832,7 +843,18 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
 
           <fieldset className="snr-group" disabled={locked}>
             <legend>Expertise et règlement</legend>
-            {choose('Expert', 'Code_Expert1', lookups.experts, { none: '0', noneLabel: '(Aucun)', span: 6 })}
+            {/* the experts of the claim's branch first, then the others; a new expert can be added here */}
+            <label className="snr-span-6 snr-expert">
+              <span>Expert<button type="button" className="snr-expert-add" onClick={() => setAddingExpert(true)} disabled={locked}>+ Nouvel expert</button></span>
+              <select value={form.Code_Expert1} disabled={locked} onChange={(event) => change({ Code_Expert1: event.target.value })}>
+                <option value="0">(Aucun)</option>
+                {form.Code_Expert1 !== '' && String(form.Code_Expert1) !== '0' && !lookups.experts.some((expert) => String(expert.id) === String(form.Code_Expert1)) && <option value={form.Code_Expert1}>{form.Code_Expert1}</option>}
+                {branchExperts.length > 0 && <optgroup label={`Experts ${branchLabel}`}>{branchExperts.map((expert) => <option key={expert.id} value={expert.id}>{expert.label}</option>)}</optgroup>}
+                {branchExperts.length > 0
+                  ? <optgroup label="Autres experts">{otherExperts.map((expert) => <option key={expert.id} value={expert.id}>{expert.label}</option>)}</optgroup>
+                  : otherExperts.map((expert) => <option key={expert.id} value={expert.id}>{expert.label}</option>)}
+              </select>
+            </label>
             {input('Montant devis', 'Montant_Devis', { type: 'number' })}
             {input('Montant rapport', 'Montant_Rapport', { type: 'number' })}
             {input('Montant quittance', 'Montant_Quittance', { type: 'number' })}
@@ -997,6 +1019,11 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
           </section>
         </div>
       )}
+      {addingExpert && <ExpertManagementModal onClose={() => {
+        setAddingExpert(false);
+        // the expert just saved appears in the list
+        getSinistreLookups(accessToken).then((data) => setLookups((current) => ({ ...current, experts: data.experts || current.experts }))).catch(() => {});
+      }} />}
       {importFile && <DocumentImportDialog file={importFile} kicker={`SINISTRES · MODULE ${moduleId} · IMPORT`} title="Importer un constat / une déclaration" read={(onProgress) => extractSinistre(accessToken, importFile, onProgress)} summarize={summarizeImport} applyLabel="Appliquer au dossier" onApply={applyImport} onClose={() => setImportFile(null)} />}
     </div>
   );

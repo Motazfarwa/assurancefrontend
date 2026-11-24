@@ -17,7 +17,11 @@ function DetailSection({ title, children, className = '' }) {
   return <section className={`client-detail-section${className ? ` ${className}` : ''}`}><h2>{title}</h2><div className="client-detail-grid">{children}</div></section>;
 }
 
-const POLICY_COLUMNS = [['num_police', 'N° police'], ['nom_compagnie', 'Compagnie'], ['risque', 'Risque'], ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['prime_total', 'Prime totale'], ['obser', 'Observation'], ['commission', 'Commission']];
+const POLICY_COLUMNS = [['num_police', 'N° police'], ['nom_compagnie', 'Compagnie'], ['risque', 'Risque'], ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['prime_total_affiche', 'Prime totale'], ['obser', 'Observation'], ['commission_affiche', 'Commission']];
+// The prime shown for a police (as the legacy software): its last terme quittance when the last quittance is a terme,
+// otherwise its first comptant quittance (the API gives it as *_aff; ristournes never count). Without quittance: the police's.
+export const shownPrime = (policy, key) => policy[`${key}_aff`] ?? policy[key];
+const withShownPrimes = (policy) => ({ ...policy, prime_total_affiche: shownPrime(policy, 'prime_total'), commission_affiche: shownPrime(policy, 'commission') });
 // Same columns as the legacy receipts grid. Effet = receipt start (emission) date; Reg = settled (has a settlement date).
 const RECEIPT_COLUMNS = [['num_quittance', 'N° quittance'], ['date_saisie', 'Date Saisie'], ['date_emission', 'Effet'], ['tc', 'TC'], ['prime_net', 'P. Net'], ['reg', 'Reg'], ['Date_Reglement', 'Date Reg'], ['commission', 'MM. Comp'], ['Date_M', 'Date Mvt'], ['montant_quittance', 'Mont. Quit.'], ['solde_quittance', 'Solde']];
 
@@ -84,7 +88,7 @@ const POLICY_DETAILS = [
   ['effet', 'Date effet'], ['echeance', 'Échéance'], ['expiration', 'Expiration'], ['duree', 'Durée'],
   ['num_imat', 'Immatriculation'], ['marque', 'Marque'], ['Garantie', 'Garantie'], ['Franchise', 'Franchise'],
   ['capital', 'Capital'], ['prime_net', 'Prime nette'], ['commission', 'Commission'], ['prime_total', 'Prime totale'],
-  ['obser', 'Observation'],
+  ['quittance_aff', 'Prime de la quittance'], ['obser', 'Observation'],
 ];
 
 export function RecordsDialog({ kicker, title, subtitle, columns: fixedColumns, records, loading, error, onClose, actions, nested = false, wide = false, className = "", filters, onFilterChange, statusTabs, onRowClick, headerActions }) {
@@ -119,6 +123,8 @@ function PolicyDetailDialog({ policy, onClose, actions }) {
   const value = (key) => {
     if (key === 'etat') return [String(policy.etat || '').trim(), policyStatus(policy)].filter(Boolean).join(' · ') || '—';
     if (key === 'duree') return durationText(policy);
+    if (['prime_net', 'commission', 'prime_total'].includes(key)) return formatValue(shownPrime(policy, key));
+    if (key === 'quittance_aff') return policy.quittance_aff ? `${policy.quittance_aff} · ${policy.tc_aff === 'T' ? 'dernière prime terme' : 'première prime au comptant'}` : '—';
     return formatValue(policy[key]);
   };
   return <div className="client-records-backdrop is-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -217,7 +223,7 @@ export default function ClientPreviewPage() {
   async function loadPolicies(filters = policyFilters) {
     setPoliciesState((current) => ({ ...current, loading: true, error: '' }));
     try {
-      const records = (await searchRecords(accessToken, 'policies', filters)).map(withFleet);
+      const records = (await searchRecords(accessToken, 'policies', filters)).map(withFleet).map(withShownPrimes);
       setPoliciesState({ loading: false, error: '', records });
       return records;
     } catch (error) {

@@ -48,13 +48,13 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
         // only a validation recorded in the new system makes a journal "Validé"; one whose lines are all already
         // comptabilisées (by the old software) is still to validate
         const open = !item.validation;
-        const pending = Number(item.a_declarer) > 0;
         return <tr key={item.jour} className={open ? 'is-open' : ''}>
           <td><button type="button" className="jrn-period-name" onClick={() => onOpen(item.jour)}>{names.title} du {formatDate(item.jour)}</button><small>{item.quinzaine === false ? `déclaré le ${shortDate(item.jour)}` : `du ${shortDate(item.debut)} au ${shortDate(item.jour)}`}</small></td>
           <td className="cqi-number">{item.lignes}</td>
           <td className="cqi-number"><b>{fmt(item.montant)}</b></td>
-          <td>{item.validation ? <span className="jrn-period-state is-done">Validé le {stamp(item.validation.date_saisie)}{item.validation.utilisateur ? ` par ${item.validation.utilisateur}` : ''}</span>
-            : <span className="jrn-period-state">À valider{pending ? '' : ` · tout est ${names.done}`}</span>}</td>
+          {/* Validé: its feuille de caisse is validated; otherwise Non validé */}
+          <td>{item.validation ? <span className="jrn-period-state is-done" title={`Validé le ${stamp(item.validation.date_saisie)}${item.validation.utilisateur ? ` par ${item.validation.utilisateur}` : ''}`}>Validé</span>
+            : <span className="jrn-period-state">Non validé</span>}</td>
           <td className="jrn-period-actions">
             <button type="button" className="expert-cancel" onClick={() => onOpen(item.jour)}>Détails</button>
           </td>

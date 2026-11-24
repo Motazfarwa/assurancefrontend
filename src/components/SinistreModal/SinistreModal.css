@@ -251,3 +251,10 @@
 
 /* Dossiers sinistres: the "Étape" filter (libellés are long) */
 .snr-etape-filter { max-width: 240px; }
+
+/* Expert: "+ Nouvel expert" next to the label */
+.snr-expert > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.snr-expert-add { border: 0; background: none; color: #1b7a6e; font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
+.snr-expert-add:disabled { color: #9aa5a8; cursor: default; }
+/* the "Nouvel expert" window opens above the claim */
+.snr-backdrop ~ .expert-modal-backdrop, .snr-backdrop .expert-modal-backdrop { z-index: 60; }
