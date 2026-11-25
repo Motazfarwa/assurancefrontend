@@ -5,7 +5,19 @@ const fmt = (value) => Number(value || 0).toLocaleString('fr-TN', { minimumFract
 const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 const shortDate = (value) => formatDate(value).slice(0, 5);
 const stamp = (value) => (value ? `${formatDate(value)} à ${String(value).slice(11, 16)}` : '');
-const PAGE = 12;
+const PAGE = 12; // journals of the half months per page (6 months)
+
+// The date of page `page` (1 = the one chosen): 6 months back per page, kept on the 15th or the end of the month.
+export function pageDate(date, page) {
+  if (!date || page <= 1) return date;
+  const [y, m, d] = date.split('-').map(Number);
+  const months = y * 12 + (m - 1) - (page - 1) * (PAGE / 2);
+  const year = Math.floor(months / 12);
+  const month = (months % 12) + 1;
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const day = d <= 15 ? 15 : last;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
 
 const NAMES = {
   encaissement: { title: 'Journal d’encaissement', what: 'quittance', whats: 'quittances', verb: 'déclarée', done: 'déclaré' },
@@ -22,19 +34,19 @@ const plural = (count, one, many) => `${count} ${count > 1 ? many : one}`;
 // (module "Feuille de caisse", Aperçu · Valider).
 export default function JournalPeriods({ kind, accessToken, date, compagnie, nature, companyName, reloadKey, onOpen }) {
   const names = NAMES[kind];
-  const [count, setCount] = useState(PAGE);
+  const [page, setPage] = useState(1);
   const [state, setState] = useState({ loading: true, error: '', items: [], older: null });
 
-  useEffect(() => { setCount(PAGE); }, [date, compagnie, nature, reloadKey]);
+  useEffect(() => { setPage(1); }, [date, compagnie, nature, reloadKey]);
   useEffect(() => {
     if (!date) return undefined;
     let active = true;
     setState((current) => ({ ...current, loading: true, error: '' }));
-    getJournalPeriods(accessToken, { type: kind, date, compagnie, nature, nombre: count })
+    getJournalPeriods(accessToken, { type: kind, date: pageDate(date, page), compagnie, nature, nombre: PAGE })
       .then((body) => { if (active) setState({ loading: false, error: '', items: body.items || [], older: body.anterieur || null }); })
       .catch((requestError) => { if (active) setState({ loading: false, error: requestError.message, items: [], older: null }); });
     return () => { active = false; };
-  }, [accessToken, kind, date, compagnie, nature, count, reloadKey]);
+  }, [accessToken, kind, date, compagnie, nature, page, reloadKey]);
 
   return <section className="unpaid-results jrn-periods" aria-label="Journaux par quinzaine">
     <div className="unpaid-results-heading">
@@ -62,7 +74,14 @@ export default function JournalPeriods({ kind, accessToken, date, compagnie, nat
       })}</tbody>
     </table></div>
     {state.older && Number(state.older.a_declarer) > 0 && <p className="jrn-period-older">{plural(state.older.a_declarer, names.what, names.whats)} ({fmt(state.older.montant_a_declarer)} TND) réglée{state.older.a_declarer > 1 ? 's' : ''} avant le {formatDate(state.older.avant)} reste{state.older.a_declarer > 1 ? 'nt' : ''} à déclarer dans un journal plus ancien.</p>}
-    <div className="jrn-period-more"><button type="button" className="expert-cancel" onClick={() => setCount((value) => value + PAGE)} disabled={state.loading}>{state.loading ? 'Chargement…' : 'Journaux plus anciens'}</button></div>
+    {/* pagination: 12 journals (6 months) per page, page 1 the most recent */}
+    <nav className="jrn-period-more jrn-pagination" aria-label="Pages des journaux">
+      <button type="button" className="expert-cancel" onClick={() => setPage((value) => value - 1)} disabled={state.loading || page <= 1} aria-label="Page précédente">‹ Précédent</button>
+      {Array.from({ length: page + (state.items.length ? 1 : 0) }, (_, index) => index + 1).slice(Math.max(0, page - 4)).map((number) => (
+        <button type="button" key={number} className={`expert-cancel${number === page ? ' is-current' : ''}`} onClick={() => setPage(number)} disabled={state.loading} aria-current={number === page ? 'page' : undefined}>{number}</button>
+      ))}
+      <button type="button" className="expert-cancel" onClick={() => setPage((value) => value + 1)} disabled={state.loading || !state.items.length} aria-label="Page suivante">Suivant ›</button>
+    </nav>
 
   </section>;
 }

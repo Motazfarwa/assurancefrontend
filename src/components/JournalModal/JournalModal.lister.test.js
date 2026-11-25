@@ -166,9 +166,11 @@ test('"Lister": one line per journal of the half months, without "Valider" (vali
   expect(within(validated).getByTitle('Validé le 15/10/2026 à 17:30 par Sami')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Valider' })).not.toBeInTheDocument();
   expect(validateJournal).not.toHaveBeenCalled();
-  // older journals on demand
-  fireEvent.click(screen.getByRole('button', { name: 'Journaux plus anciens' }));
-  await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ nombre: 24 })));
+  // pagination: 12 journals (6 months) per page
+  fireEvent.click(screen.getByRole('button', { name: 'Page suivante' }));
+  await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-05-15', nombre: 12 })));
+  fireEvent.click(await screen.findByRole('button', { name: '1' }));
+  await waitFor(() => expect(getJournalPeriods).toHaveBeenLastCalledWith('t', expect.objectContaining({ date: '2026-11-15', nombre: 12 })));
   // "Détails": the window closes, the journal of that date is listed in the table
   fireEvent.click(within(previous).getByRole('button', { name: 'Détails' }));
   expect(screen.queryByRole('dialog', { name: 'Journal d’encaissement · journaux par quinzaine' })).not.toBeInTheDocument();
