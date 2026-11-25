@@ -15,6 +15,10 @@ const formatDate = (value) => (value ? String(value).slice(0, 10).split('-').rev
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 8)}01`;
 
+// État des frais généraux: the dépenses (frais généraux W.J), the recettes (recettes diverses) or both.
+export const ETAT_NATURES = [['D', 'Dépenses'], ['E', 'Recettes'], ['T', 'Tous']];
+const ETAT_TITLES = { D: 'Dépenses (frais généraux)', E: 'Recettes diverses', T: 'Dépenses et recettes' };
+
 const entry = (nature = 'D', banque = '') => ({ nature, code_type: '', mode: 'C', date_dep: today(), num_piece: '', code_banque: banque, montant: '', observation: '' });
 
 // The printable list of the frais of a nature over a period, shown in a browser tab of its own.
@@ -34,6 +38,8 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
   const { data } = state;
   // The printed état: in the order of the dates (the oldest first), then of the N°.
   const byDate = (items) => [...items].sort((a, b) => String(a.date_dep || '').slice(0, 10).localeCompare(String(b.date_dep || '').slice(0, 10)) || Number(a.num_dep) - Number(b.num_dep));
+  const both = nature === 'T'; // Tous: a Nature column, and the total of the dépenses and of the recettes
+  const columns = both ? 9 : 8;
   return <div className="jrn-page">
     <div className="jrn-sheet-frame">
       <div className="jrn-sheet-tools"><button type="button" className="expert-submit" onClick={(event) => event.currentTarget.ownerDocument.defaultView.print()} disabled={!data}>Imprimer</button><button type="button" className="expert-cancel" onClick={onClose}>Fermer</button></div>
@@ -44,14 +50,19 @@ function FraisSheet({ nature, natureLabel, debut, fin, options, onClose }) {
           <div className="jrn-agency jrn-printed"><span>Date : {formatDate(today())}</span></div>
         </header>
         {state.loading ? <p className="jrn-sheet-state">Chargement…</p> : state.error ? <p className="jrn-sheet-state" role="alert">{state.error}</p> : <table className="jrn-sheet-table frg-sheet-table">
-          <thead><tr><th>N°</th><th>Date</th><th>Type frais</th><th>Mode</th><th>N° pièce</th><th>Compte</th><th>Observation</th><th>Montant</th></tr></thead>
+          <thead><tr><th>N°</th><th>Date</th>{both && <th>Nature</th>}<th>Type frais</th><th>Mode</th><th>N° pièce</th><th>Compte</th><th>Observation</th><th>Montant</th></tr></thead>
           <tbody>
-            {byDate(data.items).map((item) => <tr key={item.num_dep}>
-              <td>{item.num_dep}</td><td>{formatDate(item.date_dep)}</td><td>{item.libelle || item.code_type}</td><td>{modeLabel(item.mode)}</td><td>{item.num_piece}</td><td>{item.code_banque}</td><td>{item.observation}</td><td className="num">{fmt(item.montant)}</td>
+            {byDate(data.items).map((item) => <tr key={`${item.nature}-${item.num_dep}`}>
+              <td>{item.num_dep}</td><td>{formatDate(item.date_dep)}</td>{both && <td>{item.nature === 'E' ? 'Recette' : 'Dépense'}</td>}<td>{item.libelle || item.code_type}</td><td>{modeLabel(item.mode)}</td><td>{item.num_piece}</td><td>{item.code_banque}</td><td>{item.observation}</td><td className="num">{fmt(item.montant)}</td>
             </tr>)}
-            {!data.items.length && <tr><td colSpan={8} className="jrn-sheet-state">Aucun frais sur la période.</td></tr>}
+            {!data.items.length && <tr><td colSpan={columns} className="jrn-sheet-state">Aucun frais sur la période.</td></tr>}
           </tbody>
-          <tfoot><tr><td colSpan={7}>Total ({data.items.length} frais)</td><td className="num">{fmt(data.total)}</td></tr></tfoot>
+          <tfoot>
+            {both ? <>
+              <tr><td colSpan={columns - 1}>Total dépenses ({data.items.filter((item) => item.nature !== 'E').length})</td><td className="num">{fmt(data.total_depenses)}</td></tr>
+              <tr><td colSpan={columns - 1}>Total recettes ({data.items.filter((item) => item.nature === 'E').length})</td><td className="num">{fmt(data.total_recettes)}</td></tr>
+            </> : <tr><td colSpan={columns - 1}>Total ({data.items.length} {nature === 'E' ? 'recette(s)' : 'frais'})</td><td className="num">{fmt(data.total)}</td></tr>}
+          </tfoot>
         </table>}
       </article>
     </div>
@@ -80,7 +91,7 @@ export function AfficherFraisModal({ moduleId, onClose }) {
     return () => { active = false; };
   }, [accessToken]);
 
-  const natureLabel = (code) => options?.natures.find((item) => item.code === code)?.libelle || 'Frais généraux';
+  const natureLabel = (code) => ETAT_TITLES[code] || options?.natures.find((item) => item.code === code)?.libelle || 'Frais généraux';
   const reversed = Boolean(period.debut && period.fin && period.fin < period.debut);
 
   // The aperçu opens in a browser tab of its own; a new aperçu replaces the previous tab (NewWindow closes it).
@@ -95,8 +106,8 @@ export function AfficherFraisModal({ moduleId, onClose }) {
       <header className="expert-modal-header"><div className="expert-brand"><span className="expert-brand-mark">A</span><span><strong>Gestion Assurances</strong><small>Assurance Jemmali</small></span></div><div className="expert-title"><span>COMPTABILITÉ · MODULE {moduleId}</span><h2 id="frg-list-title">État des frais généraux</h2></div><button className="expert-close" onClick={onClose} type="button" aria-label="Fermer">×</button></header>
       <div className="catalog-body">
         <div className="catalog-section frg-preview">
-          <label className="catalog-field"><span>Nature frais</span>
-            <select value={nature} onChange={(event) => setNature(event.target.value)} disabled={!options} autoFocus>{options?.natures.filter((item) => item.code !== 'S').map((item) => <option key={item.code} value={item.code}>{item.libelle}</option>)}</select>
+          <label className="catalog-field"><span>Nature</span>
+            <select value={nature} onChange={(event) => setNature(event.target.value)} disabled={!options} autoFocus>{ETAT_NATURES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select>
           </label>
           <label className="catalog-field"><span>Du</span><input type="date" value={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, debut: event.target.value }))} /></label>
           <label className="catalog-field"><span>Au</span><input type="date" value={period.fin} min={period.debut} onChange={(event) => setPeriod((value) => ({ ...value, fin: event.target.value }))} /></label>
@@ -104,7 +115,7 @@ export function AfficherFraisModal({ moduleId, onClose }) {
         </div>
         {reversed && <div className="expert-error catalog-message rst-message" role="alert">La date de fin précède la date de début.</div>}
         {error && <div className="expert-error catalog-message rst-message" role="alert">{error}</div>}
-        <p className="jrn-hint">Les frais saisis de la nature choisie sur la période (date du frais), avec le type, le mode, la pièce, le compte et le total.</p>
+        <p className="jrn-hint">Les dépenses (frais généraux), les recettes diverses, ou « Tous » : les deux ensemble avec le total de chacune, sur la période (date du frais), avec le type, le mode, la pièce et le compte.</p>
       </div>
     </section>
     {report && <NewWindow popup={report.popup} title={`${natureLabel(report.nature)} du ${formatDate(report.debut)} au ${formatDate(report.fin)}`} onClose={() => setReport(null)}>

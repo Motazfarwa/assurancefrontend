@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import FraisGenerauxModal, { AfficherFraisModal } from './FraisGenerauxModal';
 import { INSURANCE_MODULES } from '../../data/insuranceModules';
 
@@ -19,6 +19,10 @@ test('"État des frais généraux" is a module of its own: nature, period, aper�
   expect(INSURANCE_MODULES.find((module) => module.id === '401')).toMatchObject({ title: 'État des frais généraux', form: 'frais-generaux-liste' });
   render(<AfficherFraisModal moduleId="401" onClose={() => {}} />);
   expect(screen.getByRole('heading', { name: 'État des frais généraux' })).toBeInTheDocument();
-  expect(await screen.findByRole('option', { name: 'Frais Généraux (W.J)' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Aperçu' })).toBeEnabled();
+  // Dépenses, Recettes or Tous (both); no Sorties diverses
+  expect(await screen.findByRole('option', { name: 'Dépenses' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Recettes' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Tous' })).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: /Sorties/ })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Aperçu' })).toBeEnabled());
 });
