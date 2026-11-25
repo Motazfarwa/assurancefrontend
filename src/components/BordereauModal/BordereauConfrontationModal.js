@@ -90,6 +90,20 @@ export default function BordereauConfrontationModal({ onClose, initial }) {
     }
   }
 
+  // Shown directly: as soon as the company and the month are known (opened from the Réception terme, or chosen here),
+  // the confrontation runs without clicking « Confrontation ».
+  useEffect(() => {
+    if (!form.code_compagnie || !periode) return undefined;
+    let active = true;
+    setError('');
+    setLoading(true);
+    getConfrontation(accessToken, { code_compagnie: form.code_compagnie, tc: form.tc, periode })
+      .then((body) => { if (active) { setResult(body); setTab('confrontation'); } })
+      .catch((requestError) => { if (active) { setResult(null); setError(requestError.message); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [accessToken, form.code_compagnie, form.tc, periode]);
+
   const heading = `Nom Compagnie : ${companyName}    TC : ${form.tc === 'T' ? 'Terme' : 'Comptant'}    Période : ${periode}`;
   const fusionText = result?.resume.fusionne
     ? `Bordereau fusionné le ${shortDate(result.bordereau.date_fusion)}`
