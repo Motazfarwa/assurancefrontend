@@ -179,9 +179,14 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
   // that Total less the Prime Total of the lines, each line entered takes its prime off the Solde (an imported file: 0).
   // Comptant: the total of the quittances, and the Solde what is due to the company (prime totale less the commissions).
   const total = !kind.quittances && announced !== null ? announced : linesTotal;
-  const solde = useMemo(() => (kind.quittances
-    ? lines.reduce((sum, line) => sum + Number(line.prime_total || 0) - Number(line.commission || 0), 0)
-    : total - linesTotal), [kind.quittances, lines, total, linesTotal]);
+  // Rounded to the millime (and never -0): a balanced bordereau shows 0,000, not -0,000.
+  const solde = useMemo(() => {
+    const raw = kind.quittances
+      ? lines.reduce((sum, line) => sum + Number(line.prime_total || 0) - Number(line.commission || 0), 0)
+      : total - linesTotal;
+    const rounded = Math.round(raw * 1000) / 1000;
+    return rounded === 0 ? 0 : rounded;
+  }, [kind.quittances, lines, total, linesTotal]);
 
   // Client code and name of the policies the lines name, asked once per policy number.
   useEffect(() => {
