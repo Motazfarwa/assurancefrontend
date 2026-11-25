@@ -42,6 +42,30 @@ export function whenWindowReady(popup, title, ready) {
   return () => { done = true; clearInterval(timer); };
 }
 
+// « ← Retour » on every aperçu tab: closes the tab and goes back to the application where it was (the tab that opened
+// it); not printed.
+export function addBackButton(doc, popup) {
+  if (!doc?.body || doc.getElementById('apercu-retour')) return;
+  const style = doc.createElement('style');
+  style.textContent = '#apercu-retour{position:fixed;left:16px;bottom:16px;z-index:2147483647;display:inline-flex;align-items:center;gap:8px;'
+    + 'min-height:44px;padding:0 20px;border:1px solid #cfe0e4;border-radius:999px;background:#fff;color:#1b5f57;'
+    + 'font:600 16px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 6px 18px rgba(18,45,60,.18);cursor:pointer}'
+    + '#apercu-retour:hover{background:#f1f8f6}@media print{#apercu-retour{display:none!important}}';
+  doc.head.appendChild(style);
+  const button = doc.createElement('button');
+  button.id = 'apercu-retour';
+  button.type = 'button';
+  button.textContent = '← Retour';
+  button.setAttribute('aria-label', 'Retour à l’application');
+  button.addEventListener('click', () => {
+    try { popup.opener?.focus(); } catch { /* another origin: nothing to focus */ }
+    popup.close();
+    // a tab the browser will not close (opened by hand, or the opener is gone): back to the application
+    setTimeout(() => { if (!popup.closed) popup.location.href = `${BASE}/workspace`; }, 150);
+  });
+  doc.body.appendChild(button);
+}
+
 // A whole HTML page written in a new tab named after the report, then printed when `print`; null when blocked.
 export function writeNamedWindow(title, html, { print = false, features } = {}) {
   const popup = openNamedWindow(title, features);
@@ -50,6 +74,7 @@ export function writeNamedWindow(title, html, { print = false, features } = {}) 
     doc.open();
     doc.write(html);
     doc.close();
+    addBackButton(doc, popup);
     nameWindow(popup, title); // document.open gives the tab the address of this page: named again
     popup.focus();
     if (print) setTimeout(() => popup.print(), 0);
@@ -87,6 +112,7 @@ export default function NewWindow({ popup, title, onClose, children }) {
     doc.body.innerHTML = '';
     const root = doc.createElement('div');
     doc.body.appendChild(root);
+    addBackButton(doc, popup);
     setContainer(root);
     // listened once the page is loaded: the blank page replacing the opening about:blank is not a closing
     closed = () => closeRef.current();

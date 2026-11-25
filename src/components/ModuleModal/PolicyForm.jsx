@@ -317,6 +317,53 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
         return () => controller.abort();
     }, []);
 
+    // N° police typed: the polices whose number contains it (of the compagnie chosen), proposed under the field.
+    const [suggestions, setSuggestions] = useState({ open: false, items: [], active: -1 });
+    const typingNumber = useRef(false);
+    useEffect(() => {
+        const typed = values.num_police.replace(/\s/g, "");
+        if (!typingNumber.current || typed.length < 3 || typed === loadedRef.current.num) {
+            setSuggestions(current => (current.open ? { open: false, items: [], active: -1 } : current));
+            return undefined;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const query = { q: typed, ...(values.code_compagnie ? { code_compagnie: values.code_compagnie } : {}) };
+                const response = await fetch(`${API_URL}/api/polices/suggestions?${new URLSearchParams(query)}`, { credentials: "include", signal: controller.signal });
+                const data = await response.json().catch(() => ({}));
+                if (controller.signal.aborted) return;
+                const items = response.ok && Array.isArray(data.items) ? data.items.filter(item => item.num_police) : [];
+                // the number typed is exactly the only one proposed: nothing to choose
+                const only = items.length === 1 && items[0].num_police === typed;
+                setSuggestions({ open: items.length > 0 && !only, items, active: -1 });
+            } catch (err) {
+                if (err.name !== "AbortError") setSuggestions({ open: false, items: [], active: -1 });
+            }
+        }, 300);
+        return () => { controller.abort(); clearTimeout(timer); };
+    }, [values.num_police, values.code_compagnie]);
+
+    function pickSuggestion(item) {
+        typingNumber.current = false;
+        setSuggestions({ open: false, items: [], active: -1 });
+        handleNumberChange(item.num_police);
+    }
+
+    function suggestionKeys(event) {
+        if (!suggestions.open) return;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const step = event.key === "ArrowDown" ? 1 : -1;
+            setSuggestions(current => ({ ...current, active: (current.active + step + current.items.length) % current.items.length }));
+        } else if (event.key === "Enter" && suggestions.active >= 0) {
+            event.preventDefault();
+            pickSuggestion(suggestions.items[suggestions.active]);
+        } else if (event.key === "Escape") {
+            setSuggestions(current => ({ ...current, open: false }));
+        }
+    }
+
     // N° police -> the companies and branches it can belong to: read from the number (year + code branche + digits, or the
     // older code branche + year + digits) and checked against the branches of each company. Nothing is typed for it.
     useEffect(() => {
@@ -943,9 +990,25 @@ export default function PolicyForm({ clientCode = "", prefill = null, onStepChan
                                 readOnly={Boolean(editing)}
                                 value={values.num_police}
                                 maxLength={15}
-                                onChange={e => handleNumberChange(e.target.value)}
+                                onChange={e => { typingNumber.current = true; handleNumberChange(e.target.value); }}
+                                onKeyDown={suggestionKeys}
+                                onBlur={() => setTimeout(() => setSuggestions(current => ({ ...current, open: false })), 150)}
+                                autoComplete="off"
                                 placeholder={`${new Date().getFullYear()} + code branche + chiffres`}
                             />
+                        )}
+                        {suggestions.open && !editing && (
+                            <ul className="pf-num-suggestions" id="pf-num-suggestions" role="listbox" aria-label="Polices correspondantes">
+                                {suggestions.items.map((item, index) => (
+                                    <li key={`${item.num_police}-${item.num_int}`} role="option" aria-selected={index === suggestions.active}
+                                        className={index === suggestions.active ? "is-active" : undefined}
+                                        onMouseDown={e => { e.preventDefault(); pickSuggestion(item); }}>
+                                        <b>{item.num_police}</b>
+                                        <span>{[item.code_client, item.nom_client].filter(Boolean).join(" ")}</span>
+                                        <small>{[item.nom_compagnie, item.num_imat, item.etat === "AN" || item.etat === "RV" ? "en vigueur" : item.etat].filter(Boolean).join(" · ")}</small>
+                                    </li>
+                                ))}
+                            </ul>
                         )}
                         {isCreate && values.flotte && <label className="pf-flotte-prefix">
                             <span>Préfixe flotte</span>

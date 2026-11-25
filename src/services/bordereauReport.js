@@ -3,7 +3,12 @@
 import { AGENCY_INFO } from '../data/agencyInfo';
 import { writeNamedWindow } from '../components/NewWindow/NewWindow';
 
-export const money = (value) => (value == null || value === '' ? '' : Number(value).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
+// Rounded to the millime first: a sum like 47075 - 47075.0000000001 is 0,000, never -0,000.
+export const money = (value) => {
+  if (value == null || value === '') return '';
+  const rounded = Math.round(Number(value) * 1000) / 1000;
+  return (Object.is(rounded, -0) || rounded === 0 ? 0 : rounded).toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+};
 export const shortDate = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));

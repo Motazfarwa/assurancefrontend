@@ -258,3 +258,25 @@
 .snr-expert-add:disabled { color: #9aa5a8; cursor: default; }
 /* the "Nouvel expert" window opens above the claim */
 .snr-backdrop ~ .expert-modal-backdrop, .snr-backdrop .expert-modal-backdrop { z-index: 60; }
+
+/* Smaller drop-down lists (the options use the field's size) */
+.snr-group select { font-size: 12px; }
+.snr-group select option, .snr-group select optgroup { font-size: 12px; padding: 2px 4px; }
+
+/* Dates: the whole jj/mm/aaaa (and the hour) always readable, whatever the width */
+.snr-group input[type="date"], .snr-group input[type="datetime-local"] { padding: 2px 4px 2px 6px; font-variant-numeric: tabular-nums; letter-spacing: -.1px; }
+.snr-group input[type="date"]::-webkit-calendar-picker-indicator, .snr-group input[type="datetime-local"]::-webkit-calendar-picker-indicator { margin-left: 2px; padding: 0; }
+.snr-flag input[type="date"] { min-width: 112px; }
+@media (max-width: 1280px) {
+  /* the two dates of the dossier each on a full line when the section gets narrow */
+  .snr-group label:has(> input[type="datetime-local"]), .snr-group label:has(> input[type="date"]) { grid-column: span 6; }
+}
+@media (max-width: 640px) {
+  .snr-group input:not([type="checkbox"]), .snr-group select { height: 36px; font-size: 14px; }
+  .snr-flag { flex-wrap: wrap; }
+  .snr-flag input[type="date"] { flex: 1 1 140px; }
+}
+
+/* Dégâts: textarea */
+.snr-degats textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 4px 8px; border: 1px solid #d3dfe5; border-radius: 7px; background: #fff; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.3; color: #173247; resize: vertical; }
+.snr-degats textarea[readonly] { background: #f4f8f9; }

@@ -796,8 +796,8 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
               onPick={(numero) => { if (numero !== current) open(numero); }}
             />
             {input('N° sinistre compagnie', 'Num_Sinistre_Compagnie_Assure', { span: 3, maxLength: 20, onBlur: () => openByNumber('Num_Sinistre_Compagnie_Assure'), onType: () => openByNumber('Num_Sinistre_Compagnie_Assure', { quiet: true }), placeholder: '🔍 Ex : 20260125954V', search: true })}
-            {input('Date et heure du sinistre', 'Date_Sinistre', { type: 'datetime-local', span: 4, required: true })}
-            {input('Date saisie', 'Date_Saisie', { type: 'date', span: 2 })}
+            {input('Date et heure du sinistre', 'Date_Sinistre', { type: 'datetime-local', span: 3, required: true })}
+            {input('Date saisie', 'Date_Saisie', { type: 'date', span: 3 })}
             {input('Lieu du sinistre', 'Lieu_Sinistre', { span: 3, maxLength: 50, placeholder: 'Adresse, route…' })}
             {choose('Branche', 'Code_Type_Branche', lookups.branches)}
           </fieldset>
@@ -837,7 +837,11 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             {choose('Garantie', 'Garantie', asOptions(lookups.garanties))}
             {choose('Type dégâts', 'Type_Degats', asOptions(lookups.types_degats))}
             {choose('Responsabilité', 'Code_Responsabilite', lookups.responsabilites, { none: '0', noneLabel: 'Non définie' })}
-            {input('Dégâts', 'Degats', { span: 4, maxLength: 50 })}
+            {/* Dégâts: a short text on two lines (the column holds 50 characters) */}
+            <label className="snr-span-4 snr-degats">
+              <span>Dégâts</span>
+              <textarea rows={2} value={form.Degats} maxLength={50} readOnly={locked} onChange={(event) => change({ Degats: event.target.value })} />
+            </label>
             <div className="snr-span-2 snr-flag"><label className="snr-check"><input type="checkbox" checked={form.IDA} onChange={(event) => change({ IDA: event.target.checked })} />Convention IDA</label></div>
           </fieldset>
 
