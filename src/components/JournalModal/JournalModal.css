@@ -335,3 +335,8 @@
 .jrn-pagination { gap: 6px; flex-wrap: wrap; }
 .jrn-pagination button { min-width: 34px; padding: 0 10px; }
 .jrn-pagination button.is-current { background: #1b7a6e; border-color: #1b7a6e; color: #fff; opacity: 1; }
+
+/* Etat des comptes: libellé filter, every account */
+.jrn-bank-libelle input { min-width: 0; }
+.jrn-bank-global td small { color: #6b8290; }
+.jrn-bank-account { margin-top: 18px; }

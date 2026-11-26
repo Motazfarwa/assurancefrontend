@@ -35,6 +35,21 @@ function SheetFrame({ title, subtitle, onClose, children, ready = true }) {
   </div>;
 }
 
+export const ALL_ACCOUNTS = '*';
+const fold = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// The libellé filter: the movements whose libellé (or client, or reference) contains the text typed, with the credits /
+// debits recomputed on them; the solde de départ stays the account's.
+export function filterByLibelle(data, libelle) {
+  const wanted = fold(libelle).trim();
+  if (!wanted) return data;
+  const items = data.items.filter((item) => [item.libelle, item.nom_client, item.code_client, item.reference].some((value) => fold(value).includes(wanted)));
+  const sum = (sens) => Math.round(items.filter((item) => item.sens === sens).reduce((total, item) => total + Number(item.montant || 0), 0) * 1000) / 1000;
+  const credit = sum('C');
+  const debit = sum('D');
+  return { ...data, items, total_credit: credit, total_debit: debit, solde_final: Math.round((Number(data.solde_depart || 0) + credit - debit) * 1000) / 1000, libelle: libelle.trim() };
+}
+
 const dayLabel = (value) => new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 const plural = (count, word) => `${count} ${word}${count > 1 ? 's' : ''}`;
 
@@ -88,9 +103,15 @@ export const modeLabel = (code) => MODES[String(code || '').trim().toUpperCase()
 // "Détail des écritures", as the legacy ImpCompteDetail_Tech: one line per écriture in date order (date, libellé — the
 // client of a règlement, the libellé of a dépense —, débit, crédit, mode, N° pièce), then the CUMUL of the period.
 function EcrituresSheet({ data, onClose }) {
-  const { banque, items } = data;
-  return <SheetFrame title={`DÉTAIL DES ÉCRITURES DU COMPTE ${banque.code_banque}`} subtitle={[`${banque.nom_banque || ''}${banque.num_compte ? ` · N° ${banque.num_compte}` : ''}`, `Du ${formatDate(data.debut)} au ${formatDate(data.fin)}`]} onClose={onClose}>
-    <table className="jrn-sheet-table jrn-bank-table jrn-bank-ecritures">
+  const { banque } = data;
+  return <SheetFrame title={`DÉTAIL DES ÉCRITURES DU COMPTE ${banque.code_banque}`} subtitle={[`${banque.nom_banque || ''}${banque.num_compte ? ` · N° ${banque.num_compte}` : ''}`, `Du ${formatDate(data.debut)} au ${formatDate(data.fin)}`, ...(data.libelle ? [`Libellé contenant « ${data.libelle} »`] : [])]} onClose={onClose}>
+    <EcrituresTable data={data} />
+  </SheetFrame>;
+}
+
+function EcrituresTable({ data }) {
+  const { items } = data;
+  return <table className="jrn-sheet-table jrn-bank-table jrn-bank-ecritures">
       <thead><tr><th>Date</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Mode</th><th>N° pièce</th></tr></thead>
       <tbody>
         {items.map((item) => <tr key={item.id}>
@@ -102,18 +123,24 @@ function EcrituresSheet({ data, onClose }) {
         {!items.length && <tr><td colSpan={6} className="jrn-sheet-state">Aucune écriture sur la période.</td></tr>}
       </tbody>
       <tfoot><tr><td colSpan={2}>CUMUL ({plural(items.length, 'écriture')})</td><td className="num">{money(data.total_debit)}</td><td className="num">{money(data.total_credit)}</td><td colSpan={2}>Solde final : {money(data.solde_final)}</td></tr></tfoot>
-    </table>
-  </SheetFrame>;
+    </table>;
 }
 
 // Etat global: one line per day (crédit, débit, solde at the end of the day); détaillé: the movements day by day, each
 // day with its own totals. Both open on the four figures of the period and close on the totals per nature.
 function AccountSheet({ data, mode, onClose }) {
-  const { banque, items } = data;
-  const { days, natures } = useMemo(() => accountBreakdown(items), [items]);
+  const { banque } = data;
   const detail = mode === 'detail';
+  return <SheetFrame title={`ETAT ${detail ? 'DÉTAILLÉ' : 'GLOBAL'} DU COMPTE ${banque.code_banque}`} subtitle={[`${banque.nom_banque || ''}${banque.num_compte ? ` · N° ${banque.num_compte}` : ''}`, `Du ${formatDate(data.debut)} au ${formatDate(data.fin)}`, ...(data.libelle ? [`Libellé contenant « ${data.libelle} »`] : [])]} onClose={onClose}>
+    <AccountBody data={data} detail={detail} />
+  </SheetFrame>;
+}
+
+function AccountBody({ data, detail }) {
+  const { items } = data;
+  const { days, natures } = useMemo(() => accountBreakdown(items), [items]);
   const footer = <tfoot><tr><td colSpan={detail ? 3 : 2}>{plural(items.length, 'mouvement')} · Solde final au {formatDate(data.fin)}</td><td className="num">{money(data.total_credit)}</td><td className="num">{money(data.total_debit)}</td><td className="num">{money(data.solde_final)}</td></tr></tfoot>;
-  return <SheetFrame title={`ETAT ${detail ? 'DÉTAILLÉ' : 'GLOBAL'} DU COMPTE ${banque.code_banque}`} subtitle={[`${banque.nom_banque || ''}${banque.num_compte ? ` · N° ${banque.num_compte}` : ''}`, `Du ${formatDate(data.debut)} au ${formatDate(data.fin)}`]} onClose={onClose}>
+  return <>
     <AccountCards data={data} />
     <h2 className="jrn-bank-title">{detail ? 'Mouvements jour par jour' : 'Mouvements par jour'}</h2>
     {detail ? <table className="jrn-sheet-table jrn-bank-table jrn-bank-days">
@@ -143,6 +170,32 @@ function AccountSheet({ data, mode, onClose }) {
       {footer}
     </table>}
     <NatureTable natures={natures} />
+  </>;
+}
+
+// Every account at once. Etat global, as the legacy ImpCompteGlobal: one line per account (banque, compte, solde de
+// départ, recette, dépense, solde final) and the TOTAUX; détaillé / écritures: that table, then each account's detail.
+function AllAccountsSheet({ accounts, mode, debut, fin, libelle, onClose }) {
+  const total = (key) => accounts.reduce((sum, account) => sum + Number(account[key] || 0), 0);
+  const title = mode === 'global' ? 'ETAT GLOBAL DES COMPTES' : mode === 'detail' ? 'ETAT DÉTAILLÉ DES COMPTES' : 'DÉTAIL DES ÉCRITURES DES COMPTES';
+  return <SheetFrame title={title} subtitle={[`Période du ${formatDate(debut)} au ${formatDate(fin)}`, ...(libelle ? [`Libellé contenant « ${libelle} »`] : [])]} onClose={onClose}>
+    <table className="jrn-sheet-table jrn-bank-table jrn-bank-global">
+      <thead><tr><th>Banque</th><th>Compte</th><th>Solde départ</th><th>Recette</th><th>Dépense</th><th>Solde final</th></tr></thead>
+      <tbody>
+        {accounts.map((account) => <tr key={account.banque.code_banque}>
+          <td>{account.banque.code_banque}{account.banque.nom_banque && account.banque.nom_banque !== account.banque.code_banque ? <small> · {account.banque.nom_banque}</small> : null}</td>
+          <td>{account.banque.num_compte}</td>
+          <td className="num">{money(account.solde_depart)}</td><td className="num">{money(account.total_credit)}</td>
+          <td className="num">{money(account.total_debit)}</td><td className="num">{money(account.solde_final)}</td>
+        </tr>)}
+        {!accounts.length && <tr><td colSpan={6} className="jrn-sheet-state">Aucun compte.</td></tr>}
+      </tbody>
+      <tfoot><tr><td colSpan={2}>TOTAUX ({plural(accounts.length, 'compte')})</td><td className="num">{money(total('solde_depart'))}</td><td className="num">{money(total('total_credit'))}</td><td className="num">{money(total('total_debit'))}</td><td className="num">{money(total('solde_final'))}</td></tr></tfoot>
+    </table>
+    {mode !== 'global' && accounts.map((account) => <section key={account.banque.code_banque} className="jrn-bank-account">
+      <h2 className="jrn-bank-title">Compte {account.banque.code_banque}{account.banque.num_compte ? ` · N° ${account.banque.num_compte}` : ''}</h2>
+      {mode === 'detail' ? <AccountBody data={account} detail /> : <EcrituresTable data={account} />}
+    </section>)}
   </SheetFrame>;
 }
 
@@ -239,7 +292,8 @@ function ConfrontationSheet({ data, result, fichier, outside, tolerance, amountT
 export default function EtatComptesBanqueModal({ moduleId, onClose }) {
   const { accessToken } = useAuth();
   const [banks, setBanks] = useState([]);
-  const [filters, setFilters] = useState(() => ({ ...lastMonth(), code_banque: '', mode: 'global' }));
+  const [filters, setFilters] = useState(() => ({ ...lastMonth(), code_banque: '', mode: 'global', libelle: '' }));
+  const [allData, setAllData] = useState(null); // every account (« Tous les comptes »): { key, accounts }
   const [report, setReport] = useState(null); // { popup, kind: 'etat' | 'confrontation' }
   const [data, setData] = useState(null); // the account movements, for the filters they were loaded with
   const [statement, setStatement] = useState(null); // the bank's file: { fichier, rows, headerRow, headers, mapping }
@@ -275,6 +329,18 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
     return loaded;
   }
 
+  // « Tous les comptes »: each account in use, fetched together.
+  async function allMovements() {
+    const allKey = `${filters.debut}|${filters.fin}|${banks.map((bank) => bank.code_banque).join(',')}`;
+    if (allData?.key === allKey) return allData;
+    const accounts = await Promise.all(banks.map((bank) => getBankStatement(accessToken, { code_banque: bank.code_banque, debut: filters.debut, fin: filters.fin })
+      .then((result) => ({ ...result, debut: filters.debut, fin: filters.fin }))));
+    const loaded = { key: allKey, accounts };
+    setAllData(loaded);
+    return loaded;
+  }
+
+  const allAccounts = filters.code_banque === ALL_ACCOUNTS;
   const valid = filters.code_banque && filters.debut && filters.fin && filters.fin >= filters.debut;
   function change(patch) { setFilters((current) => ({ ...current, ...patch })); setError(''); }
 
@@ -284,8 +350,8 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
     try { popup = openReportWindow('Etat détaillé des comptes'); } catch (openError) { setError(openError.message); return; }
     setBusy(true);
     try {
-      await movements();
-      setReport({ popup, kind: 'etat' });
+      if (allAccounts) await allMovements(); else await movements();
+      setReport({ popup, kind: allAccounts ? 'tous' : 'etat' });
     } catch (loadError) { popup.close(); setError(loadError.message); }
     finally { setBusy(false); }
   }
@@ -327,9 +393,11 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
           <label className="acompte-field jrn-company"><span>Code banque</span>
             <select value={filters.code_banque} onChange={(event) => change({ code_banque: event.target.value })}>
               <option value="">Choisir…</option>
+              <option value={ALL_ACCOUNTS}>Tous les comptes</option>
               {banks.map((bank) => <option key={bank.code_banque} value={bank.code_banque}>{bank.code_banque}</option>)}
             </select>
           </label>
+          <label className="acompte-field jrn-bank-libelle"><span>Libellé</span><input type="search" value={filters.libelle} placeholder="Ex : loyer, STEG, client…" onChange={(event) => change({ libelle: event.target.value })} /></label>
           <fieldset className="jrn-bank-mode"><legend>Etat</legend>
             <label className="jrn-check"><input type="radio" name="bank-mode" checked={filters.mode === 'global'} onChange={() => change({ mode: 'global' })} />Etat global</label>
             <label className="jrn-check"><input type="radio" name="bank-mode" checked={filters.mode === 'detail'} onChange={() => change({ mode: 'detail' })} />Etat détaillé</label>
@@ -343,7 +411,7 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
           <div className="jrn-bank-confront-head">
             <div><strong>Confrontation avec le relevé de la banque</strong><small>Importez le relevé Excel (ou CSV) du compte pour la même période.</small></div>
             <input ref={fileInput} type="file" accept=".xls,.xlsx,.csv,.txt" hidden onChange={chooseFile} />
-            <button type="button" className="expert-cancel" onClick={() => fileInput.current?.click()} disabled={!valid || busy}>{statement ? 'Changer de relevé' : 'Importer le relevé'}</button>
+            <button type="button" className="expert-cancel" onClick={() => fileInput.current?.click()} disabled={!valid || busy || allAccounts} title={allAccounts ? 'Choisissez un compte pour le confronter à son relevé' : undefined}>{statement ? 'Changer de relevé' : 'Importer le relevé'}</button>
           </div>
           {statement && <>
             <p className="jrn-hint">« {statement.fichier} » : {plural(lines.length, 'opération')} lue{lines.length > 1 ? 's' : ''}, dont <strong>{period.lines.length} du {formatDate(filters.debut)} au {formatDate(filters.fin)}</strong>{period.outside ? ` (${period.outside} hors période, non confrontée${period.outside > 1 ? 's' : ''})` : ''}{result ? '' : ' · changez le compte ou les dates : réimportez pour confronter'}.</p>
@@ -396,9 +464,12 @@ export default function EtatComptesBanqueModal({ moduleId, onClose }) {
         <p className="jrn-hint">Crédit : les règlements clients versés sur le compte et les entrées diverses. Débit : les dépenses payées par le compte (sinistres, ristournes, frais généraux, sorties diverses). Le solde de départ part du solde initial du compte.</p>
       </div>
     </section>
-    {report && data && <NewWindow popup={report.popup} title={report.kind === 'etat' ? 'Etat détaillé des comptes' : 'Confrontation bancaire'} onClose={() => setReport(null)}>
+    {report && report.kind === 'tous' && allData && <NewWindow popup={report.popup} title="Etat des comptes" onClose={() => setReport(null)}>
+      <AllAccountsSheet accounts={allData.accounts.map((account) => filterByLibelle(account, filters.libelle))} mode={filters.mode} debut={filters.debut} fin={filters.fin} libelle={filters.libelle.trim()} onClose={() => setReport(null)} />
+    </NewWindow>}
+    {report && report.kind !== 'tous' && data && <NewWindow popup={report.popup} title={report.kind === 'etat' ? 'Etat détaillé des comptes' : 'Confrontation bancaire'} onClose={() => setReport(null)}>
       {report.kind === 'etat'
-        ? (filters.mode === 'ecritures' ? <EcrituresSheet data={data} onClose={() => setReport(null)} /> : <AccountSheet data={data} mode={filters.mode} onClose={() => setReport(null)} />)
+        ? (filters.mode === 'ecritures' ? <EcrituresSheet data={filterByLibelle(data, filters.libelle)} onClose={() => setReport(null)} /> : <AccountSheet data={filterByLibelle(data, filters.libelle)} mode={filters.mode} onClose={() => setReport(null)} />)
         : result && <ConfrontationSheet data={data} result={result} fichier={statement.fichier} outside={period.outside} tolerance={tolerance} amountTolerance={amountTolerance} onClose={() => setReport(null)} />}
     </NewWindow>}
   </div>;

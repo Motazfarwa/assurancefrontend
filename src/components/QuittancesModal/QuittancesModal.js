@@ -6,6 +6,7 @@ import { isBordereauCompany, listCompanies } from '../../services/companyApi';
 import { EditRecordDialog, RECEIPT_FIELDS, RecordsDialog } from '../../pages/ClientPreview/ClientPreviewPage';
 import ModuleLinks from '../ModuleLinks/ModuleLinks';
 import NewQuittanceDialog from './NewQuittanceDialog';
+import { printQuittance } from './quittancePdf';
 
 const COLUMNS = [
   ['num_quittance', 'N° quittance'], ['num_police', 'N° police'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
@@ -133,7 +134,11 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
       statusTabs={{ options: STATUSES, value: filters.reglement, onChange: (reglement) => setFilters((current) => ({ ...current, reglement })) }}
       onRowClick={(record) => { if (canEdit(record)) setEditing(record); }}
       onClose={onClose}
-      actions={(record) => canEdit(record) && <button type="button" onClick={() => setEditing(record)}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}
+      actions={(record) => <>
+        {canEdit(record) && <button type="button" onClick={() => setEditing(record)}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}
+        {/* the quittance printed, or saved as PDF from the print window */}
+        <button type="button" onClick={() => { try { printQuittance(record); } catch (printError) { setNotice(printError.message); } }} aria-label={`Imprimer la quittance ${record.num_quittance} en PDF`}>Imprimer PDF</button>
+      </>}
     />
     {creating && <NewQuittanceDialog moduleId={moduleId} onClose={() => setCreating(false)}
       onSaved={(number, client) => {
