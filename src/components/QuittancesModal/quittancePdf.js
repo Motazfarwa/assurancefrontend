@@ -1,5 +1,6 @@
 import { AGENCY_INFO } from '../../data/agencyInfo';
 import { API_BASE_URL } from '../../services/apiBase';
+import { getMySignature } from '../../services/signatureApi';
 
 // One quittance printed as the companies' « QUITTANCE DE PRIME » form (printed from the page; « Enregistrer au format
 // PDF » in the print window saves it): the company, the agency and its code, the police and its validity, the client,
@@ -28,7 +29,8 @@ export async function fetchQuittancePrint(accessToken, numero) {
   return body;
 }
 
-export function quittanceHtml(data) {
+// signature: the electronic signature of the user printing (« Ma signature »), under « Pour la Compagnie ».
+export function quittanceHtml(data, signature = null) {
   const { compagnie, police, validite, client, montants } = data;
   const agence = compagnie.nom_agence || AGENCY_INFO.nom;
   const [duD, duM, duY] = dateParts(validite.du);
@@ -64,6 +66,7 @@ export function quittanceHtml(data) {
   .money th, .money td { border: 1px solid #000; padding: 2px 6px; text-align: center; }
   .money td.total { vertical-align: middle; font-weight: 700; }
   .money .cie-sign { border: 0; text-align: center; vertical-align: top; font-weight: 700; }
+  .money .cie-sign .signature { display: block; max-width: 220px; max-height: 80px; margin: 6px auto 0; }
   .pay { display: grid; grid-template-columns: 240px 1fr; gap: 10px 0; padding: 14px 14px 0; font-weight: 700; }
   .box { display: inline-block; min-width: 22px; margin-right: 6px; padding: 0 5px; border: 1px solid #000; text-align: center; }
   @media print { body { padding: 0; } }
@@ -89,7 +92,7 @@ export function quittanceHtml(data) {
     <div><span>Adresse</span><span>${esc(client.adresse)}</span></div>
   </div>
   <table class="money">
-    <tr><th style="width:12%">PRIME NETTE</th><th style="width:18%">ACCESSOIRES</th><th style="width:14%">TAXES</th><th style="width:20%">PRIME TOTALE</th><th class="cie-sign" rowspan="4">Pour la Compagnie</th></tr>
+    <tr><th style="width:12%">PRIME NETTE</th><th style="width:18%">ACCESSOIRES</th><th style="width:14%">TAXES</th><th style="width:20%">PRIME TOTALE</th><th class="cie-sign" rowspan="4">Pour la Compagnie${signature ? `<br><img class="signature" src="${esc(signature)}" alt="Signature">` : ''}</th></tr>
     <tr><td>${amount(montants.prime_nette)}</td><td>${amount(montants.accessoires)}</td><td>${amount(taxes[0])}</td><td class="total" rowspan="3">${amount(montants.prime_totale)}</td></tr>
     <tr><td>${amount(0)}</td><td></td><td>${amount(taxes[1])}</td></tr>
     <tr><td>${amount(0)}</td><td></td><td>${amount(taxes[2])}</td></tr>
@@ -107,7 +110,10 @@ export function quittanceHtml(data) {
 // Prints the quittance from the page itself: written in a hidden frame, then only the browser's print window opens; the
 // user stays in Gestion des quittances.
 export async function printQuittance(accessToken, record) {
-  const data = await fetchQuittancePrint(accessToken, record.num_quittance);
+  const [data, signed] = await Promise.all([
+    fetchQuittancePrint(accessToken, record.num_quittance),
+    getMySignature(accessToken).catch(() => null), // no signature: printed without
+  ]);
   const doc = document;
   doc.getElementById('quittance-print-frame')?.remove();
   const frame = doc.createElement('iframe');
@@ -118,7 +124,7 @@ export async function printQuittance(accessToken, record) {
   doc.body.appendChild(frame);
   const win = frame.contentWindow;
   win.document.open();
-  win.document.write(quittanceHtml(data));
+  win.document.write(quittanceHtml(data, signed?.image || null));
   win.document.close();
   win.addEventListener('afterprint', () => setTimeout(() => frame.remove(), 500), { once: true });
   setTimeout(() => {

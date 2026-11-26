@@ -431,7 +431,10 @@ export default function BordereauReceptionModal({ onClose, tc = 'T' }) {
       setSavedId(result.id_bordereau);
       setFromQuittances(false);
       setDirty(false);
-      setNotice(`Bordereau enregistré : ${result.nb_lignes} ligne(s). Vous pouvez lancer la confrontation.`);
+      // a bordereau already fused stays fused: the quittances of its new lines are added at once (état des impayés)
+      setNotice(result.fusionne
+        ? `Bordereau enregistré : ${result.nb_lignes} ligne(s). Bordereau déjà fusionné : ${result.quittances_creees || 0} nouvelle(s) quittance(s) ajoutée(s) dans les quittances${result.lignes_sans_quittance ? `, ${result.lignes_sans_quittance} ligne(s) sans N° de quittance` : ''}.`
+        : `Bordereau enregistré : ${result.nb_lignes} ligne(s). Vous pouvez lancer la confrontation.`);
     } catch (saveError) {
       setError(saveError.message);
     } finally {

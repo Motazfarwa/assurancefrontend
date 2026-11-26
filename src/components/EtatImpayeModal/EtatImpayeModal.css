@@ -169,3 +169,10 @@
   .eti-preview .eti-scroll { overflow: visible; }
   .eti-preview .eti-table thead th { position: sticky; top: var(--eti-bar, 56px); z-index: 1; background: #f2f6f7; box-shadow: inset 0 1px 0 #b9c7cd, inset 0 -1px 0 #b9c7cd; }
 }
+
+/* Nom client: the matching clients under the field */
+.eti-name { position: relative; }
+.eti-name-matches { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; max-height: 260px; margin: 3px 0 0; padding: 4px 0; overflow-y: auto; list-style: none; border: 1px solid #cfe0e4; border-radius: 9px; background: #fff; box-shadow: 0 14px 34px rgba(18, 45, 60, .18); }
+.eti-name-matches li { padding: 7px 12px; color: #173247; font-size: 12.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eti-name-matches li b { margin-right: 6px; }
+.eti-name-matches li:hover, .eti-name-matches li.is-active { background: #e9f5f2; }

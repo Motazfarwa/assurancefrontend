@@ -44,3 +44,5 @@
 .cmp-list tbody tr { cursor: pointer; }
 .cmp-list tbody tr:hover { background: #eef6f4; }
 .cmp-list tbody tr.is-current { background: #e3f3ef; }
+
+.cmp-archived { color: #a2461f; font-weight: 600; }

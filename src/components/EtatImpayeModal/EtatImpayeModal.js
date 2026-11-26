@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { downloadMemoirePdf, fetchMemoirePdf, getClientLinks, getMemoireContacts, getRecoveryRate, getUnpaidStatement, listStatementCompanies, saveFile, sendMemoire } from '../../services/unpaidApi';
 import { getClientReglements } from '../../services/reglementClientApi';
+import { searchClients } from '../../services/clientApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import '../AgencyUnpaidModal/AgencyUnpaidModal.css';
 import './EtatImpayeModal.css';
@@ -177,6 +178,39 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
     set({ [name]: type === 'checkbox' ? checked : value, ...(name === 'code_client' && !value.trim() ? { nom_client: '' } : {}) });
     setError('');
   };
+  // Nom client typed: the matching clients proposed; the one chosen is searched by its code (and its liens), as a code typed.
+  const [nameMatches, setNameMatches] = useState({ open: false, items: [], active: -1 });
+  const nameTimer = useRef(null);
+  const latestName = useRef('');
+  function typeName(event) {
+    update(event);
+    const typed = event.target.value.trim();
+    latestName.current = typed;
+    clearTimeout(nameTimer.current);
+    if (typed.length < 3) { setNameMatches({ open: false, items: [], active: -1 }); return; }
+    nameTimer.current = setTimeout(async () => {
+      try {
+        const items = await searchClients(accessToken, typed, 12);
+        if (latestName.current === typed) setNameMatches({ open: items.length > 0, items, active: -1 });
+      } catch { setNameMatches({ open: false, items: [], active: -1 }); }
+    }, 350);
+  }
+  function chooseName(client) {
+    setNameMatches({ open: false, items: [], active: -1 });
+    set({ code_client: client.clientCode, nom_client: client.nom_client || [client.lastName, client.firstName].filter(Boolean).join(' ') });
+    setError('');
+  }
+  function nameKeys(event) {
+    if (!nameMatches.open) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setNameMatches((current) => ({ ...current, active: (current.active + step + current.items.length) % current.items.length }));
+    } else if (event.key === 'Enter' && nameMatches.active >= 0) {
+      event.preventDefault();
+      chooseName(nameMatches.items[nameMatches.active]);
+    } else if (event.key === 'Escape') setNameMatches((current) => ({ ...current, open: false }));
+  }
   const detail = filters.view === 'detail';
   const sans = filters.piece === 'sans';
 
@@ -189,7 +223,12 @@ export default function EtatImpayeModal({ onClose, moduleId = '340' }) {
         <div className="unpaid-filter-form eti-filters">
           <div className="eti-row">
             <label className="eti-field eti-code"><span>Code client</span><input name="code_client" value={filters.code_client} onChange={update} maxLength={8} placeholder="Tous" /></label>
-            <label className="eti-field eti-name"><span>Nom client</span><input name="nom_client" value={filters.nom_client} onChange={update} maxLength={30} placeholder="Tous les clients" readOnly={Boolean(filters.code_client.trim())} /></label>
+            <label className="eti-field eti-name"><span>Nom client</span><input name="nom_client" value={filters.nom_client} onChange={typeName} onKeyDown={nameKeys} autoComplete="off" maxLength={30} placeholder="Tous les clients" readOnly={Boolean(filters.code_client.trim())}
+              onBlur={() => setTimeout(() => setNameMatches((current) => ({ ...current, open: false })), 150)} />
+              {nameMatches.open && !filters.code_client.trim() && <ul className="eti-name-matches" role="listbox" aria-label="Clients correspondants">
+                {nameMatches.items.map((client, index) => <li key={client.clientCode} role="option" aria-selected={index === nameMatches.active} className={index === nameMatches.active ? 'is-active' : undefined}
+                  onMouseDown={(event) => { event.preventDefault(); chooseName(client); }}><b>{client.clientCode}</b> {client.nom_client || [client.lastName, client.firstName].filter(Boolean).join(' ')}</li>)}
+              </ul>}</label>
             <div className="eti-buttons">
               <button type="button" className="expert-submit" onClick={apercu} disabled={loading}>{loading ? 'Préparation…' : 'Aperçu'}</button>
               <button type="button" className="expert-cancel" onClick={() => setFilters({ ...initialFilters, date_fin: today() })}>Effacer</button>

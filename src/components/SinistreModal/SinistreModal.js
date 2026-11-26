@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { getClientByCode } from '../../services/clientApi';
+import { getClientByCode, searchClients } from '../../services/clientApi';
 import {
   createSinistre, extractSinistre, findClaimPolicy, getSinistre, getSinistreLookups, listClientPolicies, listSinistres, nextSinistreNumber, updateSinistre,
 } from '../../services/sinistreApi';
@@ -135,7 +135,7 @@ function SinistreNumberPicker({ accessToken, value, ignored, missing, onChange, 
     const id = ++requestId.current;
     setMenu((current) => ({ ...current, open: true, loading: true, prefix, ...(offset ? {} : { items: [], active: -1 }) }));
     try {
-      const result = await listSinistres(accessToken, { numero: prefix, limit: PICKER_PAGE, offset });
+      const result = await listSinistres(accessToken, { numero: prefix, limit: PICKER_PAGE, offset, ordre: 'desc' }); // the most recent first
       if (id !== requestId.current) return; // typed on meanwhile
       setMenu((current) => ({ ...current, loading: false, total: result.total, items: offset ? [...current.items, ...result.items] : result.items }));
     } catch {
@@ -183,13 +183,15 @@ function SinistreNumberPicker({ accessToken, value, ignored, missing, onChange, 
           const typed = event.target.value;
           onChange(typed);
           clearTimeout(timer.current);
-          timer.current = setTimeout(() => { load(prefixOf(typed)); onType(); }, 200);
+          // a digit erased (backspace) is a search too: what is left is the prefix, never the opened number
+          const erased = typed.length < String(value || '').length;
+          timer.current = setTimeout(() => { load(erased ? typed.trim() : prefixOf(typed)); if (!erased) onType(); }, 200);
         }}
       />
       {menu.open && place && (
         <div className="snr-picker-menu" style={{ top: place.top, left: place.left, width: place.width, '--snr-picker-height': `${place.maxHeight}px` }} onMouseDown={(event) => event.preventDefault() /* keeps the focus: a click picks, it does not leave */}>
           <div className="snr-picker-head">
-            {menu.loading && !menu.items.length ? 'Recherche…' : menu.prefix ? `${menu.total} sinistre${menu.total > 1 ? 's' : ''} commençant par « ${menu.prefix} »` : `${menu.total} sinistres, par n° croissant`}
+            {menu.loading && !menu.items.length ? 'Recherche…' : menu.prefix ? `${menu.total} sinistre${menu.total > 1 ? 's' : ''} commençant par « ${menu.prefix} » · les plus récents d’abord` : `${menu.total} sinistres · les plus récents d’abord`}
           </div>
           <ul id="snr-picker-list" role="listbox" ref={listRef}
             onScroll={(event) => { const box = event.currentTarget; if (more && !menu.loading && box.scrollTop + box.clientHeight >= box.scrollHeight - 40) load(menu.prefix, menu.items.length); }}>
@@ -546,6 +548,41 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
     } catch { /* policies unavailable: the name alone is shown */ }
   }
 
+  // Nom client typed (as the code client): the matching clients are proposed under the field; the one chosen fills
+  // its code, its name and its polices (as a code typed).
+  const [nameMatches, setNameMatches] = useState({ open: false, items: [], active: -1 });
+  const nameTimer = useRef(null);
+  function typeClientName(value) {
+    change({ nom_client: value });
+    clearTimeout(nameTimer.current);
+    const typed = value.trim();
+    if (typed.length < 3) { setNameMatches({ open: false, items: [], active: -1 }); return; }
+    nameTimer.current = setTimeout(async () => {
+      try {
+        const items = await searchClients(accessToken, typed, 12);
+        if (formRef.current.nom_client.trim() !== typed) return; // typed on meanwhile
+        setNameMatches({ open: items.length > 0, items, active: -1 });
+      } catch { setNameMatches({ open: false, items: [], active: -1 }); }
+    }, 350);
+  }
+  function chooseClient(client) {
+    setNameMatches({ open: false, items: [], active: -1 });
+    change({ Code_Client: client.clientCode, nom_client: client.nom_client || [client.lastName, client.firstName].filter(Boolean).join(' ') });
+    formRef.current = { ...formRef.current, Code_Client: client.clientCode };
+    fillFromClient();
+  }
+  function nameKeys(event) {
+    if (!nameMatches.open) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setNameMatches((current) => ({ ...current, active: (current.active + step + current.items.length) % current.items.length }));
+    } else if (event.key === 'Enter' && nameMatches.active >= 0) {
+      event.preventDefault();
+      chooseClient(nameMatches.items[nameMatches.active]);
+    } else if (event.key === 'Escape') setNameMatches((current) => ({ ...current, open: false }));
+  }
+
   function chooseImport(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -818,7 +855,18 @@ export default function SinistreModal({ onClose, mode = 'manage', moduleId = '62
             </label>}
             <datalist id="snr-client-policies">{clientPolicies.map((row) => <option key={row.num_int || row.num_police} value={row.num_int || row.num_police}>{[row.num_police, row.num_imat, row.nom_branche, row.etat].filter(Boolean).join(' · ')}</option>)}</datalist>
             {input('Code client', 'Code_Client', { span: 2, maxLength: 8, onType: fillFromClient })}
-            {input('Nom client', 'nom_client', { span: 4, maxLength: 255 })}
+            <label className="snr-span-4 snr-name-search">
+              <span>Nom client</span>
+              <input value={form.nom_client} maxLength={255} readOnly={locked} autoComplete="off" placeholder="Nom ou prénom du client"
+                onChange={(event) => typeClientName(event.target.value)} onKeyDown={nameKeys}
+                onBlur={() => setTimeout(() => setNameMatches((current) => ({ ...current, open: false })), 150)} />
+              {nameMatches.open && !locked && <ul className="snr-name-matches" role="listbox" aria-label="Clients correspondants">
+                {nameMatches.items.map((client, index) => <li key={client.clientCode} role="option" aria-selected={index === nameMatches.active}
+                  className={index === nameMatches.active ? 'is-active' : undefined} onMouseDown={(event) => { event.preventDefault(); chooseClient(client); }}>
+                  <b>{client.clientCode}</b> {client.nom_client || [client.lastName, client.firstName].filter(Boolean).join(' ')}
+                </li>)}
+              </ul>}
+            </label>
             {choose('Compagnie', 'Code_Compagnie_Assure', lookups.compagnies, { span: 6 })}
           </fieldset>
 

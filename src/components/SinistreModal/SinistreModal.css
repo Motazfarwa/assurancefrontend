@@ -280,3 +280,18 @@
 /* Dégâts: textarea */
 .snr-degats textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 4px 8px; border: 1px solid #d3dfe5; border-radius: 7px; background: #fff; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.3; color: #173247; resize: vertical; }
 .snr-degats textarea[readonly] { background: #f4f8f9; }
+
+/* Réglé / Clôturé on tablets: the tick and its label on one line, the whole date under it (nothing cut) */
+@media (max-width: 1400px) {
+  .snr-flag { flex-wrap: wrap; align-items: center; row-gap: 4px; }
+  .snr-flag .snr-check { flex: 1 1 100%; min-height: 22px; }
+  .snr-flag input[type="date"] { flex: 1 1 100%; min-width: 0; width: 100%; }
+}
+
+/* Nom client: the matching clients under the field */
+.snr-name-search { position: relative; }
+.snr-name-matches { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; max-height: 260px; margin: 3px 0 0; padding: 4px 0; overflow-y: auto; list-style: none; border: 1px solid #cfe0e4; border-radius: 9px; background: #fff; box-shadow: 0 14px 34px rgba(18, 45, 60, .18); }
+.snr-name-matches li { padding: 7px 12px; color: #173247; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.snr-name-matches li b { margin-right: 6px; }
+.snr-name-matches li:hover, .snr-name-matches li.is-active { background: #e9f5f2; }
+@media (max-width: 640px) { .snr-name-matches li { padding: 10px 12px; font-size: 14px; } }

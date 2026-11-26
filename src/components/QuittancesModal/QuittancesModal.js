@@ -7,6 +7,7 @@ import { EditRecordDialog, RECEIPT_FIELDS, RecordsDialog } from '../../pages/Cli
 import ModuleLinks from '../ModuleLinks/ModuleLinks';
 import NewQuittanceDialog from './NewQuittanceDialog';
 import { printQuittance } from './quittancePdf';
+import SignatureDialog from '../SignatureDialog/SignatureDialog';
 
 const COLUMNS = [
   ['num_quittance', 'N° quittance'], ['num_police', 'N° police'], ['code_client', 'Code client'], ['nom_client', 'Nom client'],
@@ -49,6 +50,7 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
   const [state, setState] = useState({ loading: true, error: '', records: [] });
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [signing, setSigning] = useState(false); // « Ma signature »: put on the quittances printed
   const [notice, setNotice] = useState('');
   const latest = useRef(0); // only the answer of the last search is shown (an older, slower one is dropped)
 
@@ -114,6 +116,7 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
       headerActions={<ModuleLinks current={moduleId} available={available} onNavigate={onNavigate}>
         <button type="button" className="module-links-action is-primary" onClick={() => { setNotice(''); setCreating(true); }}>＋ Nouvelle quittance</button>
         <button type="button" className="module-links-action" onClick={() => setNotice(user?.isAdmin ? 'Modifier : cliquez sur la quittance à modifier dans la liste.' : 'Modifier : seule la commission d’une quittance peut être corrigée, cliquez sur la quittance dans la liste.')}>Modifier</button>
+        <button type="button" className="module-links-action" onClick={() => setSigning(true)}>Ma signature</button>
       </ModuleLinks>}
       columns={COLUMNS}
       {...state}
@@ -140,6 +143,7 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
         <button type="button" onClick={() => printQuittance(accessToken, record).catch((printError) => setNotice(printError.message))} aria-label={`Imprimer la quittance ${record.num_quittance} en PDF`}>Imprimer PDF</button>
       </>}
     />
+    {signing && <SignatureDialog onClose={() => setSigning(false)} />}
     {creating && <NewQuittanceDialog moduleId={moduleId} onClose={() => setCreating(false)}
       onSaved={(number, client) => {
         setCreating(false);

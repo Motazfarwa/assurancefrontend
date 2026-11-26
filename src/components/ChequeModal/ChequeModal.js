@@ -239,10 +239,13 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
     await run('delete', 'Pièce supprimée.');
   }
 
-  async function openList() {
+  // The client's pièces en instance; `all`: those of every client.
+  const [listAll, setListAll] = useState(false);
+  async function openList(all = false) {
     setError('');
     try {
-      setList(await listPieces(accessToken, { code_client: client?.code_client || '', instance: true }));
+      setList(await listPieces(accessToken, { code_client: all ? '' : client?.code_client || '', instance: true }));
+      setListAll(all || !client);
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -398,7 +401,7 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
           <button type="button" className="chq-tool" disabled={busy || editing} onClick={() => run('create', 'Pièce ajoutée.')}>Ajouter</button>
           <button type="button" className="chq-tool" disabled={busy || !editing} onClick={() => run('update', 'Pièce modifiée.')}>Modifier</button>
           <button type="button" className="chq-tool" disabled={busy || !editing} onClick={removePiece}>Supprimer</button>
-          <button type="button" className="chq-tool" disabled={busy} onClick={openList}>Lister</button>
+          <button type="button" className="chq-tool" disabled={busy} onClick={() => openList()}>Lister</button>
           <span className="chq-spacer" />
           <input ref={importInput} type="file" accept=".jpg,.jpeg,.png,.pdf,image/*,application/pdf" multiple hidden onChange={chooseImport} />
           <button type="button" className="chq-import" disabled={busy} onClick={() => importInput.current?.click()} title="Scanner un ou plusieurs chèques (images ou PDF) : ils remplissent le formulaire un par un">{batch ? 'Ajouter des chèques' : 'Importer'}</button>
@@ -547,7 +550,7 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
       {list && (
         <div className="chq-nested" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setList(null); }}>
           <section className="chq-list" role="dialog" aria-modal="true" aria-label="Pièces en instance">
-            <header><h3>Pièces en instance{client ? ` — client ${client.code_client}` : ''}</h3><button type="button" onClick={() => setList(null)} aria-label="Fermer">×</button></header>
+            <header><h3>Pièces en instance{client && !listAll ? ` — client ${client.code_client}` : ' — tous les clients'}</h3><button type="button" onClick={() => setList(null)} aria-label="Fermer">×</button></header>
             <div className="chq-table-wrap">
               <table className="chq-table">
                 <thead><tr><th>N° pièce</th><th>Client</th><th>Type</th><th>Banque</th><th>Échéance</th><th>Saisie</th><th>Montant</th><th>À verser</th></tr></thead>
@@ -561,7 +564,7 @@ export default function ChequeModal({ onClose, initialClientCode = '' }) {
                 </tbody>
               </table>
             </div>
-            <footer><span>{list.length} pièce(s) — cliquez une ligne pour l'ouvrir</span><button type="button" className="chq-tool" onClick={() => setList(null)}>Fermer</button></footer>
+            <footer><span>{list.length} pièce(s) — cliquez une ligne pour l'ouvrir{client && !listAll && <> · <button type="button" className="chq-link" onClick={() => openList(true)}>Voir les pièces en instance de tous les clients</button></>}{client && listAll && <> · <button type="button" className="chq-link" onClick={() => openList(false)}>Seulement le client {client.code_client}</button></>}</span><button type="button" className="chq-tool" onClick={() => setList(null)}>Fermer</button></footer>
           </section>
         </div>
       )}

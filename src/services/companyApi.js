@@ -22,7 +22,8 @@ async function request(path, accessToken, options = {}) {
 
 // Companies no longer offered in the company lists (policy entry, bordereaux), by name.
 const EXCLUDED_COMPANIES = new Set(['BIAT']);
-export const isOfferedCompany = (company) => !EXCLUDED_COMPANIES.has(String(company?.nom_compagnie || '').trim().toUpperCase());
+// An archived company (Gestion compagnies · Archiver) is no longer offered either.
+export const isOfferedCompany = (company) => !company?.archive && !EXCLUDED_COMPANIES.has(String(company?.nom_compagnie || '').trim().toUpperCase());
 // Companies whose bordereaux are not handled by the agency (fusion, réception comptant), by name, spaces and case ignored.
 const NO_BORDEREAU_COMPANIES = new Set(['STAR', 'MAE', 'SALIM', 'EL AMANA TAKAFUL', 'EUROP ASSISTANCE', 'EUROPE ASSISTANCE']);
 const withoutStatement = (company) => !NO_BORDEREAU_COMPANIES.has(String(company?.nom_compagnie || '').trim().replace(/\s+/g, ' ').toUpperCase());
@@ -41,6 +42,10 @@ export function createCompany(token, values) {
 }
 export function updateCompany(token, code, values) {
   return request(`/api/compagnies/${encodeURIComponent(code)}`, token, { method: 'PUT', body: JSON.stringify(values) });
+}
+// A company is not deleted: archived (archive true) or taken back (false).
+export function archiveCompany(token, code, archive) {
+  return request(`/api/compagnies/${encodeURIComponent(code)}/archive`, token, { method: 'PUT', body: JSON.stringify({ archive }) });
 }
 export function deleteCompany(token, code) {
   return request(`/api/compagnies/${encodeURIComponent(code)}`, token, { method: 'DELETE' });

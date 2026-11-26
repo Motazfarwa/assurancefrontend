@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { createCompany, deleteCompany, listCompanies, updateCompany } from '../../services/companyApi';
+import { archiveCompany, createCompany, listCompanies, updateCompany } from '../../services/companyApi';
 import '../ExpertManagementModal/ExpertManagementModal.css';
 import './CompanyManagementModal.css';
 
 // Fields of the "Gestion des compagnies" screen ([name, label, type, columns out of 12]), two rows per section so the
 // whole sheet shows without scrolling: the company row starts after its code (2) and libellé (4).
 const COMPANY_FIELDS = [
-  ['Nbr_Chiffre_Code', 'Longueur branche', 'number', 2], ['contre_ass_spe', 'Prime CAS', 'number', 2], ['Capital_CAS', 'Capital CAS', 'number', 2],
+  ['Nbr_Chiffre_Code', 'Longueur code branche', 'number', 2], ['contre_ass_spe', 'Prime CAS', 'number', 2], ['Capital_CAS', 'Capital CAS', 'number', 2],
   ['Assistance_Voyage', 'Assistance voyage', 'number', 2], ['Taux_Majoration', 'Taux majoration', 'number', 2],
   ['Adresse_Compagnie', 'Adresse compagnie', 'text', 3], ['Ville_Compagnie', 'Ville compagnie', 'text', 2],
   ['Num_Quittance_Auto', 'N° quittance automatique', 'check', 3],
@@ -115,14 +115,18 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
     finally { setSaving(false); }
   }
 
-  async function remove() {
-    if (!company || !window.confirm(`Supprimer la compagnie ${company.nom_compagnie || selectedCode} ?`)) return;
+  // A company is never deleted (its polices and quittances keep it): it is archived, no longer offered in the lists.
+  async function toggleArchive() {
+    if (!company) return;
+    const archive = !company.archive;
+    const name = company.nom_compagnie || selectedCode;
+    if (!window.confirm(archive ? `Archiver la compagnie ${name} ? Elle ne sera plus proposée dans les listes ; son historique est conservé.` : `Désarchiver la compagnie ${name} ?`)) return;
     setSaving(true); setError(''); setNotice('');
     try {
-      await deleteCompany(accessToken, selectedCode);
-      await loadCompanies('');
-      setNotice('Compagnie supprimée.');
-    } catch (deleteError) { setError(deleteError.message); }
+      await archiveCompany(accessToken, selectedCode, archive);
+      await loadCompanies(selectedCode);
+      setNotice(archive ? 'Compagnie archivée.' : 'Compagnie désarchivée.');
+    } catch (archiveError) { setError(archiveError.message); }
     finally { setSaving(false); }
   }
 
@@ -133,7 +137,7 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
         <div className="catalog-toolbar cmp-toolbar">
           {creating ? <button type="submit" className="expert-submit" disabled={saving || !codeText}>{saving ? 'Enregistrement…' : 'Ajouter la compagnie'}</button>
             : editing ? <><button type="submit" className="expert-submit" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button><button type="button" className="expert-cancel" onClick={cancelEdit} disabled={saving}>Annuler</button></>
-              : <><button type="button" className="expert-submit" onClick={() => { setEditing(true); setNotice(''); }} disabled={saving || !company}>Modifier</button><button type="button" className="catalog-delete" onClick={remove} disabled={saving || !company}>Supprimer</button></>}
+              : <><button type="button" className="expert-submit" onClick={() => { setEditing(true); setNotice(''); }} disabled={saving || !company}>Modifier</button><button type="button" className="expert-cancel" onClick={toggleArchive} disabled={saving || !company}>{company?.archive ? 'Désarchiver' : 'Archiver'}</button></>}
           <button type="button" className="expert-cancel cmp-list-button" onClick={() => setListing(true)} disabled={saving || (editing && !creating)}>Lister</button>
           <span className="catalog-count">{companies.length} compagnie{companies.length > 1 ? 's' : ''}</span>
         </div>
@@ -169,10 +173,10 @@ export default function CompanyManagementModal({ moduleId = '730', onClose }) {
         <header><h3 id="cmp-list-title">Liste des compagnies</h3><button className="expert-close" onClick={() => setListing(false)} type="button" aria-label="Fermer">×</button></header>
         <div className="cmp-list-wrap">
           {companies.length === 0 ? <p className="catalog-empty">Aucune compagnie.</p> : <table>
-            <thead><tr><th>Code</th><th>Libellé</th><th>Longueur branche</th><th>Adresse</th><th>Ville</th><th>Code agent</th></tr></thead>
+            <thead><tr><th>Code</th><th>Libellé</th><th>Longueur code branche</th><th>Adresse</th><th>Ville</th><th>Code agent</th></tr></thead>
             <tbody>{[...companies].sort((a, b) => Number(a.code_compagnie) - Number(b.code_compagnie)).map((item) => (
               <tr key={item.code_compagnie} className={String(item.code_compagnie) === selectedCode ? 'is-current' : ''} onClick={() => { show(item); setListing(false); }} title="Ouvrir cette compagnie">
-                <td>{item.code_compagnie}</td><td><b>{item.nom_compagnie}</b></td><td>{item.Nbr_Chiffre_Code ?? ''}</td><td>{item.Adresse_Compagnie || ''}</td><td>{item.Ville_Compagnie || ''}</td><td>{item.Code_Agent || ''}</td>
+                <td>{item.code_compagnie}</td><td><b>{item.nom_compagnie}</b>{item.archive && <small className="cmp-archived"> · archivée</small>}</td><td>{item.Nbr_Chiffre_Code ?? ''}</td><td>{item.Adresse_Compagnie || ''}</td><td>{item.Ville_Compagnie || ''}</td><td>{item.Code_Agent || ''}</td>
               </tr>
             ))}</tbody>
           </table>}
