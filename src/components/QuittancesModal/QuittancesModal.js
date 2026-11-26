@@ -137,7 +137,7 @@ export default function QuittancesModal({ moduleId, onClose, onNavigate, availab
       actions={(record) => <>
         {canEdit(record) && <button type="button" onClick={() => setEditing(record)}>{user?.isAdmin ? 'Modifier' : 'Modifier la commission'}</button>}
         {/* the quittance printed, or saved as PDF from the print window */}
-        <button type="button" onClick={() => { try { printQuittance(record); } catch (printError) { setNotice(printError.message); } }} aria-label={`Imprimer la quittance ${record.num_quittance} en PDF`}>Imprimer PDF</button>
+        <button type="button" onClick={() => printQuittance(accessToken, record).catch((printError) => setNotice(printError.message))} aria-label={`Imprimer la quittance ${record.num_quittance} en PDF`}>Imprimer PDF</button>
       </>}
     />
     {creating && <NewQuittanceDialog moduleId={moduleId} onClose={() => setCreating(false)}
