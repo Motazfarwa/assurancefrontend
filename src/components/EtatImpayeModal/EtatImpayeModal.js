@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { downloadMemoirePdf, fetchMemoirePdf, getClientLinks, getMemoireContacts, getRecoveryRate, getUnpaidStatement, listStatementCompanies, saveFile, sendMemoire } from '../../services/unpaidApi';
 import { getClientReglements } from '../../services/reglementClientApi';
@@ -412,9 +412,21 @@ function EtatImpayePreview({ items: allItems, limit, detail, sans, groups, dossi
   const [sending, setSending] = useState(null); // 'email' | 'whatsapp'
   const single = (dossier || detail) && clients.length === 1 ? clients[0] : null;
   const heading = dossier || detail ? 'Mémoire de règlement' : 'Etat des impayées';
+  // The column titles stay visible while scrolling, just under the bar (its height changes when it wraps).
+  const previewRef = useRef(null);
+  const barRef = useRef(null);
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar || typeof ResizeObserver === 'undefined') return undefined;
+    const apply = () => previewRef.current?.style.setProperty('--eti-bar', `${bar.offsetHeight}px`);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
 
-  return <div className="eti-preview" role="dialog" aria-modal="true" aria-label={heading}>
-    <header className="eti-preview-bar">
+  return <div className="eti-preview" ref={previewRef} role="dialog" aria-modal="true" aria-label={heading}>
+    <header className="eti-preview-bar" ref={barRef}>
       <button type="button" className="expert-cancel" onClick={onBack}>← Retour aux critères</button>
       <div className="eti-preview-title"><strong>{heading}</strong>
         <span>{groups ? `Mise en demeure · auto particuliers : ${groups[0].rows.length} (${money.format(total(groups[0].rows))} TND) · autres : ${groups[1].rows.length} (${money.format(total(groups[1].rows))} TND) · ` : ''}{sans ? 'Sans pièce' : 'Avec pièce'} · {items.length} quittance{items.length > 1 ? 's' : ''} · {clients.length} client{clients.length > 1 ? 's' : ''}{detail || dossier ? ` · ${pages} page${pages > 1 ? 's' : ''}` : ''} · total {money.format(grandTotal)} TND</span></div>

@@ -1,7 +1,6 @@
 import { AGENCY_PYRAMID } from '../../data/agencyInfo';
-import { writeNamedWindow } from '../NewWindow/NewWindow';
 
-// One quittance, printed (or saved as PDF from the print window: « Enregistrer au format PDF »): the agency, the
+// One quittance, printed from the page (or saved as PDF from the print window: « Enregistrer au format PDF »): the agency, the
 // client, the police and the amounts the client pays. The commission (the agency's) is not printed.
 const esc = (value) => String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 const date = (value) => (value ? String(value).slice(0, 10).split('-').reverse().join('/') : '');
@@ -59,7 +58,6 @@ export function quittanceHtml(record) {
   @media print { body { padding: 0; } .tools { display: none; } }
   @media (max-width: 560px) { body { padding: 12px; } header { flex-direction: column; } .printed { text-align: left; } }
 </style></head><body>
-<div class="tools"><button type="button" onclick="window.print()">Imprimer / PDF</button></div>
 <div class="sheet">
   <header>
     <div class="agency">${AGENCY_PYRAMID.map((line) => `<span>${esc(line)}</span>`).join('')}</div>
@@ -80,9 +78,26 @@ export function quittanceHtml(record) {
 </body></html>`;
 }
 
-// Opens the quittance in a tab of its own and the print window (« Enregistrer au format PDF » saves it as a PDF).
+// Prints the quittance from the page itself: written in a hidden frame, then only the print window of the browser opens
+// (« Enregistrer au format PDF » saves it as a PDF); the user stays in Gestion des quittances.
 export function printQuittance(record) {
-  const popup = writeNamedWindow(`Quittance ${String(record.num_quittance || '').trim()}`, quittanceHtml(record), { print: true });
-  if (!popup) throw new Error('Autorisez les fenêtres pop-up de ce site pour imprimer la quittance.');
-  return popup;
+  const doc = document;
+  doc.getElementById('quittance-print-frame')?.remove();
+  const frame = doc.createElement('iframe');
+  frame.id = 'quittance-print-frame';
+  frame.title = `Quittance ${String(record.num_quittance || '').trim()}`;
+  frame.setAttribute('aria-hidden', 'true');
+  Object.assign(frame.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0', visibility: 'hidden' });
+  doc.body.appendChild(frame);
+  const win = frame.contentWindow;
+  win.document.open();
+  win.document.write(quittanceHtml(record));
+  win.document.close();
+  const remove = () => setTimeout(() => frame.remove(), 500);
+  win.addEventListener('afterprint', remove, { once: true });
+  // printed once its content is laid out
+  setTimeout(() => {
+    try { win.focus(); win.print(); } catch { frame.remove(); }
+  }, 250);
+  return frame;
 }
