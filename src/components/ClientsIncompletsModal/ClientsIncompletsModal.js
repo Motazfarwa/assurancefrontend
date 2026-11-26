@@ -18,6 +18,9 @@ export const CATEGORIES = [
 ];
 // The coordonnée missing, to show only the clients without it.
 export const MANQUES = [['adresse', 'Sans adresse'], ['ville', 'Sans ville'], ['code postal', 'Sans code postal'], ['téléphone', 'Sans téléphone']];
+// Every client without an email (not one of the coordonnées required: listed apart).
+export const SANS_EMAIL = ['email', 'Sans email'];
+const manqueLabel = (key) => [...MANQUES, SANS_EMAIL].find(([code]) => code === key)?.[1] || key;
 // The filter list: every client, one kind, or one missing coordonnée ("coordonnees:ville").
 const filterValue = (categorie, manque) => (manque ? `coordonnees:${manque}` : categorie);
 
@@ -113,6 +116,7 @@ export default function ClientsIncompletsModal({ moduleId, onClose, initial = {}
               <option value="sans_quittance">Sans quittance{data?.sans_quittance !== undefined ? ` (${data.sans_quittance})` : ''}</option>
               <option value="coordonnees">Coordonnées manquantes{data ? ` (${data.coordonnees})` : ''}</option>
               {MANQUES.map(([key, label]) => <option key={key} value={`coordonnees:${key}`}>{'  '}{label}{data?.manques ? ` (${data.manques[key]})` : ''}</option>)}
+              <option value={`coordonnees:${SANS_EMAIL[0]}`}>{SANS_EMAIL[1]}{data?.manques?.email !== undefined ? ` (${data.manques.email})` : ''}</option>
             </select></label>
           <span className="cim-dates">
             <label className="cim-between"><input type="checkbox" checked={between} onChange={(event) => setBetween(event.target.checked)} /> Créés entre deux dates</label>
@@ -120,7 +124,7 @@ export default function ClientsIncompletsModal({ moduleId, onClose, initial = {}
             <input type="date" aria-label="Date de création au" value={fin} onChange={(event) => setFin(event.target.value)} disabled={!between} />
           </span>
           <label className="acompte-field cim-search"><span>Rechercher un client</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Code ou nom du client" autoFocus /></label>
-          <p className="cim-count" role="status">{state.loading ? 'Chargement…' : `${found} client${found > 1 ? 's' : ''}${period.date_debut ? ` créé${found > 1 ? 's' : ''} du ${period.date_debut.split('-').reverse().join('/')} au ${period.date_fin.split('-').reverse().join('/')}` : ''}${manque ? ` · ${MANQUES.find(([key]) => key === manque)[1].toLowerCase()}` : categorie ? ` · ${CATEGORIES.find(([key]) => key === categorie)[1].toLowerCase()}` : ''}${pages > 1 ? ` · ${first} à ${last}` : ''}`}</p>
+          <p className="cim-count" role="status">{state.loading ? 'Chargement…' : `${found} client${found > 1 ? 's' : ''}${period.date_debut ? ` créé${found > 1 ? 's' : ''} du ${period.date_debut.split('-').reverse().join('/')} au ${period.date_fin.split('-').reverse().join('/')}` : ''}${manque ? ` · ${manqueLabel(manque).toLowerCase()}` : categorie ? ` · ${CATEGORIES.find(([key]) => key === categorie)[1].toLowerCase()}` : ''}${pages > 1 ? ` · ${first} à ${last}` : ''}`}</p>
         </div>
         {reversed && <div className="expert-error unpaid-error" role="alert">La date de début doit précéder la date de fin.</div>}
         {state.error && <div className="expert-error unpaid-error" role="alert">{state.error}</div>}
